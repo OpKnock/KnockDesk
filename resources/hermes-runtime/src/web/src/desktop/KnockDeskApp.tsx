@@ -289,7 +289,9 @@ function KnockDeskApp() {
     setMemoryBusy(true);
     try {
       const result = await getApi()?.requestMemory(instruction);
-      if (result?.ok === false) throw new Error(result.error || "Memory update was rejected.");
+      if (!result || result.ok !== true) {
+        throw new Error(result?.error || "The secure desktop bridge did not confirm a memory update.");
+      }
       setMemoryInstruction("");
       setToast({ type: "ok", message: "Memory request sent to Hermes." });
       await refreshMemory();

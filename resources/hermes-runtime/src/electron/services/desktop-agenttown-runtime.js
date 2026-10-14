@@ -128,6 +128,10 @@ class DesktopAgentTownRuntime {
   async _startBackground() {
     // Adopt only a healthy HTTP server; never terminate a process we didn't spawn.
     const adopted = await probe(this.baseUrl).catch(() => null);
+    if (this.stopping) {
+      this.startPromise = null;
+      return;
+    }
     if (adopted) {
       this.external = true;
       this._setState('ready');
@@ -145,12 +149,25 @@ class DesktopAgentTownRuntime {
     // port rather than repeatedly spawning a server that can never listen.
     let freePort = null;
     for (let offset = 0; offset < 32; offset += 1) {
+      if (this.stopping) {
+        this.startPromise = null;
+        return;
+      }
       const candidate = this.port + offset;
       if (candidate > 65535) break;
-      if (await isPortAvailable(candidate)) {
+      const available = await isPortAvailable(candidate);
+      if (this.stopping) {
+        this.startPromise = null;
+        return;
+      }
+      if (available) {
         freePort = candidate;
         break;
       }
+    }
+    if (this.stopping) {
+      this.startPromise = null;
+      return;
     }
     if (freePort === null) {
       this._setState('error', 'No free loopback port was found for AgentTown.');
@@ -210,6 +227,10 @@ class DesktopAgentTownRuntime {
     while (!this.stopping && Date.now() < deadline) {
       if (launchError || (this.child && this.child.exitCode !== null)) break;
       const ready = await probe(this.baseUrl).catch(() => null);
+      if (this.stopping) {
+        this.startPromise = null;
+        return;
+      }
       if (ready) {
         this.external = false;
         this._setState('ready');
