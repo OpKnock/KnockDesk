@@ -128,9 +128,13 @@ The Electron renderer uses context isolation and a narrow preload bridge. Keep r
 
 Run the repository checks with `npm run check:privacy` and `npm run check:secrets`. They scan selected first-party text files and cannot prove that binaries, generated artifacts, historical commits, or upstream components contain no personal information.
 
+## Contributing and security
+
+Development workflow and validation requirements are in [CONTRIBUTING.md](CONTRIBUTING.md). For responsible vulnerability reporting, see [SECURITY.md](SECURITY.md). Do not publish credentials, private logs, user data, or an unpatched security report in a public issue.
+
 ## License and third-party components
 
-KnockDesk first-party code is licensed under the Apache License 2.0; see [LICENSE](LICENSE). Third-party code and assets retain their own licenses and notices. Review [NOTICE.md](NOTICE.md), the included license texts, and the release-specific dependency inventory before redistributing binaries.
+The root [LICENSE](LICENSE) applies to KnockDesk-authored code that is identified as first-party. It does **not** replace licenses or attribution notices for bundled upstream projects, dependencies, fonts, audio, images, models, native modules, or other assets. Third-party components retain their own terms. Review [NOTICE.md](NOTICE.md), the license texts shipped with each component, and the release-specific dependency inventory before redistributing binaries.
 
 ## Release readiness
 

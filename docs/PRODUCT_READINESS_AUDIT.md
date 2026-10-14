@@ -47,6 +47,7 @@ Git commit author/committer metadata is separate from repository files. This pas
 ## Release checklist
 
 - [ ] Latest GitHub Actions run is green, including the Windows renderer smoke test and packaged artifact integrity.
+- [ ] Configure protection for `main` with required CI checks, no force-pushes, and no branch deletion where the repository plan supports it. An unprotected branch is a governance gap, not itself a GitHub Terms of Service violation.
 - [ ] Start the app on a clean Windows machine using the intended Hermes CLI/virtual environment.
 - [ ] Verify runtime status, chat/session pages, memory read/update and shutdown/restart behavior.
 - [ ] Start AgentTown, validate the served Next.js page and confirm closing KnockDesk stops only app-owned child processes.
@@ -56,6 +57,7 @@ Git commit author/committer metadata is separate from repository files. This pas
 - [ ] Reconcile bundled versions, generate a release SBOM, and review GSAP licensing, FFmpeg build licensing, helper provenance and required notices.
 - [ ] Test clean install, upgrade, uninstall and user-data retention.
 - [ ] Review source, binary metadata, Git commit identity and external integrations before changing repository visibility.
+- [ ] Keep example credentials in `.env.example` unmistakably fake and run the secret scanner against it.
 
 ## Current limitations
 
