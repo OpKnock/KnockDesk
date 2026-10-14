@@ -5,7 +5,7 @@
  * their feature parity with these sources has not yet been established.
  */
 import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -17,6 +17,23 @@ const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 function run(...args) {
   console.log('>', npm, args.join(' '));
   execFileSync(npm, args, { cwd: electronDir, stdio: 'inherit' });
+}
+
+function copyRuntimeJs(sourceDir, targetDir) {
+  if (!existsSync(sourceDir)) return;
+  for (const item of readdirSync(sourceDir, { withFileTypes: true })) {
+    const source = join(sourceDir, item.name);
+    const target = join(targetDir, item.name);
+    if (item.isDirectory()) {
+      copyRuntimeJs(source, target);
+    } else if (item.isFile() && item.name.endsWith('.js')) {
+      // TypeScript compiled .ts siblings take precedence.
+      if (!existsSync(target)) {
+        mkdirSync(dirname(target), { recursive: true });
+        cpSync(source, target);
+      }
+    }
+  }
 }
 
 function main() {
@@ -35,12 +52,27 @@ function main() {
     throw new Error('Compilation did not produce dist/main.js');
   }
 
-  // Compiled JS is staged with its relative imports intact.
+  // Never mix stale staged files into a fresh build.
+  rmSync(stagedDir, { recursive: true, force: true });
+  const stagedDist = join(stagedDir, 'dist');
   mkdirSync(stagedDir, { recursive: true });
-  cpSync(dist, join(stagedDir, 'dist'), { recursive: true, force: true });
+  cpSync(dist, stagedDist, { recursive: true });
+  // TypeScript emits its own files, but allowJs does not ensure every
+  // hand-written CommonJS dependency is present. Copy missing JS siblings.
+  for (const folder of ['main', 'services', 'pwa']) {
+    copyRuntimeJs(join(electronDir, folder), join(stagedDist, folder));
+  }
   for (const name of ['preload.js', 'agenttown-preload.js', 'hermes-preload.js']) {
     const source = join(electronDir, name);
-    if (existsSync(source)) cpSync(source, join(stagedDir, name));
+    if (!existsSync(source)) throw new Error('Missing Electron preload: ' + name);
+    cpSync(source, join(stagedDist, name));
+  }
+  for (const required of ['main.js', 'preload.js', 'main/ipc/index.js',
+    'main/ipc/system-handlers.js', 'main/shared/paths.js',
+    'services/hermes-manager.js']) {
+    if (!existsSync(join(stagedDist, required))) {
+      throw new Error('Incomplete staged Electron output: ' + required);
+    }
   }
 
   console.log('Staged:', resolve(stagedDir));
