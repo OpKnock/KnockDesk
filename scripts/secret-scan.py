@@ -3,6 +3,7 @@
 The scanner reports only a redacted match, never the full source line. It skips
 vendored runtimes, generated bundles, lockfiles, binary payloads and examples.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -12,13 +13,29 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SKIP_DIRS = {
-    ".git", ".next", "node_modules", "site-packages", "venv", ".venv",
-    "__pycache__", "dist", "build", "staging", "hermes-runtime/python",
-    "python-embedded", "app.asar.unpacked", "agent-town-dist",
+    ".git",
+    ".next",
+    "node_modules",
+    "site-packages",
+    "venv",
+    ".venv",
+    "__pycache__",
+    "dist",
+    "build",
+    "staging",
+    "hermes-runtime/python",
+    "python-embedded",
+    "app.asar.unpacked",
+    "agent-town-dist",
 }
 SKIP_NAMES = {
-    ".env.example", "package-lock.json", "pnpm-lock.yaml", "yarn.lock",
-    "uv.lock", "poetry.lock", "LICENSES.chromium.html",
+    ".env.example",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "uv.lock",
+    "poetry.lock",
+    "LICENSES.chromium.html",
 }
 MAX_FILE_BYTES = 2 * 1024 * 1024
 PATTERNS = {
@@ -49,9 +66,24 @@ DEFAULT_PATHS = (
 
 def scan_file(path: Path) -> list[tuple[int, str, str]]:
     if path.name in SKIP_NAMES or path.suffix.lower() in {
-        ".png", ".jpg", ".jpeg", ".gif", ".ico", ".exe", ".dll",
-        ".node", ".bin", ".dat", ".asar", ".jsc", ".wasm", ".onnx",
-        ".traineddata", ".zip", ".7z", ".pdf",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".ico",
+        ".exe",
+        ".dll",
+        ".node",
+        ".bin",
+        ".dat",
+        ".asar",
+        ".jsc",
+        ".wasm",
+        ".onnx",
+        ".traineddata",
+        ".zip",
+        ".7z",
+        ".pdf",
     }:
         return []
     try:
@@ -88,9 +120,17 @@ def iter_files(target: Path):
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("paths", nargs="*", help="paths relative to repo root (default: first-party source set)")
+    parser.add_argument(
+        "paths",
+        nargs="*",
+        help="paths relative to repo root (default: first-party source set)",
+    )
     args = parser.parse_args()
-    targets = [ROOT / value for value in args.paths] if args.paths else [ROOT / value for value in DEFAULT_PATHS]
+    targets = (
+        [ROOT / value for value in args.paths]
+        if args.paths
+        else [ROOT / value for value in DEFAULT_PATHS]
+    )
     hits = 0
     seen: set[Path] = set()
     for target in targets:
