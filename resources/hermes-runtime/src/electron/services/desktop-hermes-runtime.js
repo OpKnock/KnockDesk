@@ -20,6 +20,36 @@ const STARTUP_TIMEOUT_MS = 4 * 60 * 1000;
 const POLL_INTERVAL_MS = 1500;
 const MAX_RESPONSE_BYTES = 1024 * 1024;
 
+function stopOwnedChild(child, timeoutMs = 2500) {
+  if (!child || child.exitCode !== null) return Promise.resolve();
+  return new Promise((resolve) => {
+    let settled = false;
+    let timer;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      child.removeListener('exit', finish);
+      resolve();
+    };
+    child.once('exit', finish);
+    timer = setTimeout(() => {
+      try {
+        if (child.exitCode === null) child.kill();
+      } catch {
+        // The OS may already have removed the process.
+      }
+      finish();
+    }, timeoutMs);
+    try {
+      const sent = child.kill();
+      if (!sent && child.exitCode !== null) finish();
+    } catch {
+      finish();
+    }
+  });
+}
+
 function request(url, timeoutMs = 1800) {
   return new Promise((resolve, reject) => {
     const req = http.get(url, { timeout: timeoutMs, headers: { accept: 'application/json' } }, (res) => {
@@ -66,6 +96,7 @@ class DesktopHermesRuntime {
     this.stopping = false;
     this.startPromise = null;
     this.healthTimer = null;
+    this.memoryChildren = new Set();
   }
 
   getHermesHome() {
@@ -231,6 +262,7 @@ class DesktopHermesRuntime {
   }
 
   memoryRequest(instruction) {
+    if (this.stopping) return Promise.resolve({ ok: false, error: 'KnockDesk is shutting down.' });
     const clean = String(instruction || '').trim().slice(0, 1500);
     if (!clean) return Promise.resolve({ ok: false, error: 'Enter a memory instruction first.' });
     if (this.state !== 'ready') {
@@ -263,6 +295,7 @@ class DesktopHermesRuntime {
           cwd: os.homedir(),
           env: hermesSpawnEnv(),
         });
+        this.memoryChildren.add(child);
       } catch (error) {
         finish({ ok: false, error: 'Could not launch Hermes: ' + error.message });
         return;
@@ -286,13 +319,19 @@ class DesktopHermesRuntime {
     this.stopping = true;
     if (this.healthTimer) clearInterval(this.healthTimer);
     this.healthTimer = null;
-    // An adopted runtime belongs to the user and must not be killed by KnockDesk.
-    if (this.child && !this.external && this.child.exitCode === null) {
-      try {
-        this.child.kill();
-      } catch { /* already stopped */ }
-    }
+
+    // Do not kill a service merely adopted from the user's existing session.
+    const serverChild = this.child && !this.external ? this.child : null;
+    const memoryChildren = [...this.memoryChildren];
+    const pendingStart = this.startPromise;
+    await Promise.allSettled([
+      stopOwnedChild(serverChild),
+      ...memoryChildren.map((child) => stopOwnedChild(child)),
+      pendingStart,
+    ].filter(Boolean));
+
     this.child = null;
+    this.memoryChildren.clear();
     this._setState('stopped');
   }
 }
