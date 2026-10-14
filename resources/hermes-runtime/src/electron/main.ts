@@ -25,7 +25,6 @@ import {
 import { HermesManager } from './services/hermes-manager.js';
 import { AgentTownManager } from './services/agenttown-manager.js';
 import { registerDesktopHandlers } from './services/desktop-manager.js';
-import { preloadPath } from './main/shared/paths.js';
 
 let mainWindow: BrowserWindow | null = null;
 let hermesManager: InstanceType<typeof HermesManager> | null = null;
@@ -64,7 +63,7 @@ async function createWindow(): Promise<BrowserWindow> {
       height: 36,
     },
     webPreferences: {
-      preload: preloadPath,
+      preload: path.join(__dirname, 'desktop-preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
