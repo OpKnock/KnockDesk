@@ -14,7 +14,7 @@ KnockDesk has a maintained source-owned Electron/React desktop shell and a separ
 | Packaged archive | ASAR listing, brand invariant, real LFS payload checks | Every packaged UI screen and integration is not exhaustively tested |
 | Git LFS | Pointer and binary-attribute checks | LFS availability on another machine/account |
 | Python and secrets | Python syntax, Ruff and first-party secret scan | Secrets hidden in binaries, Git history or unscanned generated/upstream bundles |
-| Privacy | Scanner searches selected first-party docs/scripts/desktop source for emails and absolute home paths | Binary metadata, all upstream files, remote services, and Git commit metadata |
+| Privacy | Scanner and regression tests cover email addresses plus Windows/Unix home paths in selected first-party text files | Binary metadata, historical commit metadata, upstream source and generated/vendor payloads require separate review |
 | Dependencies and licenses | Configured npm/Python audits and bundled notices | License compatibility of all transitive dependencies and binary provenance |
 
 ## Feature status
@@ -40,7 +40,7 @@ KnockDesk has a maintained source-owned Electron/React desktop shell and a separ
 
 ## Personal-data review
 
-The source scan checks selected first-party text files for likely email addresses and machine-home paths. A separate repository source search for the explicit user name/email/path terms did not return indexed source matches during this review. This is not a guarantee about binaries, upstream code, generated payloads or commit metadata.
+The privacy scanner now checks both slash styles for Windows user paths and has regression coverage for that case. The bulk unpack helper derives the repository root from its own file location rather than a machine-specific absolute path. Scans still cover selected first-party text files only; this is not a guarantee about binaries, embedded metadata, upstream code, generated payloads or Git commit metadata.
 
 Git commit author/committer metadata is separate from repository files. This pass does not rewrite Git history. Removing identities from historical commits would require a force-pushed history rewrite, changing commit SHAs and potentially disrupting clones, releases and references. Keep upstream legal attribution and copyright notices; do not remove third-party author credits as a substitute for a personal-data review.
 

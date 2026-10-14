@@ -242,3 +242,19 @@ test('Windows source smoke test waits for the built desktop.html renderer', () =
   assert.ok(smoke.includes('"renderer/desktop.html" in candidate.url'));
   assert.equal(smoke.includes('"renderer/index.html" in candidate.url'), false);
 });
+
+
+test('Windows smoke test scopes repeated navigation labels to its landmark', () => {
+  const smoke = readFileSync(resolve(root, 'scripts/source_desktop_smoke_test.py'), 'utf8');
+  assert.ok(smoke.includes('page.get_by_role("navigation", name="Main navigation")'));
+  assert.ok(smoke.includes('navigation.get_by_role("button", name="System health").click()'));
+  assert.equal(smoke.includes('page.get_by_role("button", name="System health").click()'), false);
+});
+
+test('source runtime accepts KnockDesk environment names and retains legacy aliases', () => {
+  const hermes = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/services/hermes-runtime.js'), 'utf8');
+  const agentTown = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/services/desktop-agenttown-runtime.js'), 'utf8');
+  assert.ok(hermes.includes('process.env.KNOCKDESK_HERMES_EXE || process.env.STONIC_HERMES_EXE'));
+  assert.ok(agentTown.includes('process.env.KNOCKDESK_AGENTTOWN_DIR'));
+  assert.ok(agentTown.includes('process.env.STONIC_AGENTTOWN_DIR'));
+});

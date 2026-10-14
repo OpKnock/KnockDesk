@@ -1,27 +1,52 @@
-# Validation and Maintenance Scripts
+# Maintenance and Validation Tools
 
-This directory contains the repository's source checks, archive tools, and Windows runtime smoke-test helpers.
+Run these commands from the repository root. On Windows, use PowerShell with Node.js 22+, npm, Python 3.11, and Git LFS installed.
 
-| Script | Purpose |
-|---|---|
-| scripts/build-pipeline.test.mjs | Fast source/build contract regression tests |
-| scripts/unpack-app-asar.mjs | Safely list, extract and repack an ASAR without overwriting the original |
-| scripts/privacy-scan.py | Detect common email-address and machine-specific home-path leaks in first-party files |
-| scripts/source_desktop_smoke_test.py | Launch Electron and exercise the source-owned desktop renderer on Windows |
-| scripts/smoke_test.py | Smoke-test the existing packaged executable (requires a real LFS payload) |
-| scripts/health_check.py | Diagnose an already-running packaged app through Chromium DevTools |
-| scripts/uninstall_verify.py | Verify uninstall behavior and user-data retention |
-| scripts/inventory.py / scripts/regen-logo-assets.py | Repository inventory and brand asset maintenance |
+## Quick validation
 
-## Quick checks
-
-From the repository root:
-
-~~~powershell
+```powershell
 npm test
-python scripts/privacy-scan.py
-~~~
+npm run check:knockdesk
+npm run check:privacy
+npm run check:secrets
+npm run test:maintenance
+```
 
-For the source-owned shell, use npm run dev or npm run check:knockdesk. GitHub Actions runs additional workspace and Windows checks; a passing source-renderer smoke test is not proof that every provider and optional sidecar is operational.
+## Build and runtime validation
 
-For the packaged binary, first run git lfs pull. See Build and source map in the docs directory for ASAR extraction and release limitations.
+| Tool | Responsibility |
+|---|---|
+| `scripts/build-pipeline.test.mjs` | Source/build-contract regression tests |
+| `scripts/dev-knockdesk.mjs` | One-command source-shell development launcher |
+| `scripts/source_desktop_smoke_test.py` | Windows smoke test for the Electron shell and React renderer |
+| `scripts/smoke_test.py` | Smoke test for the packaged app; requires real Git LFS payloads |
+| `scripts/health_check.py` | Diagnoses a running packaged app via Chromium DevTools |
+| `scripts/uninstall_verify.py` | Checks uninstall behavior and user-data retention |
+
+## Privacy and inventory
+
+| Command | Output |
+|---|---|
+| `npm run check:privacy` | Reports likely email-address and absolute-home-path leaks in selected first-party text files |
+| `npm run check:secrets` | Reports redacted matches for known API-key patterns |
+| `npm run inventory` | Writes a file/size report to `staging/INVENTORY.md` |
+
+These are targeted scanners, not proof that binary metadata, generated bundles, Git history, upstream code, or every third-party payload is free of secrets or personal data.
+
+## Archive inspection
+
+For the primary Electron archive, fetch actual LFS payloads and run:
+
+```powershell
+git lfs install
+git lfs pull
+npm run list:asar
+npm run unpack:asar
+npm run repack:asar
+```
+
+The helper writes extraction output to `resources/app.asar.extracted/` and a rebuilt copy to `resources/app.rebuilt.asar`; it never overwrites `resources/app.asar`.
+
+For bulk inspection of ZIP, wheel, and Chromium PAK files, use `npm run unpack:all`. It may create a large amount of generated output. ZIP paths are validated before extraction, generated extraction folders are skipped on subsequent runs, and failures return a non-zero exit status.
+
+A passing source-renderer smoke test does not prove that all model providers, messaging channels, voice devices, native modules, or optional sidecars operate correctly. See `docs/PRODUCT_READINESS_AUDIT.md` for release gates.

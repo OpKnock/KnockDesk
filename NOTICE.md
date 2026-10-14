@@ -1,73 +1,74 @@
-# Third-Party Notices
+# KnockDesk Third-Party Notices
 
-KnockDesk includes third-party runtimes, libraries, applications and binary assets. This file is an inventory to aid attribution and release review; it is not legal advice and must not be treated as a guarantee that every version or license has been independently verified. Where applicable, original license and notice files remain with the component or distribution.
+KnockDesk combines first-party application code with third-party runtimes, libraries, bundled applications, native modules, and binary assets. This notice is an attribution and release-review aid, not legal advice or a release-specific software bill of materials (SBOM).
 
-KnockDesk first-party code is licensed under the Apache License 2.0; see LICENSE. Third-party components remain under their own licenses. Do not remove upstream copyright or attribution notices when modifying or redistributing those components.
+First-party KnockDesk code is licensed under the Apache License 2.0; see [LICENSE](LICENSE). Third-party components retain their own terms. Keep applicable upstream copyright notices, license texts, and attribution files when modifying or redistributing those components.
 
-## 1. Core runtimes and platforms
+**Version note:** versions below are recorded in the current repository inventory or package metadata. They must be reconciled against the exact release payload before distribution.
 
-| Component | Recorded version / location | License or notice | Upstream |
+## 1. Runtime and platform components
+
+| Component | Recorded location / version | License or notice | Upstream |
 |---|---|---|---|
-| Electron | 32.x; application shell | MIT; LICENSE.electron.txt | https://github.com/electron/electron |
-| Chromium | Included through Electron | BSD-style and bundled third-party notices; LICENSES.chromium.html | https://www.chromium.org |
-| Node.js | v22.11.0; resources/bin/node.exe | MIT plus third-party notices; verify exact bundled build at release | https://github.com/nodejs/node |
-| Python | 3.11.15; resources/hermes-runtime/python/ | PSF; resources/hermes-runtime/python/LICENSE.txt | https://www.python.org |
-| Python | 3.11.9; resources/python-embedded/ | PSF; resources/python-embedded/LICENSE.txt | https://www.python.org |
-| agent-browser | Recorded as 0.31.1; resources/bin/agent-browser.exe | Apache-2.0; verify exact bundled build at release | https://github.com/vercel-labs/agent-browser |
+| Electron | Desktop shell; 32.x recorded | MIT; see `LICENSE.electron.txt` | https://github.com/electron/electron |
+| Chromium | Included through Electron and browser payloads | BSD-style and other component notices; see `LICENSES.chromium.html` and bundled notices | https://www.chromium.org |
+| Node.js | `resources/bin/node.exe`; v22.11.0 recorded | MIT plus third-party notices; verify the exact shipped build | https://github.com/nodejs/node |
+| Python | `resources/hermes-runtime/python/`; 3.11.15 recorded | PSF license; see the bundled Python license | https://www.python.org |
+| Python | `resources/python-embedded/`; 3.11.9 recorded | PSF license; see the bundled Python license | https://www.python.org |
+| agent-browser | `resources/bin/agent-browser.exe`; 0.31.1 recorded | Apache-2.0 recorded; verify against the executable/version | https://github.com/vercel-labs/agent-browser |
+| Playwright browser payloads | `resources/browsers/` | Playwright and browser-specific notices apply | https://github.com/microsoft/playwright |
 
-Version numbers above are carried forward from the repository's bundle inventory and must be reconciled against the actual shipped payloads before issuing a new release.
+## 2. Hermes and bundled applications
 
-## 2. JavaScript and TypeScript packages
-
-Package metadata and each package's own license file are the source of truth. This list records dependency families; transitive dependencies are not exhaustively enumerated here.
-
-### Electron application and web dashboard
-
-The distribution includes packages such as @google/genai, @google/generative-ai, @jitsi/robotjs, @mediapipe/tasks-vision, @picovoice/porcupine-node, @picovoice/pvrecorder-node, @supabase/supabase-js, axios, better-sqlite3, bytenode, clsx, cors, dotenv, electron-updater, exceljs, express, jimp, js-tiktoken, lucide-react, mammoth, mermaid, mime-types, node-record-lpcm16, open, pdf-parse, playwright, react, react-dom, react-markdown, recharts, remark-gfm, screenshot-desktop, systeminformation, tailwind-merge, @nous-research/ui, @observablehq/plot, @react-three/fiber, @tailwindcss/vite, @xterm/xterm and its add-ons, class-variance-authority, leva, motion, qrcode, react-router-dom, unicode-animations, and Vite/TypeScript build tooling.
-
-These packages use a mix of MIT, Apache-2.0, BSD, ISC and other terms. Consult each exact package's package.json, license and notice files rather than inferring a license from the list above. Use lockfiles under resources/hermes-runtime/src/ and packaged dependency directories to verify the versions being shipped.
-
-### Terminal UI
-
-The Hermes terminal UI includes ink, ink-text-input, React, nanostores, @nanostores/react, undici and unicode-animations. The repository also contains a Hermes Ink fork. Refer to the licenses bundled with these sources.
-
-## 3. Python packages
-
-The bundled Hermes/Python runtime includes a broad set of third-party packages. Notable families include OpenAI/Anthropic SDKs, PyYAML and ruamel.yaml, Jinja2, Pydantic, PyJWT, requests/urllib3/httpx, FastAPI/Uvicorn, websockets, psutil, croniter, Markdown, prompt_toolkit, rich, python-dotenv, certifi, pathspec, Pillow, pywin32, pywinauto, pyautogui, pyperclip, pytesseract, NumPy, openpyxl, aiohttp, Playwright, SpeechRecognition and PyAudio.
-
-The precise licenses vary and include MIT, Apache-2.0, BSD variants, PSF, MPL-2.0 and other terms. Embedded Python directories include installed package metadata and license files; use those package-level files and the exact runtime inventory for release attribution.
-
-## 4. Bundled applications, tools and services
-
-| Component | Recorded version / location | License or attribution | Upstream / note |
+| Component | Recorded location / version | Recorded license / review status | Upstream |
 |---|---|---|---|
-| Hermes-Agent runtime, CLI, gateway and dashboard | 0.17.0 recorded; resources/hermes-runtime/src/ | MIT; resources/hermes-runtime/src/LICENSE | https://github.com/NousResearch/Hermes-Agent |
-| AgentTown standalone application | 0.4.1 recorded; resources/agent-town-dist/ | MIT recorded; verify upstream project and exact source license before release | https://github.com/geezerrrr/agent-town (verify) |
-| WhatsApp bridge | Baileys 7.0.0-rc.9 recorded; scripts/whatsapp-bridge/ | MIT recorded | https://github.com/WhiskeySockets/Baileys |
-| Computer-use sidecar | Agent S / gui-agents 0.3.2 recorded; resources/knockdesk-computer/ | Apache-2.0 recorded | https://github.com/simular-ai/Agent-S |
-| Tesseract OCR | resources/computer-runtime/tesseract/ | Apache-2.0 recorded; verify bundled build and notices | https://github.com/tesseract-ocr/tesseract |
-| Playwright browser payloads and FFmpeg | resources/browsers/ | Playwright and browser notices apply; confirm FFmpeg build licensing and redistribution rights | https://github.com/microsoft/playwright |
-| WorldMonitor views | Remote service | Terms and rights are controlled by the service operator, not this repository | https://www.worldmonitor.app |
-| Helper executables | resources/elevate.exe, resources/swap-helper.exe | Recorded as project helpers; verify source provenance and licensing before redistribution | Source provenance not yet documented |
+| Hermes-Agent runtime, CLI, gateway, and dashboard | `resources/hermes-runtime/src/`; 0.17.0 recorded | MIT; retain `resources/hermes-runtime/src/LICENSE` and upstream notices | https://github.com/NousResearch/Hermes-Agent |
+| AgentTown standalone application | `resources/agent-town-dist/`; 0.4.1 recorded | MIT recorded; confirm exact upstream project, version, and license before release | https://github.com/geezerrrr/agent-town |
+| WhatsApp bridge | `scripts/whatsapp-bridge/`; Baileys 7.0.0-rc.9 recorded | MIT recorded; verify exact package and license metadata | https://github.com/WhiskeySockets/Baileys |
+| Computer-use sidecar | `resources/knockdesk-computer/`; Agent S / gui-agents 0.3.2 recorded | Apache-2.0 recorded; confirm exact sources and dependencies | https://github.com/simular-ai/Agent-S |
+| Tesseract OCR | `resources/computer-runtime/tesseract/` | Apache-2.0 recorded; verify shipped build and required notices | https://github.com/tesseract-ocr/tesseract |
+| FFmpeg | Bundled media/browser payloads | Exact build configuration and redistribution obligations require release review | https://ffmpeg.org |
+| WorldMonitor views | External service | Controlled by the service operator; external terms apply | https://www.worldmonitor.app |
 
-## 5. Release-time license review
+## 3. JavaScript and TypeScript dependency families
 
-Resolve these items before publishing a commercial or public binary distribution:
+The repository and packaged application reference packages including `@google/genai`, `@google/generative-ai`, `@jitsi/robotjs`, `@mediapipe/tasks-vision`, `@picovoice/porcupine-node`, `@picovoice/pvrecorder-node`, `@supabase/supabase-js`, `axios`, `better-sqlite3`, `bytenode`, `clsx`, `cors`, `dotenv`, `electron-updater`, `exceljs`, `express`, `jimp`, `js-tiktoken`, `lucide-react`, `mammoth`, `mermaid`, `mime-types`, `node-record-lpcm16`, `open`, `pdf-parse`, `playwright`, `react`, `react-dom`, `react-markdown`, `recharts`, `remark-gfm`, `screenshot-desktop`, `systeminformation`, `tailwind-merge`, `@nous-research/ui`, `@observablehq/plot`, `@react-three/fiber`, `@tailwindcss/vite`, `@xterm/xterm` and its add-ons, `class-variance-authority`, `leva`, `motion`, `qrcode`, `react-router-dom`, `unicode-animations`, and Vite/TypeScript tooling.
 
-- **GSAP:** the recorded dependency uses the GSAP Standard License, which is not a conventional permissive open-source license. Review the current license and intended usage.
-- **FFmpeg:** verify the exact build configuration, enabled codecs, applicable notices and redistribution obligations.
-- **qrcode-terminal:** the recorded dependency inventory did not establish a reliable license field; verify its exact bundled package and upstream terms.
-- **AgentTown and helper executables:** confirm source provenance, exact license texts and required notices.
-- **Version inventory:** regenerate dependency and binary manifests from the exact release artifact. This file contains carried-forward version data and is not a substitute for a release-specific SBOM.
+The Hermes terminal UI also includes Ink, React, nanostores, `@nanostores/react`, undici, and unicode-animations. The repository contains a Hermes Ink fork.
 
-## 6. License texts included in the distribution
+These dependencies use a mix of MIT, Apache-2.0, BSD, ISC, and other terms. The list is not exhaustive and does not assert a license for every transitive dependency. The exact lockfiles and package-level `LICENSE`, `NOTICE`, and `package.json` files are the sources to use when assembling a release-specific inventory.
 
-- LICENSE — KnockDesk first-party code (Apache-2.0).
-- LICENSE.electron.txt — Electron license.
-- LICENSES.chromium.html — Chromium and bundled Chromium third-party notices.
-- resources/hermes-runtime/python/LICENSE.txt — embedded Python license.
-- resources/python-embedded/LICENSE.txt — standalone embedded Python license.
-- resources/hermes-runtime/src/LICENSE — Hermes-Agent license.
-- Playwright and other packages may carry additional NOTICE, LICENSE, or third-party notice files in their respective package directories.
+## 4. Python dependency families
 
-Retain applicable upstream notices and license texts when distributing a modified or repackaged application. For the exact obligations of a component, consult that component's current license and legal documentation.
+The bundled Python environment references packages and package families including OpenAI and Anthropic SDKs, PyYAML and ruamel.yaml, Jinja2, Pydantic, PyJWT, requests, urllib3, httpx, FastAPI, Uvicorn, websockets, psutil, croniter, Markdown, prompt_toolkit, Rich, python-dotenv, certifi, pathspec, Pillow, pywin32, pywinauto, pyautogui, pyperclip, pytesseract, NumPy, openpyxl, aiohttp, Playwright, SpeechRecognition, and PyAudio.
+
+Licenses vary and include MIT, Apache-2.0, BSD variants, PSF, MPL-2.0, and other terms. Use the exact embedded package metadata and license files rather than assuming one license applies to the complete runtime.
+
+## 5. Binary and model/data assets
+
+The distribution may include Chromium resources, FFmpeg, native Node/Python modules, trained model/data files, MediaPipe tasks, ONNX models, WASM runtimes, fonts, sound effects, and other assets. Their presence, license, provenance, and redistribution permissions must be validated at the release-artifact level. Do not assume that an asset is first-party merely because it is stored in this repository.
+
+Helper executables such as `resources/elevate.exe` and `resources/swap-helper.exe` require documented source provenance and license review before redistribution.
+
+## 6. Items requiring release-time review
+
+Before producing a public or commercial binary release:
+
+- **GSAP:** the recorded dependency refers to the GSAP Standard License. Review the applicable terms for the intended distribution and use.
+- **FFmpeg:** verify the exact build configuration, enabled codecs, license implications, and bundled notices.
+- **qrcode-terminal:** verify the license of the exact package/version included in the shipped artifact.
+- **AgentTown and helper executables:** verify source provenance, project identity, exact version, license text, and required attribution.
+- **Complete inventory:** regenerate package and binary manifests from the exact release payload and produce an SBOM. The versions in this file are not a substitute for that process.
+
+## 7. License and notice files
+
+The repository includes or references the following notice sources:
+
+- `LICENSE` — KnockDesk first-party code under Apache-2.0.
+- `LICENSE.electron.txt` — Electron license.
+- `LICENSES.chromium.html` — Chromium and bundled Chromium third-party notices.
+- `resources/hermes-runtime/src/LICENSE` — Hermes-Agent MIT license.
+- `resources/hermes-runtime/python/LICENSE.txt` and `resources/python-embedded/LICENSE.txt` — bundled Python license texts.
+- Individual packages and bundled applications may contain additional `LICENSE`, `NOTICE`, or copyright files.
+
+This notice does not replace the licenses shipped with individual components. Retain and include all notices required by the applicable licenses when redistributing modified or repackaged builds.
