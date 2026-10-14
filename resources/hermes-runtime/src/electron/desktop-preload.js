@@ -29,17 +29,17 @@ function openExternal(target) {
 }
 
 contextBridge.exposeInMainWorld('knockdeskAPI', Object.freeze({
-  getRuntimeState: () => ipcRenderer.invoke('hermes:get-state'),
-  startRuntime: () => ipcRenderer.invoke('hermes:start'),
-  getHermesPreloadPath: () => ipcRenderer.invoke('hermes:get-preload-path'),
-  getAgentTownState: () => ipcRenderer.invoke('agenttown:get-state'),
-  startAgentTown: () => ipcRenderer.invoke('agenttown:start'),
-  getAgentTownPreloadPath: () => ipcRenderer.invoke('agenttown:get-preload-path'),
-  readMemory: () => ipcRenderer.invoke('hermes:memory-read'),
-  requestMemory: (instruction) => ipcRenderer.invoke('hermes:memory-request', {
+  getRuntimeState: () => ipcRenderer.invoke('knockdesk:runtime:get-state'),
+  startRuntime: () => ipcRenderer.invoke('knockdesk:runtime:start'),
+  getHermesPreloadPath: () => ipcRenderer.invoke('knockdesk:runtime:preload'),
+  getAgentTownState: () => ipcRenderer.invoke('knockdesk:agenttown:get-state'),
+  startAgentTown: () => ipcRenderer.invoke('knockdesk:agenttown:start'),
+  getAgentTownPreloadPath: () => ipcRenderer.invoke('knockdesk:agenttown:preload'),
+  readMemory: () => ipcRenderer.invoke('knockdesk:memory:read'),
+  requestMemory: (instruction) => ipcRenderer.invoke('knockdesk:memory:update', {
     instruction: String(instruction ?? '').trim(),
   }),
-  getSystemInfo: () => ipcRenderer.invoke('get-detailed-system-info'),
+  getSystemInfo: () => ipcRenderer.invoke('knockdesk:system:info'),
   openExternal,
   onRuntimeState: (callback) => subscribe('hermes-state', callback),
   onAgentTownState: (callback) => subscribe('agenttown-state', callback),
