@@ -76,6 +76,7 @@ function main() {
   if (existsSync(pwaSource)) cpSync(pwaSource, join(dist, 'pwa'), { recursive: true, force: true });
   assertExists(dist, [
     'main.js',
+    'desktop-preload.js',
     'preload.js',
     'agenttown-preload.js',
     'hermes-preload.js',
