@@ -1,12 +1,12 @@
 """Inventory — lists every file in this app folder with sizes.
 
 Usage: python scripts/inventory.py
-Writes: docs/INVENTORY.md
+Writes: staging/INVENTORY.md
 """
 import pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-OUT = ROOT / 'docs' / 'INVENTORY.md'
+OUT = ROOT / 'staging' / 'INVENTORY.md'
 
 rows = []
 total = 0
@@ -23,7 +23,7 @@ for p in sorted(ROOT.rglob('*')):
     total += sz
     rows.append((rel, sz))
 
-OUT.parent.mkdir(exist_ok=True)
+OUT.parent.mkdir(parents=True, exist_ok=True)
 with OUT.open('w', encoding='utf-8') as f:
     f.write('# Inventory — KnockDesk AI (full app, exe included)\n\n')
     f.write(f'Total files: {len(rows)} — {total/1e9:.2f} GB\n\n')
