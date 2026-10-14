@@ -382,9 +382,11 @@ class HermesManager {
       error: this.error ? String(this.error) : null,
       url: String(this.baseUrl || ''),
       port: Number(this.port || 0),
-      external: this.external ? String(this.external) : null,
+      external: Boolean(this.external),
       exePath: this.exePath ? String(this.exePath) : '',
-      status: this.lastStatus ? String(this.lastStatus) : null,
+      status: this.lastStatus && typeof this.lastStatus === 'object'
+        ? { ...this.lastStatus }
+        : null,
       knockdeskReady: Boolean(this._knockdeskReady),
       knockdeskPending: Boolean(this._knockdeskPending),
       knockdeskError: this._knockdeskLastError ? String(this._knockdeskLastError) : null,
