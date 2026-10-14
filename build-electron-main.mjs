@@ -90,6 +90,8 @@ function main() {
     'main/ipc/system-handlers.js',
     'main/shared/paths.js',
     'services/hermes-manager.js',
+    'services/desktop-hermes-runtime.js',
+    'services/desktop-agenttown-runtime.js',
     'renderer/index.html',
     'pwa/icon-512.png',
   ]);
