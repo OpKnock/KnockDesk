@@ -18,7 +18,9 @@ const candidates = [
   process.resourcesPath
     ? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules')
     : null,
+  path.resolve(__dirname, '../../../resources/app.asar.unpacked/node_modules'),
   path.resolve(__dirname, '../../../../../resources/app.asar.unpacked/node_modules'),
+  path.join(__dirname, 'node_modules'),
 ].filter(Boolean);
 
 const existing = candidates.filter((candidate) => {
