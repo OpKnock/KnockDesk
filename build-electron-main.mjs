@@ -72,6 +72,8 @@ function main() {
   run(['run', 'build:desktop', '--workspace', 'web']);
 
   const dist = join(electronDir, 'dist');
+  const pwaSource = join(electronDir, 'pwa');
+  if (existsSync(pwaSource)) cpSync(pwaSource, join(dist, 'pwa'), { recursive: true, force: true });
   assertExists(dist, [
     'main.js',
     'preload.js',
@@ -82,6 +84,7 @@ function main() {
     'main/shared/paths.js',
     'services/hermes-manager.js',
     'renderer/index.html',
+    'pwa/icon-512.png',
   ]);
 
   // Stage from a clean directory so deleted output cannot survive a rebuild.
@@ -105,6 +108,7 @@ function main() {
     'main/shared/paths.js',
     'services/hermes-manager.js',
     'renderer/index.html',
+    'pwa/icon-512.png',
   ]);
 
   console.log('Staged Electron main, preloads, renderer and runtime modules:');
