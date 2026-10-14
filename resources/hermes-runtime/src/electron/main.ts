@@ -63,7 +63,10 @@ function registerDesktopIpc(): void {
     hermesManager ? hermesManager.getState() : stateFallback());
 
   ipcMain.handle('knockdesk:runtime:start', async () => {
-    if (!hermesManager) return stateFallback('starting', 'Hermes is still initializing.');
+    const initialized = await initializeServicesForIpc();
+    if (!initialized || !hermesManager) {
+      return stateFallback('error', 'The Hermes runtime could not be initialized.');
+    }
     return hermesManager.start();
   });
 
@@ -76,7 +79,10 @@ function registerDesktopIpc(): void {
     agentTownManager ? agentTownManager.getState() : stateFallback('idle'));
 
   ipcMain.handle('knockdesk:agenttown:start', async () => {
-    if (!agentTownManager) return stateFallback('starting', 'AgentTown is still initializing.');
+    const initialized = await initializeServicesForIpc();
+    if (!initialized || !agentTownManager) {
+      return stateFallback('error', 'AgentTown could not be initialized.');
+    }
     return agentTownManager.start();
   });
 
@@ -85,8 +91,9 @@ function registerDesktopIpc(): void {
     return pathToFileURL(filename).toString();
   });
 
-  ipcMain.handle('knockdesk:memory:read', () => {
-    if (!hermesManager) return { available: false, memory: '', user: '' };
+  ipcMain.handle('knockdesk:memory:read', async () => {
+    const initialized = await initializeServicesForIpc();
+    if (!initialized || !hermesManager) return { available: false, memory: '', user: '' };
     return hermesManager.readMemoryFiles();
   });
 
@@ -184,6 +191,15 @@ async function initializeServices(window: BrowserWindow): Promise<void> {
   await servicesPromise;
   if (hermesManager) hermesManager.mainWindow = window;
   if (agentTownManager) agentTownManager.mainWindow = window;
+}
+
+async function initializeServicesForIpc(): Promise<boolean> {
+  const window = mainWindow && !mainWindow.isDestroyed()
+    ? mainWindow
+    : BrowserWindow.getAllWindows()[0] ?? null;
+  if (!window) return false;
+  await initializeServices(window);
+  return true;
 }
 
 async function initializeServicesOnce(window: BrowserWindow): Promise<void> {

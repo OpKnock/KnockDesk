@@ -161,3 +161,18 @@ test('desktop shutdown waits for child runtime cleanup before quitting', () => {
   assert.ok(main.includes('hermesManager?.stop?.()'));
   assert.ok(main.includes('agentTownManager?.stop?.()'));
 });
+
+test('runtime and AgentTown start requests wait for first-run service initialization', () => {
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  assert.equal((main.match(/await initializeServicesForIpc\(\)/g) || []).length, 3);
+  assert.ok(main.includes('async function initializeServicesForIpc(): Promise<boolean>'));
+  assert.ok(main.includes("stateFallback('error', 'AgentTown could not be initialized.')"));
+  assert.ok(main.includes("stateFallback('error', 'The Hermes runtime could not be initialized.')"));
+});
+
+test('manual ASAR extraction workflow exposes a downloadable artifact', () => {
+  const workflow = readFileSync(resolve(root, '.github/workflows/unpack-asar.yml'), 'utf8');
+  assert.ok(workflow.includes('workflow_dispatch:'));
+  assert.ok(workflow.includes('npx --yes asar extract'));
+  assert.ok(workflow.includes('actions/upload-artifact@v4'));
+});
