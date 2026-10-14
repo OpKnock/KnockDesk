@@ -49,4 +49,4 @@ The helper writes extraction output to `resources/app.asar.extracted/` and a reb
 
 For bulk inspection of ZIP, wheel, and Chromium PAK files, use `npm run unpack:all`. It may create a large amount of generated output. ZIP paths are validated before extraction, generated extraction folders are skipped on subsequent runs, and failures return a non-zero exit status.
 
-A passing source-renderer smoke test does not prove that all model providers, messaging channels, voice devices, native modules, or optional sidecars operate correctly. See `docs/PRODUCT_READINESS_AUDIT.md` for release gates.
+A passing source-renderer smoke test does not prove that all model providers, messaging channels, voice devices, native modules, or optional sidecars operate correctly. See `docs/PRODUCT_READINESS_AUDIT.md` for release gates. Run the maintenance tests after changing extraction or privacy logic; pull-request CI runs the same regression suite.
