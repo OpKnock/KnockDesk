@@ -33,7 +33,7 @@ test('Electron loads the source-built KnockDesk shell and does not block on Herm
   const paths = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main/shared/paths.ts'), 'utf8');
   const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
   assert.ok(paths.includes("path.resolve(__dirname, '../../preload.js')"));
-  assert.ok(main.includes("path.join(__dirname, 'renderer', 'index.html')"));
+  assert.ok(main.includes("path.join(__dirname, 'renderer', 'desktop.html')"));
   assert.ok(main.includes('webviewTag: true'));
   assert.ok(main.includes('void hermesManager.start()'));
   assert.ok(!main.includes('await hermesManager.start()'));
