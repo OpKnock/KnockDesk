@@ -1,171 +1,138 @@
 # KnockDesk
 
-KnockDesk is a local-first desktop AI assistant for Windows. It pairs an
-Electron shell with the Hermes agent runtime: a chat dashboard, a messaging
-gateway, long-term memory, scheduled jobs, mobile remote access, and an
-AgentTown visualizer — all running on your own machine.
+**KnockDesk** is a local-first Windows desktop workspace for the Hermes AI agent runtime. The repository contains the Windows distribution, maintained Electron/React source for a separately buildable desktop shell, local runtime controllers, plugins, and validation tooling.
 
-> **Status:** v3.1.12-local. This repository is the full app: launcher,
-> runtime, sources, and validation scripts.
+## Project status
 
-## Features
+This repository contains two related but distinct desktop experiences:
 
-- **Chat dashboard** — conversation UI with an embedded terminal session,
-  model picker, reasoning controls, and session history.
-- **Messaging gateway** — connect chat platforms (Telegram, Discord, Slack,
-  WhatsApp, Matrix, email, and more) to the same agent.
-- **Mobile remote** — a phone companion app talks to the desktop over an
-  encrypted local bridge relay.
-- **Memory** — pluggable long-term memory providers plus local JSON stores
-  for chats, contacts, notes, and tasks.
-- **Computer use** — an opt-in sidecar that can operate the desktop
-  (mouse/keyboard) with an on-screen overlay and HUD.
-- **AgentTown** — a pixel-art visualizer that shows agents collaborating.
-- **Voice** — wake-word detection and voice input support.
-- **Automation** — scheduled cron jobs, skills, and a tool/plugin system.
+- **Packaged distribution:** KnockDesk.exe, resources/app.asar, and resources/main.jsc. These files form the currently shipped application. The compiled renderer and V8 bytecode are not the original TypeScript/React source.
+- **Source-owned desktop shell:** resources/hermes-runtime/src/electron/main.ts and resources/hermes-runtime/src/web/src/desktop/. This shell has its own build, test and Windows smoke-test path. It is maintainable source, but it is **not yet a feature-for-feature replacement** for every screen and behavior in the packaged UI.
 
-## Quick start (prebuilt)
+The source build produces a staging directory, not a signed installer or a release that replaces the existing binaries. CI results and known limitations are documented in [Build and source map](docs/BUILD_AND_SOURCE_MAP.md).
 
-Requirements: Windows 10/11.
+## Capabilities
 
-```powershell
-.\KnockDesk.exe
-```
+The source-owned shell includes desktop navigation/layout, runtime status and start controls, an embedded Hermes dashboard view, local memory inspection and memory requests, system diagnostics, and the optional AgentTown visualizer. Its integrations are intentionally exposed through a narrow Electron preload bridge rather than unrestricted renderer access to Node.js.
 
-The app creates its data on first run (see [Data & privacy](#data--privacy)).
-For diagnostics, launch with the remote-debugging flag (development only):
+The packaged distribution includes additional components such as the Hermes runtime, browser and computer-use support, messaging integrations, voice support, and other bundled applications. Availability depends on the selected runtime, configured providers, permissions, and external services.
 
-```powershell
-.\KnockDesk.exe --remote-debugging-port=9222 --remote-allow-origins=*
-```
+## Requirements
 
-## Build and run the source-owned KnockDesk desktop shell
+For a source build:
 
-Requirements: Windows 10/11, Node.js 22+, Python 3.11 for the optional smoke test.
+- Windows 10 or 11 for the desktop application and Windows smoke test.
+- Node.js 22 or later and npm.
+- Git with Git LFS installed to retrieve large packaged binaries.
+- A working Hermes CLI/runtime for agent features. The renderer can be smoke-tested without starting the agent runtime.
 
-The maintained source-owned shell has a separate React renderer under
-`resources/hermes-runtime/src/web/src/desktop/`. It does not patch or replace
-the original packaged `resources/app.asar`, `resources/main.jsc`, or
-`KnockDesk.exe`. It provides a maintainable desktop surface for the Hermes
-chat/session UI, memory requests, runtime diagnostics, and the optional
-AgentTown visualizer. It is not a byte-for-byte recreation of the original
-shipped dashboard.
+## Get the repository
 
-### One-command development
+~~~powershell
+git lfs install
+git clone https://github.com/OpKnock/KnockDesk.git
+cd KnockDesk
+git lfs pull
+~~~
+
+The repository is private unless its owner changes its visibility. Git LFS pointers are not executable files; run git lfs pull to fetch their payloads.
+
+## Run the source-owned desktop shell
 
 From the repository root:
 
-```powershell
+~~~powershell
 npm run dev
-```
+~~~
 
-The script installs the committed Electron/web workspace dependencies,
-compiles the Electron main process, starts Vite on `127.0.0.1:5174`, and
-launches the desktop shell. Use `Ctrl+C` to stop the development processes.
+The development command installs the locked Electron and web workspaces, compiles the Electron main process, starts the desktop Vite renderer, and launches Electron. Close the desktop window or press Ctrl+C to stop it.
 
-Hermes requires a valid bundled runtime or an existing Hermes CLI installation.
-The source tree does not commit `resources/hermes-runtime/venv/`; if the
-runtime cannot be found, KnockDesk still opens and reports the runtime issue
-instead of silently exiting. AgentTown is optional and starts only when opened.
+The development shell looks for a Hermes installation/runtime. If a bundled virtual environment is not present in your checkout, install/configure Hermes separately or set STONIC_HERMES_EXE to the full path of the Hermes executable. AgentTown is optional and starts when selected.
 
-### Validate and stage a build
+## Build and test
 
-```powershell
+From the repository root:
+
+~~~powershell
 npm test
-npm run build:knockdesk
-```
+npm run check:knockdesk
+~~~
 
-The build uses the lockfile at
-`resources/hermes-runtime/src/package-lock.json` and stages a verified source
-layout under `staging/electron-main/dist/`. It does not create a signed
-installer or overwrite the existing shipped binaries. GitHub Actions also
-builds the renderer and runs a Windows Electron smoke test.
+The source-owned renderer can also be checked from the Hermes workspace:
 
-`npm run build` inside `resources/hermes-runtime/src/web` builds the separate
-Hermes Python-served management dashboard into `hermes_cli/web_dist/`. The
-KnockDesk desktop renderer is built separately by
-`npm run build:desktop --workspace web` from the workspace root.
+~~~powershell
+cd resources/hermes-runtime/src
+npm ci --workspace electron --workspace web --include-workspace-root=false --no-audit
+npm run compile --workspace electron
+npm run typecheck --workspace web
+npm test --workspace web
+npm run build:desktop --workspace web
+~~~
 
-## Validate
+The root npm test runs source/build-contract regression tests. GitHub Actions adds workspace installation, TypeScript checks, dashboard tests, renderer lint/build, Python syntax/security-tool checks, LFS integrity checks, dependency audits, and a Windows Electron renderer smoke test. A passing renderer smoke test does **not** prove that every optional provider, messaging platform, voice feature, or the original packaged UI works end to end.
 
-```bash
-pip install -r scripts/requirements.txt
-playwright install --with-deps chromium
+## Inspect or unpack the packaged application
 
-python scripts/smoke_test.py --timeout 90
-python scripts/health_check.py --port 9222
-python scripts/uninstall_verify.py --run-uninstaller --keep-user-data
-python scripts/inventory.py
-```
+Download the actual LFS payloads first. Then use the repository's archive helper:
 
-Continuous integration runs lint, type checks, bundle-integrity checks, and
-dependency audits on every push (see `.github/workflows/ci.yml`).
+~~~powershell
+npm run list:asar
+npm run unpack:asar
+~~~
 
-## Project layout
+The default extraction goes to resources/app.asar.extracted/, which is ignored by Git so generated unpacked files do not accidentally bloat commits. To rebuild an inspection copy without overwriting the original archive:
 
-| Path | Contents |
+~~~powershell
+npm run repack:asar
+~~~
+
+The rebuilt archive is written to resources/app.rebuilt.asar. The original resources/app.asar is never overwritten by the helper. See [Build and source map](docs/BUILD_AND_SOURCE_MAP.md) for boundaries between source, generated output, bytecode, binary payloads and external services.
+
+Unpacking an ASAR makes the bundled files inspectable; it does not recover TypeScript, React source maps, or the source for V8 bytecode. For durable dashboard changes, prefer the maintained source under resources/hermes-runtime/src/web/src/desktop/.
+
+## Data, privacy and network behavior
+
+KnockDesk is **local-first, not universally offline**. Application settings, memory files, and runtime data are stored locally by default. However, data leaves the machine when you choose cloud model providers, connect messaging platforms, use remote relays or integrations, or open external services. Provider/API terms then apply. WorldMonitor and other external views are not controlled by this repository.
+
+Microphone, computer-use, browser-control, messaging, and remote-access features may require OS permissions, credentials, or explicit configuration. Review each integration before enabling it. Never commit API keys, personal access tokens, session tokens, private logs, or local machine paths.
+
+A source scan is available for accidental email addresses and machine-specific home-directory paths in first-party project files:
+
+~~~powershell
+python scripts/privacy-scan.py
+~~~
+
+This scan does not remove identity from Git commit history or from the GitHub account/profile. It also cannot prove that every binary or generated payload is free of personal metadata.
+
+## Repository map
+
+| Path | Purpose |
 |---|---|
-| `KnockDesk.exe` | Electron launcher |
-| `resources/app.asar` | Bundled renderer UI |
-| `resources/main.jsc` | Compiled main process (source: `resources/hermes-runtime/src/electron/main.ts`) |
-| `resources/hermes-runtime/src/web/` | Dashboard SPA source (Vite + React + Tailwind) |
-| `resources/hermes-runtime/src/electron/` | Electron main-process source (TypeScript) |
-| `resources/hermes-runtime/src/ui-tui/` | Terminal UI (Ink React, embedded via xterm) |
-| `resources/hermes-runtime/src/agent/`, `gateway/`, `tools/` | Agent core, messaging gateway, tool implementations |
-| `resources/hermes-runtime/src/hermes_cli/` | CLI, setup wizard, config and skin engine |
-| `resources/hermes-runtime/src/skills/`, `plugins/` | Built-in skills and plugins |
-| `resources/hermes-plugins/` | KnockDesk plugins: mobile platform (`knockdesk`), computer-use tool (`knockdesk-computer`), memory provider (`knockdesk-memory`) |
-| `resources/knockdesk-computer/` | Computer-use sidecar source (`runner.py`, overlay) |
-| `resources/agent-town-dist/` | Built AgentTown visualizer (Next.js standalone) |
-| `resources/hermes-runtime/python/`, `venv/` | Embedded Hermes Python runtime |
-| `resources/python-embedded/` | Standalone Windows Python distribution |
-| `resources/bin/` | Bundled `node.exe` and `agent-browser` binary |
-| `resources/browsers/` | Playwright browser builds |
-| `resources/computer-runtime/` | Computer-use runtime (Tesseract OCR, venv) |
-| `resources/public/` | Brand assets (logo PNG set + `.ico`) |
-| `resources/wake_word_bg.py` | Wake-word background service |
-| `scripts/` | `smoke_test.py`, `health_check.py`, `uninstall_verify.py`, `inventory.py` |
-| `locales/` | Chromium locale packs |
-| `docs/INVENTORY.md` | Generated full file inventory |
+| resources/hermes-runtime/src/electron/ | Electron main process, preload bridges and runtime controllers |
+| resources/hermes-runtime/src/web/src/desktop/ | Maintained React desktop renderer |
+| resources/hermes-runtime/src/web/ | Hermes web dashboard source and Vite configs |
+| resources/hermes-runtime/src/hermes_cli/ | Hermes CLI and Python dashboard/runtime source |
+| resources/hermes-plugins/ | KnockDesk plugins |
+| resources/knockdesk-computer/ | Computer-use sidecar source |
+| resources/agent-town-dist/ | Built AgentTown standalone application; not its original source project |
+| resources/app.asar | Packaged Electron application archive |
+| resources/app.asar.unpacked/ | Native modules and files unpacked by Electron packaging |
+| resources/main.jsc | Compiled V8 bytecode; not editable TypeScript source |
+| resources/hermes-runtime/python/ | Embedded Python runtime and installed packages |
+| resources/browsers/ | Browser/FFmpeg payloads |
+| scripts/ | Build, unpack, validation and maintenance tooling |
+| docs/INVENTORY.md | Generated repository file inventory |
+| .github/workflows/ | CI and inventory workflows |
 
-Large binaries (`*.exe`, `*.dll`, `*.pak`, `*.bin`, `*.dat`, `*.asar`,
-`*.jsc`) are tracked with Git LFS — see `.gitattributes`.
+See [Build and source map](docs/BUILD_AND_SOURCE_MAP.md) for the authoritative source-vs-binary distinctions.
 
-## Data & privacy
+## Security and release notes
 
-Everything stays on your machine by default. On first run the app creates:
-
-- Electron stores (chats, contacts, notes, tasks, settings, keys) in the
-  platform user-data directory
-- `Documents/KnockDesk Data/` — persona (`SOUL.md`), memory (`MEMORY.md`),
-  custom skills
-- `Documents/KnockDesk_Vault/` — file vault
-- `%LOCALAPPDATA%/hermes/` — Hermes agent home (config, sessions, logs)
-
-API keys you enter are stored locally. The mobile-bridge secret is generated
-on-device and never leaves your machine except through the encrypted relay
-you explicitly pair.
-
-## Updates
-
-This local build ships with automatic updates pointed at a disabled stub
-feed. Releases are distributed as portable archives; the staged updater
-swaps files in place while preserving shortcuts and install markers.
-
-## Open-source credits
-
-KnockDesk stands on many open-source projects — the Hermes agent runtime
-(Nous Research, MIT), Electron/Chromium, Python, Node.js, React, AgentTown,
-the WhatsApp bridge (Baileys), Tesseract OCR, Playwright, and more. See
-**[NOTICE.md](NOTICE.md)** for the full attribution list and bundled
-license texts.
+- Keep Electron context isolation enabled and Node integration disabled in renderer pages.
+- Treat external URLs, provider responses, IPC payloads, and generated files as untrusted input.
+- The packaged executable and archive are preserved by the source build; use a separate release process to replace them.
+- Review [NOTICE.md](NOTICE.md) before redistribution. The repository's third-party licensing inventory includes items that still require release-time verification.
 
 ## License
 
-KnockDesk's own code is licensed under the **Apache License 2.0** — see
-[LICENSE](LICENSE). Third-party components keep their own licenses; see
-[NOTICE.md](NOTICE.md) for the full attribution list. Additional bundled
-license texts ship with the distribution (`LICENSE.electron.txt`,
-`LICENSES.chromium.html`, `resources/hermes-runtime/python/LICENSE.txt`,
-`resources/python-embedded/LICENSE.txt`,
-`resources/hermes-runtime/src/LICENSE`).
+KnockDesk first-party code is licensed under the Apache License 2.0; see [LICENSE](LICENSE). Third-party components retain their respective terms. See [NOTICE.md](NOTICE.md) and the license texts shipped with the distribution.

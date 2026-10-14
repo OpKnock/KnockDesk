@@ -91,6 +91,14 @@ jobs:
 
       - name: Format the repository secret scanner
         run: ruff format --check scripts/secret-scan.py
+      - name: Lint the repository privacy scanner
+        run: ruff check scripts/privacy-scan.py
+
+      - name: Format the repository privacy scanner
+        run: ruff format --check scripts/privacy-scan.py
+
+      - name: Scan first-party files for accidental personal data
+        run: python scripts/privacy-scan.py
 
   source-desktop-smoke:
     name: Windows desktop renderer smoke test

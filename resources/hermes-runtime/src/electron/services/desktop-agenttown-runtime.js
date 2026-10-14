@@ -104,6 +104,7 @@ class DesktopAgentTownRuntime {
     const candidates = [
       process.env.STONIC_AGENTTOWN_DIR,
       process.resourcesPath ? path.join(process.resourcesPath, 'agent-town-dist') : null,
+      path.resolve(__dirname, '..', '..', 'resources', 'agent-town-dist'),
       path.resolve(__dirname, '..', '..', '..', '..', '..', 'agent-town-dist'),
     ];
     for (const candidate of candidates) {

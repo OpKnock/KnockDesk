@@ -47,6 +47,8 @@ let relocationDone = false;
 function findRuntimeRoot() {
     const candidates = [
         process.resourcesPath ? path.join(process.resourcesPath, 'hermes-runtime') : null,
+        path.resolve(__dirname, '..', '..', 'resources', 'hermes-runtime'),
+        path.resolve(__dirname, '..', '..', '..', '..', 'hermes-runtime'),
         path.join(__dirname, '..', '..', 'hermes-runtime'),
     ];
     for (const dir of candidates) {
