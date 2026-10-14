@@ -127,11 +127,13 @@ def main() -> int:
                 heading = page.locator(".welcome-row h1").inner_text()
                 if "Make room for" not in heading:
                     raise AssertionError(f"Dashboard heading missing: {heading!r}")
+                navigation = page.get_by_role("navigation", name="Main navigation")
                 for label in ("Overview", "AI Assistant", "Sessions", "AgentTown", "Memory", "System health"):
-                    if page.get_by_role("button", name=label).count() == 0:
+                    if navigation.get_by_role("button", name=label).count() == 0:
                         raise AssertionError(f"Navigation item missing: {label}")
 
-                page.get_by_role("button", name="System health").click()
+                # Scope duplicate button names to the actual navigation landmark.
+                navigation.get_by_role("button", name="System health").click()
                 page.get_by_text("Device report").wait_for(timeout=5000)
                 page.get_by_text("logical Processors", exact=False).wait_for(timeout=5000)
                 page.wait_for_timeout(500)

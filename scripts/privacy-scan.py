@@ -32,7 +32,8 @@ EMAIL = re.compile(
     re.IGNORECASE,
 )
 HOME_PATHS = (
-    re.compile(r"(?i)\b[A-Z]:\\Users\\([^\\\s\"'<>$%{}]+)"),
+    # Windows paths can use either slash style in Python and shell scripts.
+    re.compile(r"(?i)\b[A-Z]:[\\/]+Users[\\/]+([^\\/\s\"'<>$%{}]+)"),
     re.compile(r"(?i)(?:^|[\s\"'=(])/(?:home|Users)/([^/\s\"'<>$%{}]+)"),
 )
 GENERIC_USERS = {
@@ -58,6 +59,8 @@ TARGETS = (
     "README.md",
     "NOTICE.md",
     "package.json",
+    "build-electron-main.mjs",
+    "index.html",
     ".github",
     "docs",
     "scripts",
@@ -70,6 +73,7 @@ TARGETS = (
     "resources/hermes-plugins/knockdesk-memory",
     "resources/hermes-plugins/knockdesk-computer",
     "resources/knockdesk-computer",
+    "resources/wake_word_bg.py",
 )
 
 

@@ -5,11 +5,11 @@ import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from paklib import extract  # noqa: E402  (needs sys.path bootstrap above)
-ROOT = 'C:/Users/wagde/MegaProjects/KnockDesk'
-SKIP_DIRS = ('node_modules', 'venv', '__pycache__', '.git', '.next')
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SKIP_DIRS = ('node_modules', 'venv', '.venv', '__pycache__', '.git', '.next', 'staging')
 paks = []
 for root, dirs, files in os.walk(ROOT):
-    dirs[:] = [x for x in dirs if x not in SKIP_DIRS]
+    dirs[:] = [x for x in dirs if x not in SKIP_DIRS and not x.endswith('.extracted') and not x.endswith('-unpacked')]
     for f in files:
         if f.lower().endswith('.pak'):
             paks.append(os.path.join(root, f))
@@ -41,3 +41,5 @@ for i, p in enumerate(paks):
 print('pak OK: %d, FAILED: %d' % (ok, len(fail)))
 for rel, err in fail:
     print('FAILED-FILE:', rel, '|', err)
+if fail:
+    sys.exit(1)

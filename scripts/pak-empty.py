@@ -4,11 +4,11 @@ import sys
 import io
 import struct
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-ROOT = 'C:/Users/wagde/MegaProjects/KnockDesk'
-SKIP_DIRS = ('node_modules', 'venv', '__pycache__', '.git', '.next')
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SKIP_DIRS = ('node_modules', 'venv', '.venv', '__pycache__', '.git', '.next', 'staging')
 n = 0
 for root, dirs, files in os.walk(ROOT):
-    dirs[:] = [x for x in dirs if x not in SKIP_DIRS]
+    dirs[:] = [x for x in dirs if x not in SKIP_DIRS and not x.endswith('.extracted') and not x.endswith('-unpacked')]
     for f in files:
         if not f.lower().endswith('.pak'):
             continue

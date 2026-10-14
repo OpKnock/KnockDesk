@@ -133,6 +133,7 @@ class DesktopAgentTownRuntime {
 
   _resolveDir() {
     const candidates = [
+      process.env.KNOCKDESK_AGENTTOWN_DIR,
       process.env.STONIC_AGENTTOWN_DIR,
       process.resourcesPath ? path.join(process.resourcesPath, 'agent-town-dist') : null,
       path.resolve(__dirname, '..', '..', 'resources', 'agent-town-dist'),
