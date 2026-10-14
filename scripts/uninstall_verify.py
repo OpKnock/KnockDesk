@@ -217,7 +217,8 @@ def run_checks(args: argparse.Namespace) -> int:
                     exists = True
             except FileNotFoundError:
                 pass
-            add_check(f"registry_{subkey.split('\\')[-1]}", not exists,
+            key_name = subkey.rsplit(chr(92), 1)[-1]
+            add_check(f"registry_{key_name}", not exists,
                      "Removed" if not exists else "Still present")
     except Exception as e:
         add_check("registry_check", False, f"Error: {e}", "warn")
