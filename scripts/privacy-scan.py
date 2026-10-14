@@ -79,18 +79,15 @@ def iter_files(target: Path):
     if not target.is_dir():
         return
     for current, dirs, filenames in os.walk(target):
-        dirs[:] = [
-            name
-            for name in dirs
-            if name not in {
-                ".git",
-                "node_modules",
-                "__pycache__",
-                ".next",
-                "dist",
-                "build",
-            }
-        ]
+        ignored_dirs = {
+            ".git",
+            "node_modules",
+            "__pycache__",
+            ".next",
+            "dist",
+            "build",
+        }
+        dirs[:] = [name for name in dirs if name not in ignored_dirs]
         for name in filenames:
             candidate = Path(current) / name
             if candidate.suffix.lower() in TEXT_SUFFIXES:
@@ -135,7 +132,9 @@ def main() -> int:
                 findings_total += 1
     print(f"Scanned {len(seen)} first-party text files; findings: {findings_total}")
     if findings_total:
-        print("Review matches manually; upstream legal attribution should not be deleted.")
+        print(
+            "Review matches manually; upstream legal attribution should not be deleted."
+        )
         return 1
     return 0
 
