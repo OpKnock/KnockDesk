@@ -80,6 +80,7 @@ function main() {
   if (existsSync(pwaSource)) cpSync(pwaSource, join(dist, 'pwa'), { recursive: true, force: true });
   assertExists(dist, [
     'main.js',
+    'bootstrap.js',
     'desktop-preload.js',
     'preload.js',
     'agenttown-preload.js',
@@ -105,6 +106,7 @@ function main() {
 
   assertExists(join(stagedDir, 'dist'), [
     'main.js',
+    'bootstrap.js',
     'desktop-preload.js',
     'preload.js',
     'agenttown-preload.js',
