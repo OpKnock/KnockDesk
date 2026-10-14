@@ -21,7 +21,7 @@ const rendererUrl = 'http://127.0.0.1:5174/desktop.html';
 
 function run(command, args, cwd) {
   console.log('>', command, args.join(' '));
-  execFileSync(command, args, { cwd, stdio: 'inherit' });
+  execFileSync(command, args, { cwd, stdio: 'inherit', shell: process.platform === 'win32' });
 }
 
 function sleep(ms) {
