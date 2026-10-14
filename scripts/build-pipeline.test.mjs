@@ -235,3 +235,10 @@ test('shutdown waits for owned runtime and one-shot memory processes to exit', (
   assert.ok(agentTown.includes('await Promise.allSettled(['));
   assert.ok(agentTown.includes('stopOwnedChild(ownedChild)'));
 });
+
+test('Windows source smoke test waits for the built desktop.html renderer', () => {
+  const smoke = readFileSync(resolve(root, 'scripts/source_desktop_smoke_test.py'), 'utf8');
+  assert.ok(smoke.includes('ELECTRON_APP / "dist" / "renderer" / "desktop.html"'));
+  assert.ok(smoke.includes('"renderer/desktop.html" in candidate.url'));
+  assert.equal(smoke.includes('"renderer/index.html" in candidate.url'), false);
+});
