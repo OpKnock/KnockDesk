@@ -20,6 +20,12 @@ function run(...args) {
 }
 
 function main() {
+  if (process.argv.includes('--dry-run')) {
+    console.log('Electron source:', electronDir);
+    console.log('Staging destination:', stagedDir);
+    console.log('Protected artifacts: resources/main.jsc, resources/app.asar, KnockDesk.exe');
+    return;
+  }
   // This package currently has no package-lock.json; npm ci would fail.
   run('install', '--no-save', '--package-lock=false', '--no-audit');
   run('run', 'compile');
