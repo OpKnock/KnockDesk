@@ -41,7 +41,7 @@ test('Electron loads the source-built KnockDesk shell and does not block on Herm
 
 test('staging script includes CommonJS services', () => {
   const source = readFileSync(script, 'utf8');
-  assert.ok(source.includes('copyRuntimeJs'));
+  assert.ok(source.includes('copyMissingJs'));
   assert.ok(source.includes('services/hermes-manager.js'));
 });
 
@@ -55,9 +55,12 @@ test('desktop renderer has its own stable output path', () => {
 
 test('desktop shell uses existing allowlisted IPC surfaces', () => {
   const app = readFileSync(resolve(root, 'resources/hermes-runtime/src/web/src/desktop/KnockDeskApp.tsx'), 'utf8');
-  for (const channel of ['hermes:get-state', 'hermes:get-preload-path', 'hermes:memory-read', 'hermes:memory-request', 'agenttown:get-state']) {
-    assert.ok(app.includes(channel), 'missing IPC integration: ' + channel);
+  for (const api of ['getRuntimeState()', 'getHermesPreloadPath()', 'readMemory()', 'requestMemory(instruction)', 'getAgentTownState()']) {
+    assert.ok(app.includes(api), 'missing typed bridge integration: ' + api);
   }
+  const preload = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/desktop-preload.js'), 'utf8');
+  assert.ok(preload.includes("exposeInMainWorld('knockdeskAPI'"));
+  assert.ok(!preload.includes('electronAPI'));
 });
 
 test('runtime state keeps structured status instead of stringifying it', () => {
