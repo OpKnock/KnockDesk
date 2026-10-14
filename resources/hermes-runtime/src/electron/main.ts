@@ -1,16 +1,16 @@
 /**
  * KnockDesk Electron Main Process
  * 
- * Entry point for the Electron main process. This file is compiled with bytenode
- * to produce main.jsc for production distribution.
+ * Maintained Electron entrypoint. The shipped bytecode is not generated here.
+ * This source opens the locally served Hermes dashboard so API calls and
+ * session-token injection have the expected same-origin HTTP context.
  */
 
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, dialog } from 'electron';
 import * as path from 'path';
-import * as fs from 'fs';
 
 // Import IPC handlers
-import { registerDomainHandlers, setMainWindow, getMainWindow } from './main/ipc/index.js';
+import { registerDomainHandlers, setMainWindow, setHermesManager, setKnockDeskBridge } from './main/ipc/index.js';
 
 // Import services
 import { ensureKnockDeskDirectories } from './main/bootstrap/knockdesk-bootstrap.js';
@@ -77,48 +77,42 @@ async function createWindow(): Promise<BrowserWindow> {
       allowRunningInsecureContent: false,
       experimentalFeatures: false,
     },
-    icon: path.join(__dirname, '../pwa/icon-512.png'),
+    icon: path.join(__dirname, 'pwa/icon-512.png'),
   });
 
-  // Load the dashboard
-  const dashboardUrl = process.env.NODE_ENV === 'development'
-    ? 'http://localhost:5173'
-    : `file://${path.join(__dirname, '../dist/index.html')}`;
+  // Install listeners before navigation to avoid missing ready-to-show.
+  mainWindow.once('ready-to-show', () => mainWindow?.show());
+  mainWindow.on('closed', () => { mainWindow = null; });
 
-  await mainWindow.loadURL(dashboardUrl);
-
-  // Show window when ready
-  mainWindow.once('ready-to-show', () => {
-    mainWindow?.show();
-  });
-
-  // Handle window close
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
-
-  // Register IPC handlers with the main window
+  // IPC must exist before renderer preload code invokes the bridge.
   setMainWindow(mainWindow);
   registerDomainHandlers();
 
-  // Initialize services
-  initializeServices(mainWindow);
-
+  // Hermes supplies the dashboard HTTP origin, API, and session bootstrap.
+  // A file:// navigation cannot provide those services.
+  const manager = await initializeServices(mainWindow);
+  if (manager.state !== 'ready') {
+    throw new Error('Hermes dashboard did not become ready: ' + (manager.error ?? manager.state));
+  }
+  const dashboardUrl = process.env.NODE_ENV === 'development'
+    ? 'http://127.0.0.1:5173'
+    : manager.baseUrl;
+  await mainWindow.loadURL(dashboardUrl);
   return mainWindow;
 }
 
-function initializeServices(window: BrowserWindow): void {
-  // Initialize Hermes Manager
+async function initializeServices(window: BrowserWindow): Promise<InstanceType<typeof HermesManager>> {
   hermesManager = new HermesManager();
   hermesManager.mainWindow = window;
-  hermesManager.start();
+  setHermesManager(hermesManager);
 
-  // Register Desktop handlers
   registerDesktopHandlers();
 
-  // Initialize KnockDesk Bridge
   knockDeskBridge = new KnockDeskBridge({ userDataDir: app.getPath('userData') });
-  knockDeskBridge.start();
+  setKnockDeskBridge(knockDeskBridge);
+  await knockDeskBridge.start();
+  await hermesManager.start();
+  return hermesManager;
 }
 
 // App event handlers
