@@ -16,4 +16,11 @@ jobs:
         with:
           python-version: '3.11'
       - run: python scripts/inventory.py
+      - name: Upload generated file inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: KnockDesk-Repository-Inventory-${{ github.sha }}
+          path: staging/INVENTORY.md
+          if-no-files-found: error
+          retention-days: 14
       - run: dir KnockDesk.exe
