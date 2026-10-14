@@ -25,7 +25,7 @@ function openExternal(target) {
   if (!['https:', 'http:', 'mailto:'].includes(parsed.protocol)) {
     return Promise.reject(new Error('Unsupported external URL protocol'));
   }
-  return ipcRenderer.invoke('system-open', { target: parsed.toString() });
+  return ipcRenderer.invoke('knockdesk:open-external', parsed.toString());
 }
 
 contextBridge.exposeInMainWorld('knockdeskAPI', Object.freeze({
