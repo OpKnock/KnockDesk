@@ -1,0 +1,437 @@
+@import 'tailwindcss';
+/* `fonts.css` must come BEFORE `globals.css`: as of @nous-research/ui 0.14.x,
+   `globals.css` only declares the `--font-*` CSS variables (Collapse, Rules
+   Compressed/Expanded, Mondwest). The `@font-face` registrations live in
+   `fonts.css`, so without this import the DS variables resolve to font
+   families the browser never loads and components fall back to a system
+   stack (Tabs, Segmented, Typography, Buttons, etc. all look unstyled). */
+@import '@nous-research/ui/styles/fonts.css';
+@import '@nous-research/ui/styles/globals.css';
+
+/* Scan the published design-system bundle so its utility classes survive
+   Tailwind's JIT purge. */
+@source '../node_modules/@nous-research/ui/dist';
+
+/* ------------------------------------------------------------------ */
+/* JetBrains Mono — bundled for the embedded TUI (/chat tab).          */
+/* Gives the terminal a proper monospace font even on systems where    */
+/* the user doesn't have one installed locally; xterm.js picks it up   */
+/* via ChatPage's `fontFamily` option.                                 */
+/* Apache-2.0.                                                         */
+/* ------------------------------------------------------------------ */
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts-terminal/JetBrainsMono-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts-terminal/JetBrainsMono-Bold.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts-terminal/JetBrainsMono-Italic.woff2') format('woff2');
+}
+
+/* ------------------------------------------------------------------ */
+/* Hermes Agent — Nous DS with the LENS_0 (Hermes teal) palette applied
+   statically as the default dashboard theme. */
+/* ------------------------------------------------------------------ */
+
+:root {
+  /* LENS_0 — from design-language/src/ui/components/overlays/index.tsx.
+     These are the defaults for the `default` (Hermes Teal) dashboard theme;
+     ThemeProvider rewrites them as inline styles when a user switches themes. */
+  --foreground: color-mix(in srgb, #ffffff 0%, transparent);
+  --foreground-base: #ffffff;
+  --foreground-alpha: 0;
+  --midground: color-mix(in srgb, #ffe6cb 100%, transparent);
+  --midground-base: #ffe6cb;
+  --midground-alpha: 1;
+  --background: color-mix(in srgb, #041c1c 100%, transparent);
+  --background-base: #041c1c;
+  --background-alpha: 1;
+
+  /* Typography tokens — rewritten by ThemeProvider. Defaults match the
+     system stack so themes that don't override look native. */
+  --theme-font-sans: system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --theme-font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo,
+    Consolas, monospace;
+  --theme-font-display: var(--theme-font-sans);
+  --theme-base-size: 15px;
+  --theme-line-height: 1.55;
+  --theme-letter-spacing: 0;
+
+  /* Layout tokens. */
+  --radius: 0.5rem;
+  --theme-radius: 0.5rem;
+  --theme-spacing-mul: 1;
+  --theme-density: comfortable;
+
+  /* Data-series accents — consumed by Analytics + Models pages for the
+     input-vs-output token visualisations (chart bars, table values,
+     legend swatches). Defaults are tuned for the Hermes-teal LENS_0
+     look: cream input + emerald-400 output read as warm/cool against
+     the dark canvas. Themes override via ThemeProvider, which emits
+     these as `--series-input-token` / `--series-output-token`. */
+  --series-input-token: #ffe6cb;
+  --series-output-token: #34d399;
+
+  /* =================================================================== */
+  /* KnockDesk v2 Design Tokens — New Design System                      */
+  /* =================================================================== */
+  /* Color Primitives */
+  --kd-color-bg-primary: #0a0c10;
+  --kd-color-bg-secondary: #111318;
+  --kd-color-bg-tertiary: #181b22;
+  --kd-color-bg-inverse: #f0f2f5;
+  --kd-color-bg-hover: #1a1e26;
+  --kd-color-bg-active: #222730;
+
+  --kd-color-fg-primary: #e8eaed;
+  --kd-color-fg-secondary: #9aa0a6;
+  --kd-color-fg-muted: #6b7280;
+  --kd-color-fg-inverse: #1a1a2e;
+  --kd-color-fg-link: #4fc3f7;
+
+  --kd-color-border-default: #252933;
+  --kd-color-border-strong: #313642;
+  --kd-color-border-focus: #4fc3f7;
+  --kd-color-border-error: #f44336;
+  --kd-color-border-success: #4caf50;
+
+  --kd-color-accent-cyan: #4fc3f7;
+  --kd-color-accent-amber: #ffb300;
+  --kd-color-accent-emerald: #4ade80;
+  --kd-color-accent-rose: #f87171;
+  --kd-color-accent-violet: #c084fc;
+  --kd-color-accent-indigo: #818cf8;
+
+  --kd-color-status-info: #4fc3f7;
+  --kd-color-status-success: #4ade80;
+  --kd-color-status-warning: #ffb300;
+  --kd-color-status-error: #f87171;
+
+  --kd-color-overlay-scrim: rgba(0,0,0,0.6);
+  --kd-color-overlay-modal: rgba(10,12,16,0.95);
+  --kd-color-overlay-popover: rgba(17,19,24,0.98);
+  --kd-color-overlay-tooltip: rgba(26,29,36,0.95);
+
+  /* Spacing Scale (4px base) */
+  --kd-space-0: 0;
+  --kd-space-1: 4px;
+  --kd-space-2: 8px;
+  --kd-space-3: 12px;
+  --kd-space-4: 16px;
+  --kd-space-5: 20px;
+  --kd-space-6: 24px;
+  --kd-space-8: 32px;
+  --kd-space-10: 40px;
+  --kd-space-12: 48px;
+  --kd-space-16: 64px;
+  --kd-space-20: 80px;
+  --kd-space-24: 96px;
+
+  /* Border Radius */
+  --kd-radius-none: 0;
+  --kd-radius-sm: 4px;
+  --kd-radius-md: 8px;
+  --kd-radius-lg: 12px;
+  --kd-radius-xl: 16px;
+  --kd-radius-2xl: 24px;
+  --kd-radius-full: 9999px;
+
+  /* Shadows */
+  --kd-shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --kd-shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+  --kd-shadow-lg: 0 12px 28px rgba(0,0,0,0.5);
+  --kd-shadow-xl: 0 20px 40px rgba(0,0,0,0.6);
+  --kd-shadow-focus: 0 0 0 3px rgba(79,195,247,0.4);
+  --kd-shadow-inner: inset 0 2px 4px rgba(0,0,0,0.3);
+
+  /* Typography */
+  --kd-font-family-sans: "Inter", "IBM Plex Sans", system-ui, sans-serif;
+  --kd-font-family-mono: "JetBrains Mono", "Fira Code", monospace;
+  --kd-font-family-ui: system-ui, -apple-system, sans-serif;
+
+  --kd-font-size-xs: 11px;
+  --kd-font-size-sm: 13px;
+  --kd-font-size-base: 14px;
+  --kd-font-size-lg: 16px;
+  --kd-font-size-xl: 18px;
+  --kd-font-size-2xl: 20px;
+  --kd-font-size-3xl: 24px;
+  --kd-font-size-4xl: 30px;
+
+  --kd-font-weight-normal: 400;
+  --kd-font-weight-medium: 500;
+  --kd-font-weight-semibold: 600;
+  --kd-font-weight-bold: 700;
+
+  --kd-font-line-height-tight: 1.2;
+  --kd-font-line-height-normal: 1.5;
+  --kd-font-line-height-relaxed: 1.75;
+  --kd-font-line-height-code: 1.6;
+
+  /* Motion */
+  --kd-motion-fast: 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --kd-motion-normal: 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --kd-motion-slow: 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --kd-motion-spring: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Z-Index */
+  --kd-zIndex-base: 0;
+  --kd-zIndex-dropdown: 100;
+  --kd-zIndex-sticky: 200;
+  --kd-zIndex-modal: 300;
+  --kd-zIndex-popover: 400;
+  --kd-zIndex-tooltip: 500;
+  --kd-zIndex-toast: 600;
+  --kd-zIndex-command: 700;
+
+  /* Breakpoints */
+  --kd-breakpoint-sm: 640px;
+  --kd-breakpoint-md: 768px;
+  --kd-breakpoint-lg: 1024px;
+  --kd-breakpoint-xl: 1280px;
+  --kd-breakpoint-2xl: 1536px;
+
+  /* Semantic Aliases (for component usage) */
+  --kd-bgCanvas: var(--kd-color-bg-primary);
+  --kd-bgCard: var(--kd-color-bg-secondary);
+  --kd-bgElevated: var(--kd-color-bg-tertiary);
+  --kd-bgHover: var(--kd-color-bg-hover);
+  --kd-bgActive: var(--kd-color-bg-active);
+
+  --kd-textPrimary: var(--kd-color-fg-primary);
+  --kd-textSecondary: var(--kd-color-fg-secondary);
+  --kd-textMuted: var(--kd-color-fg-muted);
+  --kd-textLink: var(--kd-color-fg-link);
+
+  --kd-borderDefault: var(--kd-color-border-default);
+  --kd-borderStrong: var(--kd-color-border-strong);
+  --kd-borderFocus: var(--kd-color-border-focus);
+
+  --kd-brandPrimary: var(--kd-color-accent-cyan);
+  --kd-brandWarning: var(--kd-color-accent-amber);
+  --kd-brandSuccess: var(--kd-color-accent-emerald);
+  --kd-brandError: var(--kd-color-accent-rose);
+  --kd-brandMagic: var(--kd-color-accent-violet);
+
+  --kd-statusInfo: var(--kd-color-status-info);
+  --kd-statusOk: var(--kd-color-status-success);
+  --kd-statusWarn: var(--kd-color-status-warning);
+  --kd-statusErr: var(--kd-color-status-error);
+
+  --kd-overlayScrim: var(--kd-color-overlay-scrim);
+  --kd-overlayModal: var(--kd-color-overlay-modal);
+  --kd-overlayPopover: var(--kd-color-overlay-popover);
+
+  --kd-space1: var(--kd-space-1);
+  --kd-space2: var(--kd-space-2);
+  --kd-space3: var(--kd-space-3);
+  --kd-space4: var(--kd-space-4);
+  --kd-space5: var(--kd-space-5);
+  --kd-space6: var(--kd-space-6);
+  --kd-space8: var(--kd-space-8);
+
+  --kd-radiusSm: var(--kd-radius-sm);
+  --kd-radiusMd: var(--kd-radius-md);
+  --kd-radiusLg: var(--kd-radius-lg);
+  --kd-radiusXl: var(--kd-radius-xl);
+  --kd-radiusFull: var(--kd-radius-full);
+
+  --kd-shadowSm: var(--kd-shadow-sm);
+  --kd-shadowMd: var(--kd-shadow-md);
+  --kd-shadowLg: var(--kd-shadow-lg);
+  --kd-shadowFocus: var(--kd-shadow-focus);
+
+  --kd-fontSans: var(--kd-font-family-sans);
+  --kd-fontMono: var(--kd-font-family-mono);
+  --kd-textXs: var(--kd-font-size-xs);
+  --kd-textSm: var(--kd-font-size-sm);
+  --kd-textBase: var(--kd-font-size-base);
+  --kd-textLg: var(--kd-font-size-lg);
+  --kd-textXl: var(--kd-font-size-xl);
+  --kd-fontNormal: var(--kd-font-weight-normal);
+  --kd-fontMedium: var(--kd-font-weight-medium);
+  --kd-fontSemibold: var(--kd-font-weight-semibold);
+  --kd-fontBold: var(--kd-font-weight-bold);
+
+  --kd-motionFast: var(--kd-motion-fast);
+  --kd-motionNormal: var(--kd-motion-normal);
+  --kd-motionSlow: var(--kd-motion-slow);
+
+  --kd-zModal: var(--kd-zIndex-modal);
+  --kd-zPopover: var(--kd-zIndex-popover);
+  --kd-zToast: var(--kd-zIndex-toast);
+
+/* Theme tokens cascade into the document root so every descendant inherits
+   the font stack, base size, and letter spacing without explicit calls. */
+html {
+  font-family: var(--theme-font-sans);
+  font-size: var(--theme-base-size);
+  line-height: var(--theme-line-height);
+  letter-spacing: var(--theme-letter-spacing);
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--theme-font-sans);
+  min-height: 0;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+code, kbd, pre, samp, .font-mono, .font-mono-ui {
+  font-family: var(--theme-font-mono);
+}
+
+/* Density: scale the shadcn spacing utilities via a multiplier. The DS
+   components use `p-N` / `gap-N` / `space-*` classes which resolve against
+   Tailwind's spacing scale; multiplying `--spacing` at :root scales them
+   all proportionally in Tailwind v4. */
+@theme inline {
+  --spacing: calc(0.25rem * var(--theme-spacing-mul, 1));
+  --font-sans: var(--theme-font-sans);
+  --font-mono: var(--theme-font-mono);
+}
+
+#root {
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  html,
+  body,
+  #root {
+    min-height: 100dvh;
+    height: auto;
+    max-height: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+}
+
+/* Nousnet's hermes-agent layout bumps `small` and `code` to readable
+   dashboard sizes. Keep in sync. */
+small { font-size: 1.0625rem; }
+code { font-size: 0.875rem; }
+
+/* Shadcn-compat tokens.
+   The dashboard's page code predates the Nous DS and uses shadcn-style
+   utility classes (bg-card, text-muted-foreground, border-border, etc.)
+   extensively. Rather than rewrite every call site, we expose those
+   tokens on top of the Nous palette so classes continue to resolve. */
+} /* :root */
+
+@theme inline {
+  /* Remap foreground to midground so `text-foreground` / `bg-foreground`
+     stay visible — in LENS_0, `--foreground` itself has alpha 0. */
+  --color-foreground: var(--midground);
+
+  --color-card: color-mix(in srgb, var(--midground-base) 4%, var(--background-base));
+  --color-card-foreground: var(--midground);
+  --color-primary: var(--midground);
+  --color-primary-foreground: var(--background-base);
+  --color-secondary: color-mix(in srgb, var(--midground-base) 6%, var(--background-base));
+  --color-secondary-foreground: var(--midground);
+  --color-muted: color-mix(in srgb, var(--midground-base) 8%, var(--background-base));
+  /* Routes the shadcn `muted-foreground` slot through the DS semantic
+     text-secondary token (defaults to midground 80%) so legacy call
+     sites that use `text-muted-foreground` get a readable color
+     instead of the old 55%-transparent default. */
+  --color-muted-foreground: var(--color-text-secondary);
+  --color-accent: color-mix(in srgb, var(--midground-base) 10%, var(--background-base));
+  --color-accent-foreground: var(--midground);
+  --color-destructive: #fb2c36;
+  --color-destructive-foreground: #ffffff;
+  --color-success: #4ade80;
+  --color-warning: #ffbd38;
+  --color-border: color-mix(in srgb, var(--midground-base) 15%, transparent);
+  --color-input: color-mix(in srgb, var(--midground-base) 15%, transparent);
+  --color-ring: var(--midground);
+  --color-popover: color-mix(in srgb, var(--midground-base) 4%, var(--background-base));
+  --color-popover-foreground: var(--midground);
+
+  --radius-sm: calc(var(--theme-radius) - 4px);
+  --radius-md: calc(var(--theme-radius) - 2px);
+  --radius-lg: var(--theme-radius);
+  --radius-xl: calc(var(--theme-radius) + 4px);
+}
+
+
+/* Collapsed sidebar tooltip entrance — skipped when moving between items. */
+@keyframes sidebar-tooltip-in {
+  from { opacity: 0; transform: translateY(-50%) translateX(-4px); }
+  to   { opacity: 1; transform: translateY(-50%) translateX(0); }
+}
+
+/* Toast animations used by `components/Toast.tsx`. */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes toast-out {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(16px); }
+}
+
+/* Generic fade + dialog entrance used by popovers and confirm dialogs. */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes dialog-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Hide scrollbar utility — used by the header's overflow-x nav row. */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* System UI-monospace stack — distinct from `font-courier` (Courier
+   Prime), used for dense data readouts where the display font would
+   break the grid. Routes through the theme's mono stack so themes
+   with a different monospace (JetBrains Mono, IBM Plex Mono, etc.)
+   still apply here. */
+.font-mono-ui {
+  font-family: var(--theme-font-mono);
+}
+
+/* Subtle grain overlay for badges. */
+.grain {
+  position: relative;
+}
+.grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.12;
+  pointer-events: none;
+  background: repeating-conic-gradient(currentColor 0% 25%, #0000 0% 50%) 0 0 /
+    2px 2px;
+}
+

@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="./logo.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Inter, network se — magar JAAN BUJH KAR non-blocking.
+       Ek aam <link rel="stylesheet"> render-blocking hota hai: Chromium
+       pehla paint tab tak rokta hai jab tak fonts.googleapis.com jawab na de.
+       Desktop app offline bhi chalti hai, aur client ki machine par slow DNS,
+       captive portal ya corporate proxy is intezaar ko kai second ka bana
+       deta hai — sirf ek font ke liye, jabki app khud disk par maujood hai.
+       `media="print"` browser ko batata hai ke ye screen ke liye zaroori nahi,
+       is liye wo paint rok kar nahi baithta; utarte hi onload ise `all` kar
+       deta hai aur font apni jagah aa jata hai. URL mein `display=swap`
+       pehle se hai, is liye text kabhi ghaib nahi hota — fallback font mein
+       likha rehta hai aur phir Inter par badal jata hai. -->
+  <link rel="stylesheet" media="print" onload="this.media='all';this.onload=null"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+  <title>KnockDesk</title>
+  <style id="kd-pro-theme">
+    /* KnockDesk Pro grade — high-contrast, professional, clean. */
+    :root {
+      /* Defaults only: NO !important here. The theme switcher applies its own
+         values as inline styles, and inline styles lose to !important, which
+         is what was silently blocking every theme change. */
+      --j-cyan: #38bdf8;
+      --j-cyan-rgb: 56 189 248;
+      --j-panel: #0a0f16;
+      --j-text-primary: 249 250 251;
+      --j-text-secondary: 148 163 184;
+      --iron-panel: 10 14 20;
+      --iron-panel2: 14 19 27;
+      --iron-raised: 21 28 39;
+      --iron-well: 6 9 14;
+      --iron-ice: 125 211 252;
+      --iron-sky: 56 189 248;
+      --iron-text: 249 250 251;
+      --iron-dim: 203 213 225;
+      --iron-muted: 148 163 184;
+      --iron-amber: 251 191 36;
+      --iron-line: 100 116 139;
+    }
+    * { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+    ::selection { background: rgba(56,189,248,.30) !important; }
+    :focus-visible { outline: 1px solid rgba(56,189,248,.65) !important; outline-offset: 2px; }
+    /* Entering screen — dark, matches the app. Mark: dist/logo.png */
+    #kd-intro { position: fixed; inset: 0; z-index: 99999; background: #07090d;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 28px; transition: opacity .6s ease; }
+    #kd-intro.kd-leave { opacity: 0; pointer-events: none; }
+    #kd-intro .kd-mark { width: 172px; height: 172px; border-radius: 44px; overflow: hidden;
+      box-shadow: 0 0 0 1px rgba(244,240,230,.14), 0 28px 70px rgba(0,0,0,.65), 0 0 90px rgba(56,189,248,.10);
+      animation: kdRise 1s cubic-bezier(.2,.9,.25,1.15) both; }
+    #kd-intro .kd-mark img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    #kd-intro .kd-word { font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      font-size: 30px; font-weight: 200; letter-spacing: .52em; text-indent: .52em;
+      color: #f4f0e6; animation: kdFade 1.2s ease .7s both; }
+    #kd-intro .kd-tag { font-family: ui-monospace, monospace; font-size: 11px;
+      letter-spacing: .34em; text-indent: .34em; color: rgba(244,240,230,.48);
+      animation: kdFade 1.2s ease 1.1s both; }
+    #kd-intro .kd-bar { width: 216px; height: 2px; background: rgba(244,240,230,.14);
+      border-radius: 2px; overflow: hidden; animation: kdFade .8s ease 1.2s both; }
+    #kd-intro .kd-bar > span { display: block; height: 100%; width: 0; background: #f4f0e6;
+      border-radius: 2px; animation: kdLoad 3.1s cubic-bezier(.3,.7,.3,1) 1.1s both; }
+    @keyframes kdRise { from { opacity: 0; transform: translateY(26px) scale(.92); }
+      to { opacity: 1; transform: none; } }
+    @keyframes kdFade { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes kdLoad { from { width: 0; } to { width: 100%; } }
+  
+    /* Header logo size increase - bigger for visibility.
+       src-based selectors (not alt-based): the bundled alt text varies. */
+    nav img[src*="logo_withoutbackground"],
+    nav img[src*="logo.png"] {
+      width: 48px !important;
+      height: 48px !important;
+    }
+    /* Also increase logo in any toolbar/header */
+    header img[src*="logo_withoutbackground"],
+    header img[src*="logo.png"],
+    .header img[src*="logo_withoutbackground"],
+    .header img[src*="logo.png"] {
+      width: 48px !important;
+      height: 48px !important;
+    }
+    /* Intro screen logo */
+    #kd-intro .kd-mark {
+      width: 230px !important;
+      height: 230px !important;
+    }
+</style>
+  <script type="module" crossorigin src="./assets/index-u5ljrpMR.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/icons-D0Ma8TzF.js">
+  <link rel="modulepreload" crossorigin href="./assets/markdown-BQu4v9Mi.js">
+  <link rel="modulepreload" crossorigin href="./assets/react-JO88gsA6.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-C1dltSfT.css">
+</head>
+
+<body>
+  <div id="kd-intro" aria-hidden="true">
+    <div class="kd-mark"><img src="./logo.png" alt="KnockDesk" draggable="false"></div>
+    <div class="kd-word">KnockDesk</div>
+    <div class="kd-tag">LOCAL &#183; PRIVATE &#183; YOURS</div>
+    <div class="kd-bar"><span></span></div>
+  </div>
+  <div id="root"></div>
+  <script>
+  // KnockDesk entering screen: fixed ~4.6s showcase, then hands over to the app.
+  (function () {
+    function done() {
+      var el = document.getElementById('kd-intro');
+      if (!el || el.classList.contains('kd-leave')) return;
+      el.classList.add('kd-leave');
+      setTimeout(function () { try { el.remove(); } catch (e) {} window.__kdIntroDone = true; }, 700);
+    }
+    setTimeout(done, 4600);
+    setTimeout(done, 8000); // backstop
+  })();
+  </script>
+  <script>
+  // KnockDesk local build: hide server-linked UI that has no backend anymore
+  // (billing, cloud upsells, external marketing channel, remote dashboard).
+  // Pure display-hiding - no app logic touched. Backend for these is already
+  // neutered in the preload bridge.
+  (function () {
+    window.LAST_LEN = -1;
+    window.LAST_HIT = 0;
+    window.txt = function(e) {
+      try { return ((e.textContent || '').replace(/\s+/g, ' ').trim()); }
+      catch (err) { return ''; }
+    };
+    window.hide = function(el) {
+      try {
+        if (!el || el === document.body || el === document.documentElement) return;
+        if (el.id === 'root' || el.id === 'kd-intro') return;
+        if (el.querySelector && (el.querySelector('#root') || el.querySelector('main'))) return;
+        // Never hide modal/dialog roots (e.g. the Settings window): hiding a
+        // container by matched descendant text is what broke Settings before.
+        if (typeof el.className === 'string' &&
+            (el.className.indexOf('fixed inset-0') !== -1 || el.className.indexOf('z-[200]') !== -1)) return;
+        var len = window.txt(el).length;
+        if (!(len > 0) || len > 2600) return;
+        el.style.setProperty('display', 'none', 'important');
+      } catch (e) {}
+    };
+    window.bounded = function(el, maxChars) {
+      try {
+        var t = window.txt(el);
+        return t.length > 0 && t.length < (maxChars || 2000);
+      } catch (e) { return false; }
+    };
+    window.up = function(el, n) { var x = el, i = 0; while (x && i < n) { x = x.parentElement; i++; } return x; };
+    window.sweep = function() {
+      try {
+        // 1) Billing/account-destructive buttons (contains-match: labels may
+        //    carry emoji/icon prefixes). Sign-out is hidden too: wiping local
+        //    auth serves no purpose in a universal no-login build.
+        document.querySelectorAll('button').forEach(function (b) {
+          var t = window.txt(b);
+          if (/manage billing/i.test(t) || /^feedback$/i.test(t) ||
+              /manage subscription/i.test(t) ||
+              /sign out completely/i.test(t) ||
+              /or run on .* with a plan/i.test(t) ||
+              /^(start|get) a plan$/i.test(t) || /^view plans?$/i.test(t) ||
+              /^see plans?$/i.test(t) || /^subscription$/i.test(t) ||
+              /^remote$/i.test(t) ||
+              /^follow\b.*channel/i.test(t) ||
+              /^upgrade\b/i.test(t) ||
+              /^see plans?$/i.test(t)) window.hide(b);
+        });
+        // 2) Cloud engine card: title is exactly "KnockDesk", sibling BYOK card
+        //    says "Your own API keys" - hide only the cloud one.
+        document.querySelectorAll('p').forEach(function (p) {
+          try {
+            if (window.txt(p) !== 'KnockDesk') return;
+            var card = p, i = 0;
+            while (card && i < 5 && card.tagName !== 'BUTTON') { card = card.parentElement; i++; }
+            if (!card || card.tagName !== 'BUTTON') return;
+            if (!window.bounded(card, 900)) return;
+            var ctxt = window.txt(card);
+            if (/your own api keys/i.test(ctxt)) return;
+            if (/plan|runs on|free month|billed|subscription/i.test(ctxt)) window.hide(card);
+          } catch (e) {}
+        });
+        // 3) Lifetime/plan header + billing sections.
+        document.querySelectorAll('h1,h2,h3,p,div').forEach(function (e) {
+          try {
+            var t = window.txt(e);
+            if (t === 'KnockDesk Lifetime') {
+              var head = window.up(e, 1);
+              if (head && window.bounded(head, 800)) window.hide(head);
+              return;
+            }
+            // Self-only: hide the short matching line itself, never an ancestor
+            // (ancestor-hiding by descendant text killed the Settings panel).
+            if (t.length > 0 && t.length < 500 &&
+                /^(no .* plan on this account|manual transfer|card \(auto-renews\)|want everything to run on .* again)/i.test(t)) {
+              window.hide(e);
+            }
+          } catch (err) {}
+        });
+        // 4) Lead-capture phone row (country-code picker).
+        // 4b) Tutorial entries that open YouTube (bounded card containing the
+        //     marker). The local Button Tour stays.
+        document.querySelectorAll('button').forEach(function (b) {
+          try {
+            if (!/^watch\b/i.test(window.txt(b))) return;
+            var card = window.up(b, 5);
+            if (!card || !window.bounded(card, 1500)) return;
+            if (/watch on youtube/i.test(window.txt(card))) window.hide(card);
+          } catch (e) {}
+        });
+        document.querySelectorAll('button[aria-label^="Country code:"]').forEach(function (b) {
+          var row = window.up(b, 3);
+          if (row && window.bounded(row, 1200)) window.hide(row);
+        });
+        // 5) WhatsApp marketing-channel card (external link card).
+        document.querySelectorAll('a[href*="whatsapp.com/channel"]').forEach(function (a) {
+          var n = a, i = 0;
+          while (n && i < 5) { n = n.parentElement; i++; if (n && /follow|channel/i.test(window.txt(n).slice(0, 80))) { window.hide(n); break; } }
+        });
+        // 6) Remote dashboard webviews: kill the remote load itself (safe -
+        //    targets the frame element only, never layout containers).
+        //    NOTE: feed placeholder TEXT is intentionally left alone: hiding by
+        //    text once matched the whole content column during progressive
+        //    render and blacked out the app. Text is inert/local; frames are
+        //    what actually phones home.
+        document.querySelectorAll('webview,iframe').forEach(function (w) {
+          var s = w.getAttribute('src') || '';
+          // Allow World Monitor, SAT-Link Feed, Today's Headlines, and local dev
+          var allowed = [
+            'worldmonitor.app',
+            'sat-link',
+            'satellite stream',
+            'today\'s headlines',
+            'today headlines',
+            '127.0.0.1',
+            'localhost'
+          ];
+          var isAllowed = allowed.some(function(a) { return s.toLowerCase().includes(a.toLowerCase()); });
+          if (/worldmonitor|stonicai|127\.0\.0\.1/i.test(s) && !isAllowed) {
+            var n = w, i = 0;
+            while (n && i < 6) {
+              n = n.parentElement; i++;
+              if (n && /sat-link|satellite stream/i.test(window.txt(n).slice(0, 120))) { window.hide(n); break; }
+            }
+            if (i >= 6) window.hide(w);
+          }
+        });
+        // 7) Settings tabs with no local backend: hide the tab BUTTONS only.
+        //    Never hide tab containers or panels (that kills Settings itself).
+        document.querySelectorAll('button,[role=tab]').forEach(function (b) {
+          var t = window.txt(b);
+          if (/^tutorials?$/i.test(t) || /^subscription$/i.test(t) || /^remote$/i.test(t) ||
+              /^follow\b.*channel$/i.test(t)) window.hide(b);
+        });
+        // 7b) Profile > WhatsApp card: anchor on its Follow Channel button and
+        //     hide the smallest matching ancestor card only (never a panel).
+        document.querySelectorAll('button').forEach(function (b) {
+          try {
+            if (!/^follow\b.*channel$/i.test(window.txt(b))) return;
+            var n = b;
+            for (var i = 0; i < 3; i++) {
+              n = n.parentElement; if (!n) break;
+              var ct = window.txt(n);
+              if (ct.length > 0 && ct.length < 900 && /whatsapp/i.test(ct)) { window.hide(n); break; }
+            }
+          } catch (e) {}
+        });
+        // 7c) Profile > WhatsApp title line: hide the short title element itself.
+        document.querySelectorAll('div').forEach(function (d) {
+          try {
+            var t = window.txt(d);
+            if (t.length === 0 || t.length > 60) return;
+            if (/^KnockDesk on whatsapp$/i.test(t)) window.hide(d);
+          } catch (e) {}
+        });
+        // 7d) Subscription upsell lines: hide short matching elements THEMSELVES
+        //     only (never ancestors) so panels/modals can never be hidden.
+        document.querySelectorAll('p,div,span').forEach(function (e) {
+          try {
+            var t = window.txt(e);
+            if (t.length === 0 || t.length > 400) return;
+            if (/want everything to run on .* again|add a plan any time|your lifetime licence never|no .* plan on this account|^see plans?$/i.test(t)) window.hide(e);
+          } catch (e2) {}
+        });
+        // 7e) Remote > stonic path ref: hide the code tag and its short parent
+        //     line only.
+        document.querySelectorAll('code').forEach(function (e) {
+          try {
+            if (/stonic-app\/supabase\/remote-link\.sql/i.test(window.txt(e))) window.hide(e);
+          } catch (e2) {}
+        });
+        document.querySelectorAll('p').forEach(function (e) {
+          try {
+            var t = window.txt(e);
+            if (t.length === 0 || t.length > 300) return;
+            if (/stonic-app\/supabase\/remote-link\.sql/i.test(t)) window.hide(e);
+          } catch (e2) {}
+        });
+        // 9) Header brand normalization (src-based: bundled alt text varies).
+        try {
+          var logo = document.querySelector('nav img[src*="logo_withoutbackground"], nav img[src*="logo.png"]');
+          if (logo) {
+            if (logo.alt !== 'KnockDesk') logo.alt = 'KnockDesk';
+            var sib = logo.nextElementSibling;
+            if (sib && sib.textContent && sib.textContent.trim() === 'KnockDesk') {
+              sib.textContent = 'KnockDesk';
+            }
+          }
+        } catch (e2) {}
+      } catch (e) {}
+    };
+    // Timed passes only (no MutationObserver - observing every render caused
+    // layout thrash that stalled boot). textContent reads above never force
+    // layout, so these passes are cheap.
+    window.pass = function() {
+      try {
+        var len = (document.body ? document.body.textContent.length : 0) | 0;
+        if (len === window.LAST_LEN) {
+          if (Date.now() - window.LAST_HIT < 20000) return;
+        }
+        window.LAST_LEN = len;
+        window.LAST_HIT = Date.now();
+        window.sweep();
+      } catch (e) {}
+    };
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(window.pass, 1500); });
+    // Sweep on click immediately AND right after paint, so freshly rendered
+    // panels (e.g. Settings tabs) never visibly flash before being cleaned.
+    document.addEventListener('click', function () {
+      try { window.sweep(); } catch (e) {}
+      if (window.requestAnimationFrame) {
+        window.requestAnimationFrame(function () { try { window.sweep(); } catch (e) {} });
+      }
+      setTimeout(window.pass, 150);
+    }, true);
+    // Scoped observer: watch ONLY an open Settings modal for tab switches.
+    // (Never observe document.body: that caused layout thrash and stalled boot.)
+    var kdSettingsObs = null, kdSettingsSched = false;
+    function kdSettingsSweep() {
+      if (kdSettingsSched) return; kdSettingsSched = true;
+      function run() { kdSettingsSched = false; try { window.sweep(); } catch (e) {} }
+      if (window.requestAnimationFrame) window.requestAnimationFrame(run);
+      else setTimeout(run, 50);
+    }
+    function kdWatchSettings() {
+      try {
+        var modal = null;
+        var divs = document.querySelectorAll('div.fixed.inset-0');
+        for (var i = 0; i < divs.length; i++) {
+          if (getComputedStyle(divs[i]).display === 'none') continue;
+          var head = window.txt(divs[i]).slice(0, 160);
+          if (/settings/i.test(head) && /ai engine/i.test(head)) { modal = divs[i]; break; }
+        }
+        if (modal) {
+          if (kdSettingsObs) { try { kdSettingsObs.disconnect(); } catch (e) {} }
+          else { kdSettingsObs = new MutationObserver(function () { kdSettingsSweep(); }); }
+          kdSettingsObs.observe(modal, { childList: true, subtree: true });
+        } else if (kdSettingsObs) { try { kdSettingsObs.disconnect(); } catch (e) {} }
+      } catch (e) {}
+    }
+    setInterval(kdWatchSettings, 2000);
+    setTimeout(window.pass, 6000);
+    setTimeout(window.pass, 15000);
+    setInterval(window.pass, 10000);
+  })();
+</script>
+
+  <script>
+  // KnockDesk startup fixes
+  (function() {
+    // First-run onboarding is a chooser overlay; returning users skip it.
+    // Pre-seed the completion flag (harmless if the bundle ignores it).
+    try {
+      if (localStorage.getItem('knockdesk_onboarding_seen') === null) {
+        localStorage.setItem('knockdesk_onboarding_seen', 'true');
+      }
+    } catch (e) {}
+    // One-time rebrand migration: intermediate `knockdesk*` localStorage keys
+    // (written by a brief dev build) wapas `stonic*` naamon par copy karo —
+    // sirf jab nayi key maujood na ho. Purani keys rehne do.
+    try {
+      var THEME_REMAP = { 'knockdesk-iron': 'stonic-iron', 'knockdesk-jarvis': 'stonic-jarvis' };
+      var THEME_KEYS = ['stonic_dashboard_theme', 'stonic_hud_theme'];
+      var seen = {};
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!k) continue;
+        var nk = null;
+        if (k.indexOf('knockdesk_') === 0) nk = 'stonic_' + k.slice(10);
+        else if (k.indexOf('KNOCKDESK_') === 0) nk = 'STONIC_' + k.slice(10);
+        else if (k.indexOf('knockdesk.') === 0) nk = 'stonic.' + k.slice(10);
+        else if (k === 'knockdesk-remote-device-id') nk = 'stonic-remote-device-id';
+        else if (k === 'knockdesk-voice-mode') nk = 'stonic-voice-mode';
+        if (!nk || seen[nk]) continue;
+        seen[nk] = 1;
+        try {
+          if (localStorage.getItem(nk) === null) {
+            var v = localStorage.getItem(k);
+            if (THEME_KEYS.indexOf(nk) !== -1 && THEME_REMAP[v]) v = THEME_REMAP[v];
+            localStorage.setItem(nk, v);
+          }
+        } catch (e) {}
+      }
+    } catch (e) {}
+
+    // Ensure header logo size + brand (CSS !important rule above wins for
+    // size; keep in sync). Src-based lookup: bundled alt text varies.
+    try {
+      var logo = document.querySelector('nav img[src*="logo_withoutbackground"], nav img[src*="logo.png"]');
+      if (logo) {
+        logo.style.width = '48px';
+        logo.style.height = '48px';
+        if (logo.alt !== 'KnockDesk') logo.alt = 'KnockDesk';
+        // Adjacent wordmark (brand name next to the logo): normalize once.
+        var sib = logo.nextElementSibling;
+        if (sib && sib.textContent && sib.textContent.trim() === 'KnockDesk') {
+          sib.textContent = 'KnockDesk';
+        }
+      }
+    } catch (e) {}
+  })();
+  </script>
+</body>
+
+</html>

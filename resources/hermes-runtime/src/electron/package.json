@@ -1,0 +1,27 @@
+{
+  "name": "knockdesk-electron-main",
+  "version": "1.0.0",
+  "description": "KnockDesk Electron Main Process",
+  "private": true,
+  "type": "commonjs",
+  "main": "dist/main.jsc",
+  "scripts": {
+    "dev": "tsx watch main.ts",
+    "build": "npm run compile && npm run bytenode",
+    "compile": "tsc --project tsconfig.build.json",
+    "bytenode": "bytenode --compile dist/main.js --output dist/main.jsc",
+    "bytenode:verify": "node -e \"require('bytenode'); require('./dist/main.jsc'); console.log('main.jsc loads successfully')\""
+  },
+  "dependencies": {
+    "electron": "^32.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "bytenode": "^1.7.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
