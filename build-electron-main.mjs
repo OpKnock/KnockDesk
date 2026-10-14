@@ -59,9 +59,11 @@ function main() {
   cpSync(dist, stagedDist, { recursive: true });
   // TypeScript emits its own files, but allowJs does not ensure every
   // hand-written CommonJS dependency is present. Copy missing JS siblings.
-  for (const folder of ['main', 'services', 'pwa']) {
+  for (const folder of ['main', 'services']) {
     copyRuntimeJs(join(electronDir, folder), join(stagedDist, folder));
   }
+  const pwa = join(electronDir, 'pwa');
+  if (existsSync(pwa)) cpSync(pwa, join(stagedDist, 'pwa'), { recursive: true, force: true });
   for (const name of ['preload.js', 'agenttown-preload.js', 'hermes-preload.js']) {
     const source = join(electronDir, name);
     if (!existsSync(source)) throw new Error('Missing Electron preload: ' + name);
