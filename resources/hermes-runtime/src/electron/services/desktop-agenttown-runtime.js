@@ -8,6 +8,7 @@
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const http = require('node:http');
+const net = require('node:net');
 const path = require('node:path');
 const { hermesSpawnEnv, resolveHermesExe } = require('./hermes-runtime');
 
@@ -15,13 +16,40 @@ const DEFAULT_PORT = Number.parseInt(process.env.KNOCKDESK_AGENTTOWN_PORT || pro
 
 function probe(url, timeoutMs = 1200) {
   return new Promise((resolve, reject) => {
-    const req = http.get(url, { timeout: timeoutMs }, (res) => {
-      res.resume();
-      if ((res.statusCode || 500) >= 200 && (res.statusCode || 500) < 400) resolve(res.statusCode);
-      else reject(new Error('AgentTown returned HTTP ' + res.statusCode));
+    const req = http.get(url, { timeout: timeoutMs, headers: { accept: 'text/html' } }, (res) => {
+      const chunks = [];
+      let size = 0;
+      res.on('data', (chunk) => {
+        if (size >= 128 * 1024) return;
+        const remaining = 128 * 1024 - size;
+        const sample = chunk.subarray(0, remaining);
+        chunks.push(sample);
+        size += sample.length;
+      });
+      res.on('end', () => {
+        if ((res.statusCode || 500) < 200 || (res.statusCode || 500) >= 400) {
+          reject(new Error('AgentTown returned HTTP ' + res.statusCode));
+          return;
+        }
+        const type = String(res.headers['content-type'] || '');
+        const html = Buffer.concat(chunks).toString('utf8');
+        if (!type.includes('text/html') || !/<html[\\s>]/i.test(html) || !html.includes('/_next/')) {
+          reject(new Error('The listener is not an AgentTown Next.js page.'));
+          return;
+        }
+        resolve(res.statusCode);
+      });
     });
     req.setTimeout(timeoutMs, () => req.destroy(new Error('AgentTown request timed out.')));
     req.once('error', reject);
+  });
+}
+
+function isPortAvailable(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once('error', () => resolve(false));
+    server.listen(port, '127.0.0.1', () => server.close(() => resolve(true)));
   });
 }
 
@@ -107,6 +135,26 @@ class DesktopAgentTownRuntime {
       this.startPromise = null;
       return;
     }
+
+    // The Hermes WhatsApp bridge may also bind port 3010. Select a free loopback
+    // port rather than repeatedly spawning a server that can never listen.
+    let freePort = null;
+    for (let offset = 0; offset < 32; offset += 1) {
+      const candidate = this.port + offset;
+      if (candidate > 65535) break;
+      if (await isPortAvailable(candidate)) {
+        freePort = candidate;
+        break;
+      }
+    }
+    if (freePort === null) {
+      this._setState('error', 'No free loopback port was found for AgentTown.');
+      this.startPromise = null;
+      return;
+    }
+    this.port = freePort;
+    this.baseUrl = 'http://127.0.0.1:' + freePort;
+    this._broadcast();
 
     // The shipped portable app can run its bundled Next server on Electron's
     // own Node runtime. No separate Node installation is needed in production.
