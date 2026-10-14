@@ -24,6 +24,7 @@ function run(args, options = {}) {
   execFileSync(npm, args, {
     cwd: options.cwd ?? runtimeDir,
     stdio: 'inherit',
+    shell: process.platform === 'win32',
     env: {
       ...process.env,
       // Build/type-check only: avoid downloading an Electron executable in CI.
