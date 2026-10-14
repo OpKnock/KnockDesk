@@ -92,6 +92,43 @@ jobs:
       - name: Format the repository secret scanner
         run: ruff format --check scripts/secret-scan.py
 
+  source-desktop-smoke:
+    name: Windows desktop renderer smoke test
+    runs-on: windows-latest
+    timeout-minutes: 20
+    needs: [source-build]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: resources/hermes-runtime/src/package-lock.json
+
+      - name: Install Electron and renderer workspaces
+        working-directory: resources/hermes-runtime/src
+        run: npm ci --workspace electron --workspace web --include-workspace-root=false --no-audit
+
+      - name: Compile Electron main and build the desktop renderer
+        run: |
+          npm run compile --workspace electron --prefix resources/hermes-runtime/src
+          npm run build:desktop --workspace web --prefix resources/hermes-runtime/src
+
+      - name: Setup Python and install Playwright
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install smoke-test dependency
+        run: python -m pip install --disable-pip-version-check playwright
+
+      - name: Launch Electron and verify desktop UI
+        run: python scripts/source_desktop_smoke_test.py
+
   asar-integrity:
     name: Existing packaged artifact integrity
     runs-on: windows-latest
