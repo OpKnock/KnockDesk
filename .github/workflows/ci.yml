@@ -114,9 +114,10 @@ jobs:
         run: npm ci --workspace electron --workspace web --include-workspace-root=false --no-audit
 
       - name: Compile Electron main and build the desktop renderer
+        working-directory: resources/hermes-runtime/src
         run: |
-          npm run compile --workspace electron --prefix resources/hermes-runtime/src
-          npm run build:desktop --workspace web --prefix resources/hermes-runtime/src
+          npm run compile --workspace electron
+          npm run build:desktop --workspace web
 
       - name: Setup Python and install Playwright
         uses: actions/setup-python@v5
