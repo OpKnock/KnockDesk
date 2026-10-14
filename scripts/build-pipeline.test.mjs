@@ -28,16 +28,40 @@ test('build script never writes directly to production ASAR or bytecode', () => 
   assert.match(source, /staging\/electron-main/);
 });
 
-test('preload points to emitted preload.js and renderer uses HTTP origin', () => {
+test('Electron loads the source-built KnockDesk shell and does not block on Hermes boot', () => {
   const paths = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main/shared/paths.ts'), 'utf8');
   const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
   assert.ok(paths.includes("path.resolve(__dirname, '../../preload.js')"));
-  assert.ok(main.includes('await hermesManager.start()'));
-  assert.ok(main.includes('manager.baseUrl'));
+  assert.ok(main.includes("path.join(__dirname, 'renderer', 'index.html')"));
+  assert.ok(main.includes('webviewTag: true'));
+  assert.ok(main.includes('void hermesManager.start()'));
+  assert.ok(!main.includes('await hermesManager.start()'));
+  assert.ok(!main.includes('manager.baseUrl'));
 });
 
 test('staging script includes CommonJS services', () => {
   const source = readFileSync(script, 'utf8');
   assert.ok(source.includes('copyRuntimeJs'));
   assert.ok(source.includes('services/hermes-manager.js'));
+});
+
+test('desktop renderer has its own stable output path', () => {
+  const html = readFileSync(resolve(root, 'resources/hermes-runtime/src/web/desktop.html'), 'utf8');
+  const vite = readFileSync(resolve(root, 'resources/hermes-runtime/src/web/vite.desktop.config.ts'), 'utf8');
+  assert.ok(html.includes('/src/desktop/main.tsx'));
+  assert.ok(vite.includes('../electron/dist/renderer'));
+  assert.ok(vite.includes('desktop.html'));
+});
+
+test('desktop shell uses existing allowlisted IPC surfaces', () => {
+  const app = readFileSync(resolve(root, 'resources/hermes-runtime/src/web/src/desktop/KnockDeskApp.tsx'), 'utf8');
+  for (const channel of ['hermes:get-state', 'hermes:get-preload-path', 'hermes:memory-read', 'hermes:memory-request', 'agenttown:get-state']) {
+    assert.ok(app.includes(channel), 'missing IPC integration: ' + channel);
+  }
+});
+
+test('runtime state keeps structured status instead of stringifying it', () => {
+  const manager = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/services/hermes-manager.js'), 'utf8');
+  assert.ok(manager.includes('status: this.lastStatus && typeof this.lastStatus === \'object\''));
+  assert.ok(manager.includes('external: Boolean(this.external)'));
 });
