@@ -31,6 +31,8 @@ let mainWindow: BrowserWindow | null = null;
 let hermesManager: InstanceType<typeof HermesManager> | null = null;
 let agentTownManager: InstanceType<typeof AgentTownManager> | null = null;
 let knockDeskBridge: InstanceType<typeof KnockDeskBridge> | null = null;
+let ipcHandlersRegistered = false;
+let servicesPromise: Promise<void> | null = null;
 
 app.disableHardwareAcceleration();
 app.setAppUserModelId('com.knockdesk.app');
@@ -77,9 +79,13 @@ async function createWindow(): Promise<BrowserWindow> {
   mainWindow.once('ready-to-show', () => mainWindow?.show());
   mainWindow.on('closed', () => { mainWindow = null; });
 
-  // Register IPC before renderer startup so initial status queries are safe.
+  // Register IPC exactly once. macOS can reopen windows without restarting
+  // the process; ipcMain.handle rejects duplicate registrations.
   setMainWindow(mainWindow);
-  registerDomainHandlers();
+  if (!ipcHandlersRegistered) {
+    registerDomainHandlers();
+    ipcHandlersRegistered = true;
+  }
 
   if (process.env.NODE_ENV === 'development') {
     const rendererUrl = process.env.KNOCKDESK_RENDERER_URL || 'http://127.0.0.1:5174/desktop.html';
@@ -102,6 +108,15 @@ async function createWindow(): Promise<BrowserWindow> {
 }
 
 async function initializeServices(window: BrowserWindow): Promise<void> {
+  if (!servicesPromise) servicesPromise = initializeServicesOnce(window);
+  await servicesPromise;
+
+  // The window may have been closed and recreated while sidecars were starting.
+  if (hermesManager) hermesManager.mainWindow = window;
+  if (agentTownManager) agentTownManager.mainWindow = window;
+}
+
+async function initializeServicesOnce(window: BrowserWindow): Promise<void> {
   ensureKnockDeskDirectories(app);
   await ensureKnockDeskPlugin();
   await ensureKnockDeskComputerPlugin();
