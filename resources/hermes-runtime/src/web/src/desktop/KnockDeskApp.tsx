@@ -137,6 +137,7 @@ function KnockDeskApp() {
   const [clock, setClock] = useState(() => new Date());
 
   const apiAvailable = Boolean(getApi());
+  const showError = useCallback((message: string) => setToast({ type: "error", message }), []);
   const title = pageTitles[page];
 
   const refreshRuntime = useCallback(async () => {
@@ -187,6 +188,7 @@ function KnockDeskApp() {
     const api = getApi();
     const offHermes = api?.on("hermes-state", (state: KnockDeskRuntimeState) => setRuntime(state));
     const offAgentTown = api?.on("agenttown-state", (state: KnockDeskAgentTownState) => setAgentTown(state));
+    const offStartupError = api?.on("knockdesk-startup-error", (message: string) => showError(String(message || "Service initialization failed.")));
     const timer = window.setInterval(() => { void refreshRuntime(); }, 4000);
     const clockTimer = window.setInterval(() => setClock(new Date()), 30_000);
     return () => {
@@ -194,8 +196,9 @@ function KnockDeskApp() {
       window.clearInterval(clockTimer);
       offHermes?.();
       offAgentTown?.();
+      offStartupError?.();
     };
-  }, [refreshRuntime]);
+  }, [refreshRuntime, showError]);
 
   useEffect(() => {
     if (toast?.type === "ok" || toast?.type === "info") {
@@ -409,7 +412,7 @@ function KnockDeskApp() {
               <EmbeddedView key={page} src={runtime.state === "ready" ? runtimeUrl : null} preload={hermesPreload}
                 emptyTitle={runtime.state === "error" ? "Runtime unavailable" : "Assistant is starting"}
                 emptyText={runtime.error || "This panel connects to the local Hermes dashboard when the runtime reports ready."}
-                onError={(message) => setToast({ type: "error", message })} />
+                onError={showError} />
             </div>
           )}
 
