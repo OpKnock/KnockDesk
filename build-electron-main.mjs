@@ -3,7 +3,8 @@
  * Reproducible source build for the maintained KnockDesk Electron shell.
  *
  * This builds into resources/hermes-runtime/src/electron/dist and then stages
- * a self-contained layout under staging/electron-main. It never mutates the
+ * the source-built shell under staging/electron-main. Runtime sidecars must
+ * also be packaged before this can be called a distributable. It never mutates the
  * existing packaged app.asar, main.jsc, or KnockDesk.exe.
  */
 import { execFileSync } from 'node:child_process';
@@ -64,9 +65,12 @@ function main() {
   }
 
   // Both workspaces share the committed lockfile at runtimeDir/package-lock.json.
-  // Running npm from the workspace directory itself fails npm's workspace graph.
-  run(['ci', '--workspace', 'electron', '--workspace', 'web',
-    '--include-workspace-root=false', '--no-audit']);
+  // Run from the workspace root; npm invoked inside electron/ fails to resolve
+  // the parent workspace graph. CI may install once and request --skip-install.
+  if (!process.argv.includes('--skip-install')) {
+    run(['ci', '--workspace', 'electron', '--workspace', 'web',
+      '--include-workspace-root=false', '--no-audit']);
+  }
 
   run(['run', 'compile', '--workspace', 'electron']);
   run(['run', 'build:desktop', '--workspace', 'web']);
@@ -101,6 +105,7 @@ function main() {
 
   assertExists(join(stagedDir, 'dist'), [
     'main.js',
+    'desktop-preload.js',
     'preload.js',
     'agenttown-preload.js',
     'hermes-preload.js',
