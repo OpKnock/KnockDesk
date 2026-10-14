@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc -p . --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:desktop": "vite build --config vite.desktop.config.ts"
   },
   "dependencies": {
     "@hermes/shared": "file:../apps/shared",
