@@ -175,7 +175,7 @@ function KnockDeskApp() {
     setSystemBusy(true);
     try {
       const result = await getApi()?.getSystemInfo();
-      setSystemInfo(result && typeof result === "object" ? result : { details: result });
+      setSystemInfo(result && typeof result === "object" ? result as Record<string, unknown> : { details: result });
     } catch (error) {
       setToast({ type: "error", message: errorMessage(error) });
     } finally {
