@@ -1,149 +1,27 @@
-# KnockDesk Validation Suite
+# Validation and Maintenance Scripts
 
-Runtime verification tools for KnockDesk. Run these **on your machine** (or CI) after the app starts.
+This directory contains the repository's source checks, archive tools, and Windows runtime smoke-test helpers.
 
-## Scripts
+| Script | Purpose |
+|---|---|
+| scripts/build-pipeline.test.mjs | Fast source/build contract regression tests |
+| scripts/unpack-app-asar.mjs | Safely list, extract and repack an ASAR without overwriting the original |
+| scripts/privacy-scan.py | Detect common email-address and machine-specific home-path leaks in first-party files |
+| scripts/source_desktop_smoke_test.py | Launch Electron and exercise the source-owned desktop renderer on Windows |
+| scripts/smoke_test.py | Smoke-test the existing packaged executable (requires a real LFS payload) |
+| scripts/health_check.py | Diagnose an already-running packaged app through Chromium DevTools |
+| scripts/uninstall_verify.py | Verify uninstall behavior and user-data retention |
+| scripts/inventory.py / scripts/regen-logo-assets.py | Repository inventory and brand asset maintenance |
 
-| Script | Purpose | When to run |
-|--------|---------|-------------|
-| `smoke_test.py` | Full boot verification via CDP | After every build, before release |
-| `health_check.py` | Quick post-launch sanity check | After app starts, in CI, or manually |
-| `uninstall_verify.py` | Verify clean uninstall | After running uninstaller |
+## Quick checks
 
-## Quick Start
+From the repository root:
 
-```bash
-# Install deps
-pip install -r scripts/requirements.txt
-playwright install --with-deps chromium
+~~~powershell
+npm test
+python scripts/privacy-scan.py
+~~~
 
-# 1. Full smoke test (launch app, verify everything)
-python scripts/smoke_test.py --timeout 90
+For the source-owned shell, use npm run dev or npm run check:knockdesk. GitHub Actions runs additional workspace and Windows checks; a passing source-renderer smoke test is not proof that every provider and optional sidecar is operational.
 
-# 2. Quick health check (app already running on port 9222)
-python scripts/health_check.py --port 9222 --json
-
-# 3. Verify uninstall
-python scripts/uninstall_verify.py --run-uninstaller --keep-user-data
-```
-
-## Smoke Test (`smoke_test.py`)
-
-Launches `KnockDesk.exe --remote-debugging-port=9222`, connects via CDP, and verifies:
-
-- ✅ Process starts cleanly
-- ✅ Main window appears
-- ✅ Splash shows "KNOCKDESK" (not Stonic)
-- ✅ Logo alt = "KnockDesk"
-- ✅ Computer-use sidecar (`runner.py`) spawns
-- ✅ Memory bridge reachable
-- ✅ Zero console errors
-
-**Exit codes:**
-| Code | Meaning |
-|------|---------|
-| 0 | All checks passed |
-| 1 | Launch failed |
-| 2 | CDP connection failed |
-| 3 | Splash brand check failed |
-| 4 | Sidecar check failed |
-| 5 | Memory bridge failed |
-| 6 | Console errors detected |
-| 130 | Interrupted (Ctrl+C) |
-
-## Health Check (`health_check.py`)
-
-Lightweight check against an **already-running** app on port 9222:
-
-```bash
-# Human output
-python scripts/health_check.py --port 9222
-
-# Machine output (for CI)
-python scripts/health_check.py --port 9222 --json
-```
-
-Checks:
-- CDP reachable
-- Window title = "KnockDesk"
-- Splash brand (if visible)
-- Logo alt text
-- Root element attached
-- Console errors/warnings
-- Sidecar processes (`runner.py`, `knockdesk_overlay.py`)
-- Hermes gateway process
-- Memory bridge exposed
-- Settings modal opens (Ctrl+,)
-
-**Exit codes:** 0=healthy, 1=unhealthy, 2=degraded, 124=timeout
-
-## Uninstall Verification (`uninstall_verify.py`)
-
-Run **after** uninstaller completes:
-
-```bash
-# Verify clean removal (keeps user data)
-python scripts/uninstall_verify.py --run-uninstaller --keep-user-data --json
-
-# Full clean (removes user data too)
-python scripts/uninstall_verify.py --run-uninstaller --json
-```
-
-Checks:
-- No KnockDesk processes remain
-- Install directories removed
-- User data preserved (or removed)
-- Registry keys gone
-- Start menu / desktop shortcuts gone
-- No orphan processes
-
-## CI Integration
-
-The `.github/workflows/ci.yml` runs:
-
-1. **lint-and-typecheck** — Ruff, MyPy, TypeScript, ESLint, Stylelint
-2. **asar-integrity** — ASAR readable, brand strings correct, logo present
-3. **lfs-check** — All binaries are LFS pointers, .gitattributes complete
-4. **smoke-test** — (disabled by default; enable on self-hosted GPU runner)
-5. **release-package** — On tagged releases, creates zip + uploads asset
-6. **audit** — Python + Node dependency vulnerability scans
-
-### Enable smoke test in CI
-
-Requires a **self-hosted Windows runner with GPU** (for Electron hardware acceleration):
-
-```yaml
-# In .github/workflows/ci.yml, change:
-smoke-test:
-  if: true  # was: false
-  runs-on: [self-hosted, windows, gpu]
-```
-
-## Requirements
-
-| Tool | Version |
-|------|---------|
-| Python | 3.11+ |
-| Node | 22+ (for CI) |
-| Playwright | 1.40+ |
-| Windows | 10/11 (for app execution) |
-
-## Troubleshooting
-
-| Issue | Fix |
-|-------|-----|
-| CDP connection refused | App not launched with `--remote-debugging-port=9222` |
-| "Sidecar not found" | `resources/knockdesk-computer/runner.py` missing or Python not in PATH |
-| Console errors in smoke test | Check `scripts/smoke_test.py` output for specific errors |
-| Uninstaller not found | Run from installed location, or install first |
-| Registry check fails | Run PowerShell as Admin for HKLM keys |
-
-## Extending
-
-Add custom checks by editing the scripts — they're pure Python with clear `add_check()` pattern:
-
-```python
-add_check("my_check", ok=True, detail="Custom detail", severity="warn")
-```
-
-Severity levels: `"error"` (fails overall), `"warn"` (degraded only), `"info"` (informational).
+For the packaged binary, first run git lfs pull. See Build and source map in the docs directory for ASAR extraction and release limitations.

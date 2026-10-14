@@ -36,9 +36,10 @@ contextBridge.exposeInMainWorld('knockdeskAPI', Object.freeze({
   startAgentTown: () => ipcRenderer.invoke('knockdesk:agenttown:start'),
   getAgentTownPreloadPath: () => ipcRenderer.invoke('knockdesk:agenttown:preload'),
   readMemory: () => ipcRenderer.invoke('knockdesk:memory:read'),
-  requestMemory: (instruction) => ipcRenderer.invoke('knockdesk:memory:update', {
-    instruction: String(instruction ?? '').trim(),
-  }),
+  requestMemory: (instruction) => ipcRenderer.invoke(
+    'knockdesk:memory:update',
+    String(instruction ?? '').trim(),
+  ),
   getSystemInfo: () => ipcRenderer.invoke('knockdesk:system:info'),
   openExternal,
   onRuntimeState: (callback) => subscribe('hermes-state', callback),
