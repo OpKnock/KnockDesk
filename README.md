@@ -63,8 +63,12 @@ npm run build
 npm test
 ```
 
-The Electron script stages JavaScript in `staging/electron-main/`; it does
-not produce a replacement `main.jsc` or a distributable installer.
+The Electron script stages JavaScript and hand-written CommonJS dependencies in
+`staging/electron-main/dist/`; it does not produce a replacement `main.jsc`
+or a distributable installer. The maintained Electron entrypoint loads the
+Hermes dashboard over `http://127.0.0.1:9119` after its local backend starts;
+for development it uses the Vite server on port 5173. This corrects the
+API/token origin mismatch but does not recreate the shipped KnockDesk UI.
 The Vite dashboard targets `hermes_cli/web_dist/`, which is served by
 the Hermes Python dashboard. Replacing the packaged renderer requires
 a separate compatibility migration.
