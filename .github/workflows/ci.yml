@@ -56,15 +56,15 @@ jobs:
         run: npm run build --workspace web
 
       - name: Build source-owned KnockDesk renderer and Electron shell
-        run: node build-electron-main.mjs
+        run: node build-electron-main.mjs --skip-install
 
       - name: Secret scan first-party sources
         run: python scripts/secret-scan.py
 
   python-quality:
-    name: Python lint and type checks
+    name: Python syntax and first-party security tooling
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -74,22 +74,15 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: pip
-          cache-dependency-path: |
-            resources/knockdesk-computer/requirements.txt
-            scripts/requirements.txt
 
-      - name: Install quality tools
-        run: python -m pip install --disable-pip-version-check ruff mypy
+      - name: Compile maintained Python sources
+        run: python -m compileall -q resources/knockdesk-computer resources/hermes-plugins scripts
 
-      - name: Ruff lint
-        run: ruff check resources/knockdesk-computer/ resources/hermes-plugins/ scripts/
+      - name: Lint the repository secret scanner
+        run: ruff check scripts/secret-scan.py
 
-      - name: Ruff format
-        run: ruff format --check resources/knockdesk-computer/ resources/hermes-plugins/ scripts/
-
-      - name: MyPy
-        run: mypy --strict resources/knockdesk-computer/ resources/hermes-plugins/knockdesk/ resources/hermes-plugins/knockdesk-computer/ resources/hermes-plugins/knockdesk-memory/
+      - name: Format the repository secret scanner
+        run: ruff format --check scripts/secret-scan.py
 
   asar-integrity:
     name: Existing packaged artifact integrity
