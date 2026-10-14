@@ -124,6 +124,10 @@ class DesktopHermesRuntime {
 
   async _startBackground() {
     const firstProbe = await this._probe().catch(() => null);
+    if (this.stopping) {
+      this.startPromise = null;
+      return;
+    }
     if (firstProbe) {
       this.external = true;
       this.lastStatus = firstProbe;
@@ -175,6 +179,10 @@ class DesktopHermesRuntime {
       if (this.childError) break;
       if (this.child && this.child.exitCode !== null) break;
       const status = await this._probe().catch(() => null);
+      if (this.stopping) {
+        this.startPromise = null;
+        return;
+      }
       if (status) {
         this.lastStatus = status;
         this._setState('ready');
