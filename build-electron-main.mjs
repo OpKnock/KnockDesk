@@ -20,7 +20,8 @@ function run(...args) {
 }
 
 function main() {
-  run('ci', '--no-audit');
+  // This package currently has no package-lock.json; npm ci would fail.
+  run('install', '--no-save', '--package-lock=false', '--no-audit');
   run('run', 'compile');
   const dist = join(electronDir, 'dist');
   const entry = join(dist, 'main.js');
