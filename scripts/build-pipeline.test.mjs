@@ -117,3 +117,11 @@ test('dependency-free runtime controllers expose stable idle states without star
   assert.equal(agentTown.getState().port, 3010);
   assert.equal(typeof hermes.readMemoryFiles().memory, 'string');
 });
+
+test('AgentTown rejects non-HTML or non-Next listeners and accepts real Next HTML', () => {
+  const require = createRequire(import.meta.url);
+  const { isAgentTownHtml } = require(resolve(root, 'resources/hermes-runtime/src/electron/services/desktop-agenttown-runtime.js'));
+  assert.equal(isAgentTownHtml('text/html; charset=utf-8', '<!doctype html><html lang="en"><script src="/_next/static/app.js"></script>'), true);
+  assert.equal(isAgentTownHtml('application/json', '{"ok":true}'), false);
+  assert.equal(isAgentTownHtml('text/html', '<html lang="en"><title>Not a Next app</title></html>'), false);
+});
