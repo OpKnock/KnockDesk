@@ -70,4 +70,4 @@ export function createPaths(): Paths {
  * Preload script path for Electron BrowserWindow.
  * Used in main.ts for webPreferences.preload.
  */
-export const preloadPath: string = __filename.replace('paths.ts', 'preload.js');
+export const preloadPath: string = path.resolve(__dirname, '../../preload.js');
