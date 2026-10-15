@@ -15,6 +15,7 @@
 
 const { ipcMain, nativeImage, desktopCapturer, screen } = require('electron');
 const { exec } = require('child_process');
+const { execFile } = require('child_process');
 const path = require('path');
 const { isMac, macOpenApplication, macGetActiveWindow, macListWindows } = require('./platform-utils');
 
@@ -46,10 +47,23 @@ function getScreenshot() {
     return screenshot;
 }
 
-// Helper: promisified exec
+// Helper: promisified exec (shell — only for static commands, never user input)
 function execPromise(command, options = {}) {
     return new Promise((resolve, reject) => {
         exec(command, { timeout: 15000, ...options }, (error, stdout, stderr) => {
+            if (error) {
+                reject(error);
+            } else {
+                resolve(stdout.toString().trim());
+            }
+        });
+    });
+}
+
+// Helper: promisified execFile (no shell — for commands carrying variables)
+function execFilePromise(file, args, options = {}) {
+    return new Promise((resolve, reject) => {
+        execFile(file, args, { timeout: 15000, ...options }, (error, stdout, stderr) => {
             if (error) {
                 reject(error);
             } else {
@@ -367,7 +381,7 @@ function registerDesktopHandlers() {
         } | ConvertTo-Json
       `;
 
-            const output = await execPromise(`powershell -NoProfile -Command "${psCommand.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`, { timeout: 10000 });
+            const output = await execFilePromise('powershell.exe', ['-NoProfile', '-Command', psCommand.replace(/\n/g, ' ')], { timeout: 10000 });
             const windowInfo = JSON.parse(output);
 
             return {
@@ -399,7 +413,7 @@ function registerDesktopHandlers() {
 
             const psCommand = `Get-Process | Where-Object { $_.MainWindowTitle -ne '' } | Select-Object ProcessName, Id, MainWindowTitle | ConvertTo-Json -Compress`;
 
-            const output = await execPromise(`powershell -NoProfile -Command "${psCommand}"`, { timeout: 10000 });
+            const output = await execFilePromise('powershell.exe', ['-NoProfile', '-Command', psCommand], { timeout: 10000 });
 
             let windows = [];
             try {
