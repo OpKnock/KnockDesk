@@ -1,10 +1,10 @@
 # KnockDesk
 
-**A JARVIS-inspired AI workspace for your Windows PC.**
+**A JARVIS-inspired AI workspace with a maintained Windows/macOS source shell.**
 
 KnockDesk is a local-first desktop assistant that brings voice interaction, configurable personas, persistent memory, skills, resident agents, world-monitoring tools, and computer-use capabilities into one workspace. It is designed to feel personal while helping you get practical work done on your computer.
 
-**Windows 10/11 · Open source · Provider API costs may apply**
+**Windows 10/11 and macOS source shell · Open source · Provider API costs may apply**
 
 > **Build note:** The repository contains a maintained source-owned desktop shell as well as a separately preserved legacy packaged application. The source build is under active stabilization and is not yet certified as a feature-for-feature replacement for every screen and integration in the packaged app. See [Product Readiness](docs/PRODUCT_READINESS_AUDIT.md).
 
@@ -61,9 +61,11 @@ This repository does not currently publish assets through GitHub Releases. If yo
 
 ### Run the maintained desktop shell from source
 
+The maintained source shell can run on Windows or macOS. The separately preserved legacy `KnockDesk.exe` package is Windows-only.
+
 **Requirements**
 
-- Windows 10 or Windows 11
+- Windows 10 or Windows 11, or a macOS version supported by Electron 44
 - Node.js 22 or later and npm
 - Git and Git LFS for repository payloads
 - Python 3.11 for maintenance checks and selected tooling
@@ -78,15 +80,25 @@ cd KnockDesk
 git lfs pull
 ```
 
-Install and launch the development shell:
+Install and launch the development shell on Windows:
 
 ```powershell
 npm run dev
 ```
 
-The launcher installs the locked Electron and web workspaces, compiles the Electron main process, starts the desktop renderer, and launches Electron. Close the app or press **Ctrl+C** in the terminal to stop it.
+On macOS, install Node.js 22+, Git, and Git LFS first. With Homebrew, Git LFS can be installed with `brew install git-lfs`. Then use Terminal:
 
-The renderer can start without a live Hermes runtime, but assistant and other runtime-backed features need the relevant runtime and configuration. If the bundled runtime is not available, set `KNOCKDESK_HERMES_EXE` to the full path of your Hermes executable.
+```bash
+git lfs install
+git clone https://github.com/OpKnock/KnockDesk.git
+cd KnockDesk
+git lfs pull
+npm run dev
+```
+
+The launcher installs the locked Electron and web workspaces for the current operating system, compiles the Electron main process, starts the desktop renderer, and launches Electron. Close the app or press **Ctrl+C** in the terminal to stop it.
+
+The maintained renderer smoke test runs on both Windows and macOS in CI. That verifies the shell can launch and render; it does **not** certify live Hermes/AgentTown services, full feature parity with the preserved Windows package, or a signed/notarized release. The bundled legacy Hermes virtual environment is not a portable macOS runtime. On macOS, install a native Hermes CLI separately and set `KNOCKDESK_HERMES_EXE` to its absolute path before launching, for example `export KNOCKDESK_HERMES_EXE="$HOME/.local/bin/hermes"`. Assistant and other runtime-backed features remain dependent on the runtime and provider configuration.
 
 ## Where your data lives
 
