@@ -53,7 +53,27 @@ function proxyToApi(req, res) {
 
 function serveStatic(req, res) {
   const urlPath = req.url.split('?')[0];
-  let filePath = path.join(DIST_DIR, urlPath === '/' ? 'index.html' : urlPath);
+  let requested;
+  try {
+    requested = decodeURIComponent(urlPath);
+  } catch {
+    res.writeHead(400, { 'Content-Type': 'text/plain' });
+    res.end('Bad request');
+    return;
+  }
+  // Traversal guard (CodeQL js/path-injection): resolve and require
+  // containment — lexical join() alone lets `/../` escape DIST_DIR.
+  const resolved = path.resolve(DIST_DIR, '.' + requested);
+  const contained = resolved === DIST_DIR || resolved.startsWith(DIST_DIR + path.sep);
+  let filePath = contained ? resolved : null;
+  if (filePath === null) {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not found');
+    return;
+  }
+  if (requested === '/') {
+    filePath = path.join(DIST_DIR, 'index.html');
+  }
 
   // SPA fallback: if file doesn't exist and isn't a static asset, serve index.html
   if (!fs.existsSync(filePath) && !path.extname(filePath)) {
