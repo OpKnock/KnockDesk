@@ -208,6 +208,7 @@ test('staging bundles the plugin source used by its first-run installer', () => 
   assert.ok(build.includes("'knockdesk/plugin.yaml'"));
   assert.ok(build.includes("'knockdesk-computer/plugin.yaml'"));
   assert.ok(build.includes("'knockdesk-memory/plugin.yaml'"));
+  assert.ok(build.includes("'services/retryable-initializer.js'"));
 });
 
 test('runtime startup cannot spawn or mark ready after shutdown begins', () => {
@@ -236,10 +237,14 @@ test('shutdown waits for owned runtime and one-shot memory processes to exit', (
   assert.ok(agentTown.includes('stopOwnedChild(ownedChild)'));
 });
 
-test('Windows source smoke test waits for the built desktop.html renderer', () => {
+test('Windows and macOS source smoke paths wait for the built desktop.html renderer', () => {
   const smoke = readFileSync(resolve(root, 'scripts/source_desktop_smoke_test.py'), 'utf8');
   assert.ok(smoke.includes('ELECTRON_APP / "dist" / "renderer" / "desktop.html"'));
+  assert.ok(smoke.includes('elif sys.platform == "darwin"'));
   assert.ok(smoke.includes('"renderer/desktop.html" in candidate.url'));
+  assert.ok(smoke.includes('start_new_session=os.name != "nt"'));
+  assert.ok(smoke.includes('os.killpg(group_id, signal.SIGTERM)'));
+  assert.ok(smoke.includes('os.killpg(group_id, signal.SIGKILL)'));
   assert.equal(smoke.includes('"renderer/index.html" in candidate.url'), false);
 });
 
@@ -265,4 +270,126 @@ test('development and Windows smoke flows install the Electron 44 binary on dema
   const ci = readFileSync(resolve(root, '.github/workflows/ci.yml'), 'utf8');
   assert.ok(dev.includes("'install-electron', '--no'"));
   assert.ok(ci.includes('npm exec --workspace electron -- install-electron --no'));
+});
+
+test('failed first-run initialization clears the cached promise so the user can retry', () => {
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  assert.match(main, /createRetryableInitializer/);
+  assert.match(main, /initializeServicesOnceWithRetry\(window\)/);
+});
+
+test('retryable initializer deduplicates concurrent startup requests', async () => {
+  const { createRetryableInitializer } = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/retryable-initializer.js'
+  ));
+  let release;
+  let calls = 0;
+  const initializer = createRetryableInitializer(() => {
+    calls += 1;
+    return new Promise((resolve) => { release = resolve; });
+  });
+
+  const first = initializer();
+  const second = initializer();
+  assert.equal(first, second, 'concurrent callers should share the same promise');
+  await Promise.resolve();
+  assert.equal(calls, 1, 'only one initialization attempt should start');
+  release('ready');
+  assert.equal(await first, 'ready');
+  assert.equal(await initializer(), 'ready', 'successful initialization remains cached');
+  assert.equal(calls, 1, 'successful initialization must not run twice');
+});
+
+test('retryable initializer permits a new attempt after rejection', async () => {
+  const { createRetryableInitializer } = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/retryable-initializer.js'
+  ));
+  let calls = 0;
+  const initializer = createRetryableInitializer(async () => {
+    calls += 1;
+    if (calls === 1) throw new Error('transient setup failure');
+    return 'ready';
+  });
+
+  await assert.rejects(initializer(), /transient setup failure/);
+  assert.equal(await initializer(), 'ready');
+  assert.equal(calls, 2, 'second call should rerun the failed initialization');
+});
+
+test('retryable initializer rejects a missing callback clearly', () => {
+  const { createRetryableInitializer } = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/retryable-initializer.js'
+  ));
+  assert.throws(() => createRetryableInitializer(null), /initialize must be a function/);
+});
+
+test('startup stops with a clear error when the KnockDesk data directory cannot be initialized', () => {
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  assert.match(main, /const dataDirectory = ensureKnockDeskDirectories\(app\);/);
+  assert.match(main, /if \(!dataDirectory\)/);
+  assert.match(main, /Check that your Documents folder is writable, then retry/);
+});
+
+test('Hermes background startup errors clear the pending promise and can be retried', async () => {
+  const { DesktopHermesRuntime } = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/desktop-hermes-runtime.js'
+  ));
+  const runtime = new DesktopHermesRuntime();
+  let attempts = 0;
+  runtime._startBackground = async () => {
+    attempts += 1;
+    if (attempts === 1) throw new Error('transient Hermes startup failure');
+    runtime._setState('ready');
+  };
+
+  const firstStart = runtime.start();
+  const firstAttempt = runtime.startPromise;
+  await Promise.resolve(firstAttempt).catch(() => undefined);
+  await firstStart;
+  assert.equal(runtime.getState().state, 'error', 'a rejected background start must surface an error state');
+  assert.match(runtime.getState().error, /Hermes startup failed: transient Hermes startup failure/);
+  assert.equal(runtime.startPromise, null, 'a failed background start must release the retry lock');
+
+  await runtime.start();
+  await runtime.startPromise;
+  assert.equal(attempts, 2, 'the next start request must attempt launch again');
+  assert.equal(runtime.getState().state, 'ready');
+});
+
+test('native title-bar overlay is configured only on platforms that need custom window controls', () => {
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  assert.match(main, /\.\.\.\(process\.platform !== 'darwin' \? \{/);
+  assert.match(main, /titleBarOverlay:\s*\{/);
+});
+
+test('AgentTown background startup errors clear the pending promise and can be retried', async () => {
+  const { DesktopAgentTownRuntime } = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/desktop-agenttown-runtime.js'
+  ));
+  const runtime = new DesktopAgentTownRuntime();
+  let attempts = 0;
+  runtime._startBackground = async () => {
+    attempts += 1;
+    if (attempts === 1) throw new Error('transient AgentTown startup failure');
+    runtime._setState('ready');
+  };
+
+  const firstStart = runtime.start();
+  const firstAttempt = runtime.startPromise;
+  await Promise.resolve(firstAttempt).catch(() => undefined);
+  await firstStart;
+  assert.equal(runtime.getState().state, 'error', 'a rejected background start must surface an error state');
+  assert.equal(runtime.startPromise, null, 'a failed background start must release the retry lock');
+
+  await runtime.start();
+  await runtime.startPromise;
+  assert.equal(attempts, 2, 'the next start request must attempt launch again');
+  assert.equal(runtime.getState().state, 'ready');
+});
+
+test('Windows required CI status-check name remains stable with a separate macOS smoke job', () => {
+  const workflow = readFileSync(resolve(root, '.github/workflows/ci.yml'), 'utf8');
+  assert.match(workflow, /name:\s*\$\{\{\s*matrix\.name\s*\}\}/);
+  assert.match(workflow, /os:\s*windows-latest[\s\S]*?name:\s*Windows desktop renderer smoke test/);
+  assert.match(workflow, /os:\s*macos-latest[\s\S]*?name:\s*macOS desktop renderer smoke test/);
 });

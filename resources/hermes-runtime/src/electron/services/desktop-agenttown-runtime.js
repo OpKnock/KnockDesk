@@ -153,7 +153,17 @@ class DesktopAgentTownRuntime {
     if (this.state === 'ready' || this.state === 'starting') return Promise.resolve(this.getState());
     this.stopping = false;
     this._setState('starting');
-    this.startPromise = this._startBackground();
+    // A detached background failure must not leave the runtime stuck at
+    // "starting" with a permanently rejected promise. Keep launch non-blocking,
+    // report unexpected failures, and allow a later call to retry.
+    const pendingStart = this._startBackground().catch((error) => {
+      if (!this.stopping) {
+        const message = error instanceof Error ? error.message : String(error);
+        this._setState('error', 'AgentTown startup failed: ' + message);
+      }
+      if (this.startPromise === pendingStart) this.startPromise = null;
+    });
+    this.startPromise = pendingStart;
     return Promise.resolve(this.getState());
   }
 
