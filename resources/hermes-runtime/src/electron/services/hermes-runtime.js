@@ -88,6 +88,11 @@ function ensureRelocated(root) {
         return true; // already correct (dev machine, or a previous boot fixed it)
     }
 
+    if (!current) {
+        console.error('[Hermes Runtime] pyvenv.cfg has no home entry.');
+        return false;
+    }
+
     const patched = cfg.replace(/^home\s*=\s*.*$/m, `home = ${pythonDir}`);
     try {
         fs.writeFileSync(cfgPath, patched, 'ascii');
@@ -201,4 +206,4 @@ function hermesSpawnEnv(extra = {}) {
     return env;
 }
 
-module.exports = { resolveHermesExe, getBundledHermesExe, findRuntimeRoot, hermesSpawnEnv };
+module.exports = { resolveHermesExe, getBundledHermesExe, findRuntimeRoot, ensureRelocated, hermesSpawnEnv };
