@@ -689,3 +689,19 @@ test('CDP no-port-available error is classified as a port failure, not a profile
     true
   );
 });
+
+test('Hermes relocation rejects venv configuration without a home entry', () => {
+  const require = createRequire(import.meta.url);
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = require('node:fs');
+  const { tmpdir } = require('node:os');
+  const folder = mkdtempSync(resolve(tmpdir(), 'knockdesk-hermes-cfg-'));
+  try {
+    mkdirSync(resolve(folder, 'venv'));
+    mkdirSync(resolve(folder, 'python'));
+    writeFileSync(resolve(folder, 'venv', 'pyvenv.cfg'), 'include-system-site-packages = false\n');
+    const { ensureRelocated } = require(resolve(root, 'resources/hermes-runtime/src/electron/services/hermes-runtime.js'));
+    assert.equal(ensureRelocated(folder), false);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
