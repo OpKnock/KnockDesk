@@ -204,7 +204,13 @@ async function initializeServicesForIpc(): Promise<boolean> {
 }
 
 async function initializeServicesOnce(window: BrowserWindow): Promise<void> {
-  ensureKnockDeskDirectories(app);
+  const dataDirectory = ensureKnockDeskDirectories(app);
+  if (!dataDirectory) {
+    throw new Error(
+      'KnockDesk could not initialize its Documents/KnockDesk Data folder. ' +
+      'Check that your Documents folder is writable, then retry.'
+    );
+  }
 
   hermesManager = new DesktopHermesRuntime();
   hermesManager.mainWindow = window;
