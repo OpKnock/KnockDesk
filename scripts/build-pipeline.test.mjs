@@ -325,3 +325,9 @@ test('startup stops with a clear error when the KnockDesk data directory cannot 
   assert.match(main, /if \(!dataDirectory\)/);
   assert.match(main, /Check that your Documents folder is writable, then retry/);
 });
+
+test('Hermes background startup errors remain retryable', () => {
+  const source = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/services/desktop-hermes-runtime.js'), 'utf8');
+  assert.match(source, /Hermes startup failed:/);
+  assert.match(source, /this.startPromise === pendingStart/);
+});
