@@ -214,6 +214,7 @@ test('staging bundles the plugin source used by its first-run installer', () => 
   assert.ok(build.includes("'knockdesk-computer/plugin.yaml'"));
   assert.ok(build.includes("'knockdesk-memory/plugin.yaml'"));
   assert.ok(build.includes("'services/retryable-initializer.js'"));
+  assert.ok(build.includes("'services/child-process-tree.js'"));
 });
 
 test('runtime startup cannot spawn or mark ready after shutdown begins', () => {
@@ -236,10 +237,10 @@ test('shutdown waits for owned runtime and one-shot memory processes to exit', (
   const hermes = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/services/desktop-hermes-runtime.js'), 'utf8');
   const agentTown = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/services/desktop-agenttown-runtime.js'), 'utf8');
   assert.ok(hermes.includes('const memoryChildren = [...this.memoryChildren]'));
-  assert.ok(hermes.includes('...memoryChildren.map((child) => stopOwnedChild(child))'));
+  assert.ok(hermes.includes('...memoryChildren.map((child) => stopOwnedChild(child, 2500, {'));
   assert.ok(hermes.includes('const pendingStart = this.startPromise'));
   assert.ok(agentTown.includes('await Promise.allSettled(['));
-  assert.ok(agentTown.includes('stopOwnedChild(ownedChild)'));
+  assert.ok(agentTown.includes("stopOwnedChild(ownedChild, 2500, { detachedGroup: process.platform !== 'win32' })"));
 });
 
 test('Windows and macOS source smoke paths wait for the built desktop.html renderer', () => {
@@ -401,4 +402,34 @@ test('Windows required CI status-check name remains stable with a separate macOS
 test('CodeQL workflow does not persist its checkout token', () => {
   const workflow = readFileSync(resolve(root, '.github/workflows/codeql.yml'), 'utf8');
   assert.match(workflow, /uses: actions\/checkout@v4\s+with:\s+lfs: false\s+persist-credentials: false/);
+});
+
+test('Hermes shutdown terminates the owned process tree instead of leaving a Python child behind', () => {
+  const { terminateOwnedProcessTree } = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/child-process-tree.js'
+  ));
+  assert.equal(typeof terminateOwnedProcessTree, 'function');
+
+  const windowsCalls = [];
+  let windowsChildKilled = false;
+  const windowsChild = { pid: 1234, exitCode: null, kill: () => { windowsChildKilled = true; } };
+  const spawnedKiller = { once() { return this; } };
+  assert.equal(terminateOwnedProcessTree(windowsChild, {
+    platform: 'win32',
+    spawnProcess: (...args) => { windowsCalls.push(args); return spawnedKiller; },
+  }), true);
+  assert.deepEqual(windowsCalls[0].slice(0, 2), ['taskkill.exe', ['/PID', '1234', '/T', '/F']]);
+  assert.equal(windowsCalls[0][2].windowsHide, true);
+  assert.equal(windowsChildKilled, false, 'use taskkill /T so the launcher does not orphan its interpreter');
+
+  const posixCalls = [];
+  let posixChildKilled = false;
+  const posixChild = { pid: 5678, exitCode: null, kill: () => { posixChildKilled = true; } };
+  assert.equal(terminateOwnedProcessTree(posixChild, {
+    platform: 'darwin',
+    detachedGroup: true,
+    killProcess: (pid, signal) => posixCalls.push([pid, signal]),
+  }), true);
+  assert.deepEqual(posixCalls, [[-5678, 'SIGKILL']], 'terminate the isolated process group on POSIX');
+  assert.equal(posixChildKilled, false);
 });

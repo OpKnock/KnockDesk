@@ -10,6 +10,7 @@ const fs = require('node:fs');
 const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
+const { stopOwnedChild } = require('./child-process-tree');
 const { resolveHermesExe, hermesSpawnEnv } = require('./hermes-runtime');
 
 const DEFAULT_PORT = Number.parseInt(
@@ -19,36 +20,6 @@ const DEFAULT_PORT = Number.parseInt(
 const STARTUP_TIMEOUT_MS = 4 * 60 * 1000;
 const POLL_INTERVAL_MS = 1500;
 const MAX_RESPONSE_BYTES = 1024 * 1024;
-
-function stopOwnedChild(child, timeoutMs = 2500) {
-  if (!child || child.exitCode !== null) return Promise.resolve();
-  return new Promise((resolve) => {
-    let settled = false;
-    let timer;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      if (timer) clearTimeout(timer);
-      child.removeListener('exit', finish);
-      resolve();
-    };
-    child.once('exit', finish);
-    timer = setTimeout(() => {
-      try {
-        if (child.exitCode === null) child.kill();
-      } catch {
-        // The OS may already have removed the process.
-      }
-      finish();
-    }, timeoutMs);
-    try {
-      const sent = child.kill();
-      if (!sent && child.exitCode !== null) finish();
-    } catch {
-      finish();
-    }
-  });
-}
 
 function request(url, timeoutMs = 1800) {
   return new Promise((resolve, reject) => {
@@ -182,6 +153,7 @@ class DesktopHermesRuntime {
     try {
       this.child = spawn(exe, ['dashboard', '--no-open'], {
         windowsHide: true,
+        detached: process.platform !== 'win32',
         stdio: ['ignore', 'pipe', 'pipe'],
         cwd: os.homedir(),
         env: hermesSpawnEnv(),
@@ -293,13 +265,14 @@ class DesktopHermesRuntime {
         resolve(result);
       };
       const timer = setTimeout(() => {
-        try { child?.kill(); } catch { /* process already exited */ }
-        finish({ ok: false, error: 'Hermes took longer than 180 seconds. Please try again.' });
+        void stopOwnedChild(child, 2500, { detachedGroup: process.platform !== 'win32' })
+          .finally(() => finish({ ok: false, error: 'Hermes took longer than 180 seconds. Please try again.' }));
       }, 180000);
 
       try {
         child = spawn(exe, ['-z', prompt], {
           windowsHide: true,
+          detached: process.platform !== 'win32',
           stdio: ['ignore', 'pipe', 'pipe'],
           cwd: os.homedir(),
           env: hermesSpawnEnv(),
@@ -338,8 +311,10 @@ class DesktopHermesRuntime {
     const memoryChildren = [...this.memoryChildren];
     const pendingStart = this.startPromise;
     await Promise.allSettled([
-      stopOwnedChild(serverChild),
-      ...memoryChildren.map((child) => stopOwnedChild(child)),
+      stopOwnedChild(serverChild, 2500, { detachedGroup: process.platform !== 'win32' }),
+      ...memoryChildren.map((child) => stopOwnedChild(child, 2500, {
+        detachedGroup: process.platform !== 'win32',
+      })),
       pendingStart,
     ].filter(Boolean));
 

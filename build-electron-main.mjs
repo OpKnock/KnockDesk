@@ -168,6 +168,7 @@ function main() {
     'services/desktop-hermes-runtime.js',
     'services/desktop-agenttown-runtime.js',
     'services/retryable-initializer.js',
+    'services/child-process-tree.js',
     'renderer/desktop.html',
     'pwa/icon-512.png',
   ]);
