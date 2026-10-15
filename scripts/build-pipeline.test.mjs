@@ -386,3 +386,10 @@ test('AgentTown background startup errors clear the pending promise and can be r
   assert.equal(attempts, 2, 'the next start request must attempt launch again');
   assert.equal(runtime.getState().state, 'ready');
 });
+
+test('Windows required CI status-check name remains stable with a separate macOS smoke job', () => {
+  const workflow = readFileSync(resolve(root, '.github/workflows/ci.yml'), 'utf8');
+  assert.match(workflow, /name:\s*\$\{\{\s*matrix\.name\s*\}\}/);
+  assert.match(workflow, /os:\s*windows-latest[\s\S]*?name:\s*Windows desktop renderer smoke test/);
+  assert.match(workflow, /os:\s*macos-latest[\s\S]*?name:\s*macOS desktop renderer smoke test/);
+});
