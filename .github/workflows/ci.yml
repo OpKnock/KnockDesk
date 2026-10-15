@@ -104,9 +104,17 @@ jobs:
         run: python scripts/privacy-scan.py
 
   source-desktop-smoke:
-    name: Windows desktop renderer smoke test
-    runs-on: windows-latest
-    timeout-minutes: 20
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows desktop renderer smoke test
+          - os: macos-latest
+            name: macOS desktop renderer smoke test
     needs: [source-build]
     steps:
       - uses: actions/checkout@v4
