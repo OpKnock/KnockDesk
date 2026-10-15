@@ -387,7 +387,7 @@ def _turn_ref(session_id: str, ts_ms: int, user: str, reply: str) -> str:
     session में दो दफ़ा कहा गया "ok" / "Done." दूसरी दफ़ा असली turn हो कर
     भी "पहले से है" समझ कर गिर जाता।
     """
-    digest = hashlib.sha1()
+    digest = hashlib.sha256()
     for part in (session_id, str(ts_ms), user, reply):
         digest.update(part.encode("utf-8", "replace"))
         digest.update(b"\x00")

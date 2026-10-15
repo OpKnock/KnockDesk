@@ -210,7 +210,9 @@ function assetVars(assets: ThemeAssets | undefined): Record<string, string> {
       return trimmed;
     }
     // Bare path / http(s) URL / data: URL → wrap in url().
-    return `url("${trimmed.replace(/"/g, '\\"')}")`;
+    // Escape backslash, quote, and ) so a hostile theme asset value cannot
+    // break out of the url("...") string (CodeQL js/incomplete-sanitization).
+    return `url("${trimmed.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\)/g, "\\29 ")}")`;
   };
   for (const key of NAMED_ASSET_KEYS) {
     const val = assets[key];
