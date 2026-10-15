@@ -208,6 +208,7 @@ test('staging bundles the plugin source used by its first-run installer', () => 
   assert.ok(build.includes("'knockdesk/plugin.yaml'"));
   assert.ok(build.includes("'knockdesk-computer/plugin.yaml'"));
   assert.ok(build.includes("'knockdesk-memory/plugin.yaml'"));
+  assert.ok(build.includes("'services/retryable-initializer.js'"));
 });
 
 test('runtime startup cannot spawn or mark ready after shutdown begins', () => {
