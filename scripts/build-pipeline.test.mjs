@@ -451,3 +451,26 @@ test('Hermes shutdown terminates the owned process tree instead of leaving a Pyt
   assert.deepEqual(posixCalls, [[-5678, 'SIGKILL']], 'terminate the isolated process group on POSIX');
   assert.equal(posixChildKilled, false);
 });
+
+
+test('detached process groups are cleaned even if their parent has already exited', async () => {
+  const { stopOwnedChild } = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/child-process-tree.js'
+  ));
+  const calls = [];
+  const exitedChild = {
+    pid: 6789,
+    exitCode: 0,
+    once() { return this; },
+    removeListener() { return this; },
+    kill() { throw new Error('direct child should already be exited'); },
+  };
+
+  await stopOwnedChild(exitedChild, 2500, {
+    platform: 'darwin',
+    detachedGroup: true,
+    killProcess: (pid, signal) => calls.push([pid, signal]),
+  });
+
+  assert.deepEqual(calls, [[-6789, 'SIGKILL']]);
+});
