@@ -142,11 +142,15 @@ async function createWindow(): Promise<BrowserWindow> {
     backgroundColor: '#090c12',
     title: 'KnockDesk',
     titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#0a0c10',
-      symbolColor: '#66d9f4',
-      height: 36,
-    },
+    // macOS keeps its native traffic-light controls with a hidden title bar.
+    // Windows and Linux need Electron's title-bar overlay for native controls.
+    ...(process.platform !== 'darwin' ? {
+      titleBarOverlay: {
+        color: '#0a0c10',
+        symbolColor: '#66d9f4',
+        height: 36,
+      },
+    } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'desktop-preload.js'),
       contextIsolation: true,
