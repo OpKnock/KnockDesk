@@ -63,7 +63,7 @@ jobs:
         working-directory: resources/hermes-runtime/src
         run: |
           npm run typecheck --workspace web
-          npx eslint web/src/desktop
+          npm exec --workspace web -- eslint src/desktop
           npm test --workspace web
           npm run build:desktop --workspace web
 
