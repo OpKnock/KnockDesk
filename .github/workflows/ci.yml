@@ -277,7 +277,6 @@ jobs:
           python-version: "3.11"
 
       - name: Audit Python dependencies
-        continue-on-error: true
         run: |
           python -m pip install --disable-pip-version-check pip-audit
           pip-audit -r resources/knockdesk-computer/requirements.txt
@@ -290,11 +289,10 @@ jobs:
           cache-dependency-path: resources/hermes-runtime/src/package-lock.json
 
       - name: Audit Node workspace dependencies
-        continue-on-error: true
         working-directory: resources/hermes-runtime/src
         run: |
           npm ci --workspace electron --workspace web --include-workspace-root=false --no-audit
-          npm audit --workspace electron --workspace web --audit-level=high
+          npm audit --workspace electron --workspace web --audit-level=low
 
   # Packaged release publishing remains explicitly opt-in until the maintained
   # source-owned renderer and Windows runtime have passed the desktop smoke test.
