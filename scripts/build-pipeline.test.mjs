@@ -318,3 +318,10 @@ test('retryable initializer rejects a missing callback clearly', () => {
   ));
   assert.throws(() => createRetryableInitializer(null), /initialize must be a function/);
 });
+
+test('startup stops with a clear error when the KnockDesk data directory cannot be initialized', () => {
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  assert.match(main, /const dataDirectory = ensureKnockDeskDirectories\(app\);/);
+  assert.match(main, /if \(!dataDirectory\)/);
+  assert.match(main, /Check that your Documents folder is writable, then retry/);
+});
