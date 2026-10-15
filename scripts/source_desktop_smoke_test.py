@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Launch and exercise the maintained Electron + React desktop shell on Windows."""
+"""Launch and exercise the maintained Electron + React desktop shell on Windows or macOS."""
 from __future__ import annotations
 
 import json
@@ -7,6 +7,7 @@ import os
 import socket
 import subprocess
 import signal
+import sys
 import tempfile
 import time
 import urllib.error
