@@ -100,12 +100,15 @@ function registerDesktopIpc(): void {
   });
 
   ipcMain.handle('knockdesk:memory:update', async (_event, instruction: unknown) => {
-    if (!hermesManager) return { ok: false, error: 'Hermes is not ready yet.' };
     if (typeof instruction !== 'string' || !instruction.trim()) {
       return { ok: false, error: 'Enter a memory instruction first.' };
     }
-    if (instruction.length > 4000) {
-      return { ok: false, error: 'Memory instructions must be 4,000 characters or fewer.' };
+    if (instruction.length > 1500) {
+      return { ok: false, error: 'Memory instructions must be 1,500 characters or fewer.' };
+    }
+    const initialized = await initializeServicesForIpc();
+    if (!initialized || !hermesManager) {
+      return { ok: false, error: 'Hermes could not be initialized.' };
     }
     return hermesManager.memoryRequest(instruction.trim());
   });
