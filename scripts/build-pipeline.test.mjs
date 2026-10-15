@@ -233,6 +233,7 @@ test('staging bundles the plugin source used by its first-run installer', () => 
   assert.ok(build.includes("'knockdesk-memory/plugin.yaml'"));
   assert.ok(build.includes("'services/retryable-initializer.js'"));
   assert.ok(build.includes("'services/child-process-tree.js'"));
+  assert.ok(build.includes("'services/webview-security.js'"));
 });
 
 test('runtime startup cannot spawn or mark ready after shutdown begins', () => {
@@ -417,6 +418,7 @@ test('Windows required CI status-check name remains stable with a separate macOS
   assert.match(workflow, /os:\s*windows-latest[\s\S]*?name:\s*Windows desktop renderer smoke test/);
   assert.match(workflow, /os:\s*macos-latest[\s\S]*?name:\s*macOS desktop renderer smoke test/);
 });
+
 test('CodeQL workflow does not persist its checkout token', () => {
   const workflow = readFileSync(resolve(root, '.github/workflows/codeql.yml'), 'utf8');
   assert.match(workflow, /uses: actions\/checkout@v4\s+with:\s+lfs: false\s+persist-credentials: false/);
@@ -452,7 +454,6 @@ test('Hermes shutdown terminates the owned process tree instead of leaving a Pyt
   assert.equal(posixChildKilled, false);
 });
 
-
 test('detached process groups are cleaned even if their parent has already exited', async () => {
   const { stopOwnedChild } = createRequire(import.meta.url)(resolve(
     root, 'resources/hermes-runtime/src/electron/services/child-process-tree.js'
@@ -474,4 +475,71 @@ test('detached process groups are cleaned even if their parent has already exite
   });
 
   assert.deepEqual(calls, [[-6789, 'SIGKILL']]);
+});
+
+
+test('embedded webviews reject untrusted origins and preloads and enforce isolated preferences', () => {
+  const security = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/webview-security.js'
+  ));
+  const { pathToFileURL } = createRequire(import.meta.url)('node:url');
+  const { join } = createRequire(import.meta.url)('node:path');
+  const allowedHermes = join(root, 'resources/hermes-runtime/src/electron/hermes-preload.js');
+  const allowedAgentTown = join(root, 'resources/hermes-runtime/src/electron/agenttown-preload.js');
+
+  assert.equal(security.isAllowedLoopbackUrl('http://127.0.0.1:9119'), true);
+  assert.equal(security.isAllowedLoopbackUrl('http://localhost:3010/path'), true);
+  assert.equal(security.isAllowedLoopbackUrl('http://[::1]:3010'), true);
+  assert.equal(security.isAllowedLoopbackUrl('https://127.0.0.1:9119'), false);
+  assert.equal(security.isAllowedLoopbackUrl('http://127.0.0.1.attacker.example:9119'), false);
+  assert.equal(security.isAllowedLoopbackUrl('http://user:pass@127.0.0.1:9119'), false);
+  assert.equal(security.isAllowedLoopbackUrl('file:///C:/Windows/win.ini'), false);
+
+  assert.equal(security.isAllowedWebviewPreload(undefined, [allowedHermes, allowedAgentTown]), true);
+  assert.equal(security.isAllowedWebviewPreload(pathToFileURL(allowedHermes).toString(), [allowedHermes, allowedAgentTown]), true);
+  assert.equal(security.isAllowedWebviewPreload(allowedAgentTown, [allowedHermes, allowedAgentTown]), true);
+  assert.equal(security.isAllowedWebviewPreload('file:///C:/Temp/attacker.js', [allowedHermes, allowedAgentTown]), false);
+  assert.equal(security.isAllowedWebviewPreload('javascript:alert(1)', [allowedHermes, allowedAgentTown]), false);
+
+  const preferences = {
+    nodeIntegration: true,
+    contextIsolation: false,
+    sandbox: false,
+    webSecurity: false,
+    allowRunningInsecureContent: true,
+    webviewTag: true,
+    experimentalFeatures: true,
+  };
+  security.hardenWebviewPreferences(preferences);
+  assert.equal(preferences.nodeIntegration, false);
+  assert.equal(preferences.contextIsolation, true);
+  assert.equal(preferences.sandbox, true);
+  assert.equal(preferences.webSecurity, true);
+  assert.equal(preferences.allowRunningInsecureContent, false);
+  assert.equal(preferences.webviewTag, false);
+  assert.equal(preferences.experimentalFeatures, false);
+});
+
+
+test('Electron enforces the embedded webview policy in the main process', () => {
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  assert.match(main, /webContents\.on\('will-attach-webview'/);
+  assert.match(main, /isAllowedLoopbackUrl\(source\)/);
+  assert.match(main, /isAllowedWebviewPreload\(webPreferences\.preload, allowedGuestPreloads\)/);
+  assert.match(main, /hardenWebviewPreferences\(webPreferences\)/);
+  assert.match(main, /webContents\.on\('did-attach-webview'/);
+  assert.match(main, /guestContents\.setWindowOpenHandler\(\(\) => \(\{ action: 'deny' \}\)\)/);
+  assert.match(main, /guestContents\.on\('will-navigate', guardNavigation\)/);
+  assert.match(main, /guestContents\.on\('will-redirect', guardNavigation\)/);
+});
+test('main-window OAuth popups are safely forwarded to the system browser', () => {
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  assert.match(main, /mainWindow\.webContents\.setWindowOpenHandler\(\(\{ url \}\) => \{/);
+  assert.match(main, /\['https:', 'http:', 'mailto:'\]\.includes\(target\.protocol\)/);
+  assert.match(main, /shell\.openExternal\(target\.toString\(\)\)/);
+  assert.match(main, /return \{ action: 'deny' \};/);
+});
+test('staging cleanup retries transient Windows directory removal races', () => {
+  const build = readFileSync(script, 'utf8');
+  assert.match(build, /rmSync\(stagedDir, \{\s*recursive: true,\s*force: true,\s*maxRetries: 8,\s*retryDelay: 250\s*\}\)/);
 });
