@@ -44,3 +44,5 @@ fix-asar*/
 
 # Repacked ASAR inspection artifact; never overwrite or commit it accidentally.
 resources/app.rebuilt.asar
+
+asar-v3*
