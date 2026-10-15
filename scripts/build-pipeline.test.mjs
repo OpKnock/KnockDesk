@@ -460,7 +460,8 @@ test('detached process groups are cleaned even if their parent has already exite
   const calls = [];
   const exitedChild = {
     pid: 6789,
-    exitCode: 0,
+    exitCode: null,
+    signalCode: 'SIGTERM',
     once() { return this; },
     removeListener() { return this; },
     kill() { throw new Error('direct child should already be exited'); },
