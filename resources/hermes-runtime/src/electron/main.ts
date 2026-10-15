@@ -331,13 +331,33 @@ app.on('before-quit', (event) => {
   ]).finally(() => app.quit());
 });
 
+let _handlingFatal = false;
+function _safeLog(prefix: string, value: unknown) {
+  // Logging itself must never throw: if stdout is a broken pipe (EPIPE),
+  // a throwing logger inside this handler recurses into _fatalException
+  // forever (23GB log witnessed). Swallow and show a dialog instead.
+  try {
+    console.error(prefix, value);
+  } catch {
+    /* stdout broken — the dialog below still informs the user */
+  }
+}
+
 process.on('uncaughtException', (error) => {
-  console.error('[KnockDesk] Uncaught exception:', error);
-  dialog.showErrorBox('KnockDesk Error', `An unexpected error occurred:\n${error.message}`);
+  if (_handlingFatal) return;
+  _handlingFatal = true;
+  _safeLog('[KnockDesk] Uncaught exception:', error);
+  try {
+    dialog.showErrorBox('KnockDesk Error', `An unexpected error occurred:\n${(error as Error)?.message ?? error}`);
+  } catch {
+    /* ignore */
+  } finally {
+    _handlingFatal = false;
+  }
 });
 
 process.on('unhandledRejection', (reason) => {
-  console.error('[KnockDesk] Unhandled rejection:', reason);
+  _safeLog('[KnockDesk] Unhandled rejection:', reason);
 });
 
 export { app, mainWindow, hermesManager, agentTownManager };

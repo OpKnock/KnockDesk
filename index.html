@@ -75,16 +75,16 @@
        src-based selectors (not alt-based): the bundled alt text varies. */
     nav img[src*="logo_withoutbackground"],
     nav img[src*="logo.png"] {
-      width: 48px !important;
-      height: 48px !important;
+      width: 28px !important;
+      height: 28px !important;
     }
     /* Also increase logo in any toolbar/header */
     header img[src*="logo_withoutbackground"],
     header img[src*="logo.png"],
     .header img[src*="logo_withoutbackground"],
     .header img[src*="logo.png"] {
-      width: 48px !important;
-      height: 48px !important;
+      width: 28px !important;
+      height: 28px !important;
     }
     /* Intro screen logo */
     #kd-intro .kd-mark {
@@ -413,8 +413,8 @@
     try {
       var logo = document.querySelector('nav img[src*="logo_withoutbackground"], nav img[src*="logo.png"]');
       if (logo) {
-        logo.style.width = '48px';
-        logo.style.height = '48px';
+        logo.style.width = '28px';
+        logo.style.height = '28px';
         if (logo.alt !== 'KnockDesk') logo.alt = 'KnockDesk';
         // Adjacent wordmark (brand name next to the logo): normalize once.
         var sib = logo.nextElementSibling;
