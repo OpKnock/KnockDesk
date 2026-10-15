@@ -170,6 +170,7 @@ function main() {
     'services/retryable-initializer.js',
     'services/child-process-tree.js',
     'services/webview-security.js',
+    'services/cdp-port-resolver.js',
     'renderer/desktop.html',
     'pwa/icon-512.png',
   ]);

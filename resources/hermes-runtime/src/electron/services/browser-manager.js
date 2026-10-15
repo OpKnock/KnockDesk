@@ -27,6 +27,7 @@ const net = require('net');
 const http = require('http');
 const { app, ipcMain } = require('electron');
 const { findBundledChromiumExecutable, getDefaultUserAgent } = require('./platform-utils');
+const { findUsableCdpPort, isCdpPortConflictError } = require('./cdp-port-resolver');
 
 const BROWSER_DATA_DIR = path.join(app.getPath('userData'), 'browser-data');
 const DOWNLOAD_DIR = app.getPath('downloads');
@@ -160,46 +161,47 @@ function tryReservePort(port) {
     });
 }
 
-async function resolveCdpPort() {
-    if (resolvedCdpPort !== null) return resolvedCdpPort;
+async function resolveCdpPort(excludedPorts = [], allowReuseExisting = true) {
+    const excluded = new Set(excludedPorts);
+    if (resolvedCdpPort !== null && !excluded.has(resolvedCdpPort)) return resolvedCdpPort;
+
+    // A failed Chromium bind can race with another process taking the port
+    // after we release the reservation. Forget that choice and scan again,
+    // excluding it, so a retry cannot select the same bad port.
+    if (resolvedCdpPort !== null && excluded.has(resolvedCdpPort)) {
+        releaseCdpPortReservation();
+        resolvedCdpPort = null;
+        cdpPortPromise = null;
+    }
     if (cdpPortPromise) return cdpPortPromise;
 
-    cdpPortPromise = (async () => {
-        for (let port = CDP_PORT_SCAN_START; port <= CDP_PORT_SCAN_END; port++) {
-            const reservation = await tryReservePort(port);
-            if (reservation) {
-                // Port is free — hold it until Chromium launch.
-                resolvedCdpPort = port;
-                cdpPortReservation = reservation;
-                if (port !== CDP_PORT_SCAN_START) {
-                    console.warn(`[BrowserService] ⚠️ Default CDP port ${CDP_PORT_SCAN_START} unavailable — using port ${port} instead.`);
-                } else {
-                    console.log(`[BrowserService] CDP port ${port} reserved.`);
-                }
-                return port;
-            }
-
-            // Port occupied — check WHO owns it.
-            const probe = await probeCdpEndpoint(port);
-            if (probe.reachable && probe.chromeFamily) {
-                // A Chrome-family CDP already lives here (e.g. leftover KnockDesk
-                // Chromium from a previous session) — safe to share, same as
-                // the original single-port behavior.
-                console.log(`[BrowserService] Reusing existing Chrome-family CDP on port ${port} (Browser: ${probe.browser}).`);
-                resolvedCdpPort = port;
-                return port;
-            }
-            console.warn(`[BrowserService] ⚠️ Port ${port} is occupied by a non-Chrome app (${probe.browser || 'unknown — no CDP response'}). Skipping.`);
+    cdpPortPromise = findUsableCdpPort({
+        startPort: CDP_PORT_SCAN_START,
+        endPort: CDP_PORT_SCAN_END,
+        excludedPorts,
+        allowReuseExisting,
+        tryReservePort,
+        probeCdpEndpoint,
+        logger: console,
+    }).then(({ port, reservation, reusedExisting, browser }) => {
+        resolvedCdpPort = port;
+        cdpPortReservation = reservation;
+        if (reusedExisting) {
+            console.log(`[BrowserService] Reusing existing Chrome-family CDP on port ${port} (Browser: ${browser}).`);
+        } else if (port !== CDP_PORT_SCAN_START) {
+            console.warn(`[BrowserService] Default CDP port ${CDP_PORT_SCAN_START} unavailable - using port ${port} instead.`);
+        } else {
+            console.log(`[BrowserService] CDP port ${port} reserved.`);
         }
-        // Nothing free in the whole range (extremely unlikely) — fall back.
-        console.error(`[BrowserService] ❌ No free CDP port in ${CDP_PORT_SCAN_START}-${CDP_PORT_SCAN_END}; falling back to ${CDP_PORT_SCAN_START}.`);
-        resolvedCdpPort = CDP_PORT_SCAN_START;
-        return resolvedCdpPort;
-    })();
+        return port;
+    }).catch((error) => {
+        cdpPortPromise = null;
+        console.error(`[BrowserService] CDP port resolution failed: ${error.message}`);
+        throw error;
+    });
 
     return cdpPortPromise;
 }
-
 // Sync getter for consumers that run after startup (bridge spawn paths).
 function getCdpPort() {
     return resolvedCdpPort || CDP_PORT_SCAN_START;
@@ -591,7 +593,7 @@ class BrowserManagerService {
             }
         }
 
-        const cdpPort = await resolveCdpPort();
+        let cdpPort = await resolveCdpPort();
         // Release the reservation just before Chromium binds the port itself
         releaseCdpPortReservation();
         console.log(`[BrowserService] Launching Chromium with CDP port ${cdpPort}...`);
@@ -627,17 +629,28 @@ class BrowserManagerService {
             try {
                 this.context = await chromium.launchPersistentContext(BROWSER_DATA_DIR, launchOptions);
             } catch (firstErr) {
-                // The first-ever start is the slowest and flakiest one (AV
-                // scanning the binary, profile mid-creation). One immediate
-                // retry rescues those; a hard failure (missing DLL, crash
-                // loop) just fails the same way twice and both errors land in
-                // the log.
                 appendBrowserLog(`LAUNCH ATTEMPT 1 FAILED after ${Date.now() - launchStarted}ms: ${firstErr.message}`);
                 const retryStarted = Date.now();
+
+                if (isCdpPortConflictError(firstErr)) {
+                    appendBrowserLog(`CDP port ${cdpPort} appears to be in use; scanning for a different port.`);
+                    cdpPort = await resolveCdpPort([cdpPort], false);
+                    launchOptions.args = launchOptions.args.filter((arg) => !arg.startsWith('--remote-debugging-port='));
+                    launchOptions.args.push(`--remote-debugging-port=${cdpPort}`);
+                    releaseCdpPortReservation();
+                }
+
                 this.context = await chromium.launchPersistentContext(BROWSER_DATA_DIR, launchOptions);
-                appendBrowserLog(`launch retry OK in ${Date.now() - retryStarted}ms`);
+                appendBrowserLog(`launch retry OK on CDP port ${cdpPort} in ${Date.now() - retryStarted}ms`);
             }
         } catch (err) {
+            // A bind/DevTools-port failure is unrelated to the browser profile.
+            // Do not quarantine user cookies and saved sessions for this case.
+            if (isCdpPortConflictError(err)) {
+                appendBrowserLog(`LAUNCH FAILED due to CDP port conflict after ${Date.now() - launchStarted}ms: ${err.message}`);
+                throw err;
+            }
+
             // Two identical failures mean the retry rescued nothing, and the
             // most common cause left is a profile this Chromium cannot read
             // (see quarantineBrowserProfile). Move it aside and try once more
