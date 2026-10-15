@@ -12,7 +12,7 @@ First-party KnockDesk code is licensed under the Apache License 2.0; see [LICENS
 
 | Component | Recorded location / version | License or notice | Upstream |
 |---|---|---|---|
-| Electron | Desktop shell; 32.x recorded | MIT; see `LICENSE.electron.txt` | https://github.com/electron/electron |
+| Electron | Maintained source shell: 44.7.2 in `resources/hermes-runtime/src/electron/package.json`; the legacy Windows package has a separate version that must be confirmed from the exact release payload | MIT; see `LICENSE.electron.txt` and verify the exact shipped version | https://github.com/electron/electron |
 | Chromium | Included through Electron and browser payloads | BSD-style and other component notices; see `LICENSES.chromium.html` and bundled notices | https://www.chromium.org |
 | Node.js | `resources/bin/node.exe`; v22.11.0 recorded | MIT plus third-party notices; verify the exact shipped build | https://github.com/nodejs/node |
 | Python | `resources/hermes-runtime/python/`; 3.11.15 recorded | PSF license; see the bundled Python license | https://www.python.org |
