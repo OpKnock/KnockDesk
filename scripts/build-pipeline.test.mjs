@@ -269,6 +269,51 @@ test('development and Windows smoke flows install the Electron 44 binary on dema
 
 test('failed first-run initialization clears the cached promise so the user can retry', () => {
   const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
-  assert.match(main, /servicesPromise = initializeServicesOnce\(window\)\.catch\(/);
-  assert.match(main, /servicesPromise = null;\s*throw error;/);
+  assert.match(main, /createRetryableInitializer/);
+  assert.match(main, /initializeServicesOnceWithRetry\\(window\\)/);
+});
+
+test('retryable initializer deduplicates concurrent startup requests', async () => {
+  const { createRetryableInitializer } = require(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/retryable-initializer.js'
+  ));
+  let release;
+  let calls = 0;
+  const initializer = createRetryableInitializer(() => {
+    calls += 1;
+    return new Promise((resolve) => { release = resolve; });
+  });
+
+  const first = initializer();
+  const second = initializer();
+  assert.equal(first, second, 'concurrent callers should share the same promise');
+  await Promise.resolve();
+  assert.equal(calls, 1, 'only one initialization attempt should start');
+  release('ready');
+  assert.equal(await first, 'ready');
+  assert.equal(await initializer(), 'ready', 'successful initialization remains cached');
+  assert.equal(calls, 1, 'successful initialization must not run twice');
+});
+
+test('retryable initializer permits a new attempt after rejection', async () => {
+  const { createRetryableInitializer } = require(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/retryable-initializer.js'
+  ));
+  let calls = 0;
+  const initializer = createRetryableInitializer(async () => {
+    calls += 1;
+    if (calls === 1) throw new Error('transient setup failure');
+    return 'ready';
+  });
+
+  await assert.rejects(initializer(), /transient setup failure/);
+  assert.equal(await initializer(), 'ready');
+  assert.equal(calls, 2, 'second call should rerun the failed initialization');
+});
+
+test('retryable initializer rejects a missing callback clearly', () => {
+  const { createRetryableInitializer } = require(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/retryable-initializer.js'
+  ));
+  assert.throws(() => createRetryableInitializer(null), /initialize must be a function/);
 });
