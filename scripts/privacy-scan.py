@@ -60,7 +60,6 @@ TARGETS = (
     "NOTICE.md",
     "package.json",
     "build-electron-main.mjs",
-    "index.html",
     ".github",
     "docs",
     "scripts",
