@@ -58,7 +58,7 @@ const PREFERRED_PORT = parseInt(process.env.STONIC_BRIDGE_PORT || '8749', 10);
 
 // Stream par har itni der baad ek ping. Do kaam karta hai: proxy/OS ko socket
 // zinda batata hai, aur plugin ko pata chalta rehta hai ke bridge sun raha hai.
-const PING_INTERVAL_MS = 20_000;
+const PING_INTERVAL_MS = 60_000; // idle-throttled (was 20s)
 
 // Body ki hadd. Hermes ka jawab lamba ho sakta hai magar be-hadd nahi —
 // aur ek local darwaza bhi bina hadd ke nahi chhorna chahiye.
@@ -312,8 +312,10 @@ class KnockDeskBridge {
     this._stream = res;
 
     this._pingTimer = setInterval(() => {
+      if (!this._stream || this._stream.writableEnded || this._stream.destroyed) return;
       this._write({ type: 'ping' });
     }, PING_INTERVAL_MS);
+    if (this._pingTimer && this._pingTimer.unref) this._pingTimer.unref();
 
     // ── HAR HANDLER SIRF APNE STREAM KA ZIMMEDAAR HAI ─────────────────────
     //
