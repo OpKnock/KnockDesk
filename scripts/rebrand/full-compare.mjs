@@ -1,0 +1,78 @@
+// Byte-compare every entry of two asars and assert that only the
+// intentionally edited files differ.
+//
+// Usage: node full-compare.mjs <oldAsar> <newAsar>
+import { getRawHeader } from '@electron/asar';
+import { openSync, readSync, closeSync, resolve } from 'node:fs';
+
+const OLD = resolve(process.argv[2]);
+const NEW = resolve(process.argv[3]);
+if (!OLD || !NEW) {
+  console.error('usage: node full-compare.mjs <oldAsar> <newAsar>');
+  process.exit(2);
+}
+
+function entries(asarPath) {
+  const { header, headerSize } = getRawHeader(asarPath, false);
+  const map = new Map();
+  const walk = (node, prefix) => {
+    if (!node.files) { map.set(prefix, node); return; }
+    for (const [name, child] of Object.entries(node.files)) walk(child, prefix + '/' + name);
+  };
+  walk(header, '');
+  const fd = openSync(asarPath, 'r');
+  const read = (node) => {
+    const start = 8 + headerSize + parseInt(node.offset, 10);
+    const buf = Buffer.alloc(node.size);
+    readSync(fd, buf, 0, node.size, start);
+    return buf;
+  };
+  return { map, read, close: () => closeSync(fd) };
+}
+
+const EXPECTED = new Set([
+  '/electron/main.js',
+  '/electron/services/hermes-manager.js',
+  '/electron/services/computer-manager.js',
+  '/electron/services/computer-runtime.js',
+  '/electron/services/agenttown-manager.js',
+  '/electron/services/cdp-shim.js',
+  '/electron/services/telemetry.js',
+  '/electron/services/shell-runner.js',
+  '/electron/services/hermes-runtime.js',
+  '/electron/services/knockdesk-plugin.js',
+  '/electron/services/stonic-plugin.js',
+  '/electron/services/stonic-bridge.js',
+  '/electron/services/memory/recall-agent.js',
+  '/electron/main/ipc/knockdesk-remote-handlers.js',
+  '/electron/main/ipc/stonic-remote-handlers.js',
+]);
+
+const a = entries(OLD);
+const b = entries(NEW);
+const diffs = [];
+let same = 0;
+for (const [path, nodeA] of a.map) {
+  const nodeB = b.map.get(path);
+  if (!nodeB) { diffs.push([path, 'MISSING-IN-NEW']); continue; }
+  const bufA = a.read(nodeA);
+  const bufB = b.read(nodeB);
+  if (bufA.equals(bufB)) { same++; continue; }
+  diffs.push([path, `size ${nodeA.size}->${nodeB.size}`]);
+}
+a.close(); b.close();
+
+const unexpected = diffs.filter(([p]) => !EXPECTED.has(p));
+console.log('entries compared:', a.map.size, '| byte-identical:', same, '| diffs:', diffs.length);
+console.log('expected diffs found:', diffs.filter(([p]) => EXPECTED.has(p)).length, '/', EXPECTED.size);
+for (const [p, why] of diffs.filter(([p]) => EXPECTED.has(p))) console.log('  planned:', p, `(${why})`);
+if (unexpected.length) {
+  console.error('UNEXPECTED DIFFS:');
+  for (const [p, why] of unexpected.slice(0, 30)) console.error('  ', p, why);
+  process.exit(1);
+}
+if (diffs.filter(([p]) => EXPECTED.has(p)).length !== EXPECTED.size) {
+  console.error('FAIL: some expected diffs did not occur (files not patched in?)');
+  process.exit(1);
+}
+console.log('FULL COMPARE OK - only planned files differ');
