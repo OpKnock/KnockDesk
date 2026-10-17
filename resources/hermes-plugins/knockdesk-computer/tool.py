@@ -63,8 +63,8 @@ COMPUTER_TASK_SCHEMA = {
 
 
 def _bridge() -> tuple[str, str]:
-    url = (os.environ.get("STONIC_BRIDGE_URL") or "").rstrip("/")
-    key = os.environ.get("STONIC_BRIDGE_KEY") or ""
+    url = ((os.environ.get("KNOCKDESK_BRIDGE_URL") or os.environ.get("STONIC_BRIDGE_URL")) or "").rstrip("/")
+    key = os.environ.get("KNOCKDESK_BRIDGE_KEY") or os.environ.get("STONIC_BRIDGE_KEY") or ""
     return url, key
 
 
@@ -156,7 +156,7 @@ def register(ctx) -> None:
         schema=COMPUTER_TASK_SCHEMA,
         handler=handle_computer_task,
         check_fn=check_requirements,
-        requires_env=["STONIC_BRIDGE_URL", "STONIC_BRIDGE_KEY"],
+        requires_env=["KNOCKDESK_BRIDGE_URL", "KNOCKDESK_BRIDGE_KEY"],
         description="Hand a screen task to KnockDesk's computer-use agent (real mouse + keyboard).",
         emoji="🖱️",
     )

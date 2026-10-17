@@ -244,7 +244,7 @@ function init({ userDataDir, appVersion, machineIdFn, endpoint } = {}) {
     cfg = {
       userDataDir,
       appVersion: appVersion || 'unknown',
-      endpoint: endpoint || process.env.STONIC_TELEMETRY_ENDPOINT || DEFAULT_ENDPOINT,
+      endpoint: endpoint || process.env.KNOCKDESK_TELEMETRY_ENDPOINT || process.env.STONIC_TELEMETRY_ENDPOINT || DEFAULT_ENDPOINT,
       machineIdFn,
     };
 
