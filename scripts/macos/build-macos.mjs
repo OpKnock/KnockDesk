@@ -244,7 +244,7 @@ async function buildVenv(destRoot, archTagList, wheelsDir, uvPlatform, pythonVer
             return overridden.has(key) ? null : l;
         });
         for (const [k, v] of pins_in) {
-            if (!new RegExp(`^${k.replace(/-/g, '[-_]')}([=<>]|\s)`, 'im').test(base)) {
+            if (!new RegExp(`^${k.replace(/-/g, '[-_]')}([=<>]|[\\s])`, 'im').test(base)) {
                 throw new Error(`override target not pinned in requirements: ${k}`);
             }
             lines.push(`${k}==${v}`);
