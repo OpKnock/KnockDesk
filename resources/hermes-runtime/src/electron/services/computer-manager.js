@@ -37,20 +37,28 @@ const readline = require('readline');
 const crypto = require('crypto');
 const { resolvePython, resolveTesseract, resolveRunnerScript, describeRuntime, restoreSystemCursors, killProcessTree } = require('./computer-runtime');
 
-const num = (name, dflt) => Number(process.env[name]) || dflt;
+// Env knobs: prefer the KNOCKDESK_COMPUTER_* names; a STONIC_COMPUTER_* spell
+// of the same knob (pre-rename config/doc) still wins when no new spelling is set.
+const num = (name, dflt) => {
+  let raw = process.env[name];
+  if (raw === undefined && typeof name === 'string' && name.indexOf('KNOCKDESK_COMPUTER_') === 0) {
+    raw = process.env['STONIC_COMPUTER_' + name.slice(19)];
+  }
+  return Number(raw) || dflt;
+};
 
 // Credentials aane ke itni der baad sidecar uthao. Renderer `configure` Hermes
 // ke tayyar hone par bhejta hai — us waqt tak boot ka sab se bhaari hissa guzar
 // chuka hota hai; ye chhota sa waqfa bas AgentTown waghaira ko saans dene ke liye.
-const BOOT_DELAY_MS = num('STONIC_COMPUTER_BOOT_DELAY_MS', 5 * 1000);
+const BOOT_DELAY_MS = num('KNOCKDESK_COMPUTER_BOOT_DELAY_MS', 5 * 1000);
 // Load ke dauran sidecar har 3 s `loading` ki dhadkan bhejta hai. Itni der
 // khamoshi = process hang → maar kar dobara.
-const LOAD_STALL_MS = num('STONIC_COMPUTER_LOAD_STALL_MS', 30 * 1000);
+const LOAD_STALL_MS = num('KNOCKDESK_COMPUTER_LOAD_STALL_MS', 30 * 1000);
 // Dhadkan ke bawajood itni der mein load poora na ho to bhi dobara. Is machine
 // par 8.4 minute napa gaya hai — 15 sirf gunjaish hai.
-const LOAD_HARD_CAP_MS = num('STONIC_COMPUTER_LOAD_HARD_CAP_MS', 15 * 60 * 1000);
+const LOAD_HARD_CAP_MS = num('KNOCKDESK_COMPUTER_LOAD_HARD_CAP_MS', 15 * 60 * 1000);
 // Supervisor ka backoff: base × [1, 3, 10, 20, 40], zyada se zyada 2 minute.
-const RESTART_BACKOFF_MS = num('STONIC_COMPUTER_RESTART_BACKOFF_MS', 3 * 1000);
+const RESTART_BACKOFF_MS = num('KNOCKDESK_COMPUTER_RESTART_BACKOFF_MS', 3 * 1000);
 const RESTART_BACKOFF_STEPS = [1, 3, 10, 20, 40];
 const RESTART_MAX_MS = 2 * 60 * 1000;
 // Itni dafa lagatar process `ready` tak na pohnche to haar maan lo (state 'error').
@@ -59,15 +67,15 @@ const MAX_START_FAILURES = 5;
 // uthaya hi nahi. Agent pehle se loaded hota hai, is liye asal mein ye 1 s se
 // kam hai — 15 s sirf gunjaish. Us par process badal kar wohi task EK dafa
 // dobara; phir bhi na chale to saaf error.
-const START_TIMEOUT_MS = num('STONIC_COMPUTER_START_TIMEOUT_MS', 15 * 1000);
+const START_TIMEOUT_MS = num('KNOCKDESK_COMPUTER_START_TIMEOUT_MS', 15 * 1000);
 // Sidecar ki dhadkan (`task_starting`) start-timer ko aage sarkati hai — is
 // hadd tak (misal: pichhle stop ka thread abhi mouse chhor raha ho).
-const START_HARD_CAP_MS = num('STONIC_COMPUTER_START_HARD_CAP_MS', 3 * 60 * 1000);
+const START_HARD_CAP_MS = num('KNOCKDESK_COMPUTER_START_HARD_CAP_MS', 3 * 60 * 1000);
 // Task aaya magar agent abhi load ho raha hai: itni der intezaar, phir saaf error.
-const PENDING_MAX_MS = num('STONIC_COMPUTER_PENDING_MAX_MS', 10 * 60 * 1000);
+const PENDING_MAX_MS = num('KNOCKDESK_COMPUTER_PENDING_MAX_MS', 10 * 60 * 1000);
 // Stop ke baad `task_done` ka intezaar. Sidecar cloud call kaat kar 1-2 s mein
 // deta hai; ye sirf asli hang ka pehra hai — us par process marta hai.
-const STOP_GRACE_MS = num('STONIC_COMPUTER_STOP_GRACE_MS', 12 * 1000);
+const STOP_GRACE_MS = num('KNOCKDESK_COMPUTER_STOP_GRACE_MS', 12 * 1000);
 // Ek task zyada se zyada itni der. `max_steps` step GIN-ta hai, waqt nahi —
 // aur ek atka hua upstream call kisi step ki ginti mein nahi aata. Hermes
 // plugin ki apni hadd (20 min) is se thori kam hai, jaan bujh kar.
@@ -253,10 +261,10 @@ class ComputerManager {
   _resolvedConfig() {
     const env = process.env;
     const dev = this._devOverrideAllowed();
-    const devUrl = dev ? env.STONIC_COMPUTER_API_URL : null;
-    const devKey = dev ? env.STONIC_COMPUTER_API_KEY : null;
+    const devUrl = dev ? (env.KNOCKDESK_COMPUTER_API_URL || env.STONIC_COMPUTER_API_URL) : null;
+    const devKey = dev ? (env.KNOCKDESK_COMPUTER_API_KEY || env.STONIC_COMPUTER_API_KEY) : null;
 
-    if (!dev && (env.STONIC_COMPUTER_API_URL || env.STONIC_COMPUTER_API_KEY) && !this._warnedOverride) {
+    if (!dev && (env.KNOCKDESK_COMPUTER_API_URL || env.STONIC_COMPUTER_API_URL || env.KNOCKDESK_COMPUTER_API_KEY || env.STONIC_COMPUTER_API_KEY) && !this._warnedOverride) {
       this._warnedOverride = true;
       console.warn('[Computer] KnockDesk local: env override active — sidecar seedha usi gateway par chalega.');
     }
@@ -307,15 +315,15 @@ class ComputerManager {
       //
       // Dev par asli naam bhi chalte hain (gateway ki allowlist mein mojood
       // hain), taake do models ka muqabla kiya ja sake.
-      plannerModel: (dev && env.STONIC_COMPUTER_PLANNER_MODEL) || 'knockdesk-computer-planner',
-      groundingModel: (dev && env.STONIC_COMPUTER_GROUNDING_MODEL) || 'knockdesk-computer-grounding',
+      plannerModel: (dev && (env.KNOCKDESK_COMPUTER_PLANNER_MODEL || env.STONIC_COMPUTER_PLANNER_MODEL)) || 'knockdesk-computer-planner',
+      groundingModel: (dev && (env.KNOCKDESK_COMPUTER_GROUNDING_MODEL || env.STONIC_COMPUTER_GROUNDING_MODEL)) || 'knockdesk-computer-grounding',
       // Grounding ke naap JAAN BUJH KAR khali. Runner inhein us screenshot se
       // khud nikalta hai jo wo model ko bhejta hai — aur wohi durust hai.
       // Pehle yahan '1920'/'1080' likha tha; 1080p screen par wo ittefaq se
       // sahi tha, magar 2K/4K par clicks button se khisak jate the. Dev par
       // override phir bhi mumkin hai.
-      groundingWidth: (dev && env.STONIC_COMPUTER_GROUNDING_WIDTH) || '',
-      groundingHeight: (dev && env.STONIC_COMPUTER_GROUNDING_HEIGHT) || '',
+      groundingWidth: (dev && (env.KNOCKDESK_COMPUTER_GROUNDING_WIDTH || env.STONIC_COMPUTER_GROUNDING_WIDTH)) || '',
+      groundingHeight: (dev && (env.KNOCKDESK_COMPUTER_GROUNDING_HEIGHT || env.STONIC_COMPUTER_GROUNDING_HEIGHT)) || '',
     };
   }
 
@@ -587,17 +595,17 @@ class ComputerManager {
       ...process.env,
       PYTHONIOENCODING: 'utf-8',
       PYTHONUNBUFFERED: '1',
-      STONIC_COMPUTER_API_URL: cfg.apiUrl,
-      STONIC_COMPUTER_API_KEY: cfg.apiKey,
-      STONIC_COMPUTER_ROUTE: cfg.route || 'cloud',
-      STONIC_COMPUTER_PLANNER_MODEL: cfg.plannerModel,
-      STONIC_COMPUTER_GROUNDING_MODEL: cfg.groundingModel,
+      KNOCKDESK_COMPUTER_API_URL: cfg.apiUrl,
+      KNOCKDESK_COMPUTER_API_KEY: cfg.apiKey,
+      KNOCKDESK_COMPUTER_ROUTE: cfg.route || 'cloud',
+      KNOCKDESK_COMPUTER_PLANNER_MODEL: cfg.plannerModel,
+      KNOCKDESK_COMPUTER_GROUNDING_MODEL: cfg.groundingModel,
       // '0' = "khud hisaab karo". Yahan khali string nahi bheji ja sakti:
       // Windows par khali env var kabhi pohanchti hi nahi, aur phir `process.env`
       // ki purani qeemat (dev ki .env) chupke se child tak chali jati hai.
-      STONIC_COMPUTER_GROUNDING_WIDTH: String(cfg.groundingWidth || '0'),
-      STONIC_COMPUTER_GROUNDING_HEIGHT: String(cfg.groundingHeight || '0'),
-      ...(tesseract ? { STONIC_COMPUTER_TESSERACT: tesseract } : {}),
+      KNOCKDESK_COMPUTER_GROUNDING_WIDTH: String(cfg.groundingWidth || '0'),
+      KNOCKDESK_COMPUTER_GROUNDING_HEIGHT: String(cfg.groundingHeight || '0'),
+      ...(tesseract ? { KNOCKDESK_COMPUTER_TESSERACT: tesseract } : {}),
     };
 
     // `-u` jaan bujh kar nahi diya: uska kaam PYTHONUNBUFFERED=1 (upar env

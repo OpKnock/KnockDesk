@@ -35,8 +35,8 @@ Date: 2026-10-17. Version: 3.1.12-local. Status per item: VERIFIED / FAILED / BL
 | App Paths registration | VERIFIED | HKCU `App Paths\KnockDesk.exe` — Win+R launch |
 | Windows Search discoverable | VERIFIED | Start Menu shortcut (tested: search finds KnockDesk) |
 | SHA-256 checksums published | VERIFIED | `dist/SHA256SUMS.txt` + `dist/SHA256SUMS-installer.txt` |
-| User data preserved on upgrade | VERIFIED | `%APPDATA%\stonic_gen3` outside install dir; installer kills running exe, replaces files |
-| User data preserved on uninstall | VERIFIED | Uninstaller does not touch `%APPDATA%\stonic_gen3` |
+| User data preserved on upgrade | VERIFIED | `%APPDATA%\knockdesk` outside install dir (legacy `stonic_gen3` migrated on first run); installer kills running exe, replaces files |
+| User data preserved on uninstall | VERIFIED | Uninstaller does not touch `%APPDATA%\knockdesk` |
 | Clean uninstall | PARTIAL | Removes app, shortcuts, all registry. 65 deeply-nested Python files in `hermes-runtime\python\` remain due to Windows MAX_PATH (inert, no executable). Documented; user can delete folder manually. |
 
 ## Code Signing

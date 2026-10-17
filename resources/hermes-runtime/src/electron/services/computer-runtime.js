@@ -83,6 +83,9 @@ function labVenvCandidates() {
 
 /** Python jo sidecar chalayega, ya null. */
 function resolvePython() {
+    if (process.env.KNOCKDESK_COMPUTER_PYTHON && fs.existsSync(process.env.KNOCKDESK_COMPUTER_PYTHON)) {
+        return process.env.KNOCKDESK_COMPUTER_PYTHON;
+    }
     if (process.env.STONIC_COMPUTER_PYTHON && fs.existsSync(process.env.STONIC_COMPUTER_PYTHON)) {
         return process.env.STONIC_COMPUTER_PYTHON;
     }
@@ -96,6 +99,9 @@ function resolvePython() {
 
 /** tesseract.exe ka rasta, ya null (OCR ke baghair bhi agent chalta hai). */
 function resolveTesseract() {
+    if (process.env.KNOCKDESK_COMPUTER_TESSERACT && fs.existsSync(process.env.KNOCKDESK_COMPUTER_TESSERACT)) {
+        return process.env.KNOCKDESK_COMPUTER_TESSERACT;
+    }
     if (process.env.STONIC_COMPUTER_TESSERACT && fs.existsSync(process.env.STONIC_COMPUTER_TESSERACT)) {
         return process.env.STONIC_COMPUTER_TESSERACT;
     }
@@ -130,7 +136,7 @@ function describeRuntime() {
     if (!python) {
         missing.push(
             'Python (computer-runtime): na bundled venv mila, na lab ka. '
-            + 'Chalayein `npm run build:computer-runtime`, ya STONIC_COMPUTER_PYTHON set karein. '
+            + 'Chalayein `npm run build:computer-runtime`, ya KNOCKDESK_COMPUTER_PYTHON set karein. '
             + `Dekha gaya: ${labVenvCandidates().join(' | ')}`,
         );
     }

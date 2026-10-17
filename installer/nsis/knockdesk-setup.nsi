@@ -90,5 +90,5 @@ Section "Uninstall"
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\KnockDesk"
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\App Paths\${APP_EXE}"
   DeleteRegKey HKCU "Software\OpKnock\KnockDesk"
-  ; User data (%APPDATA%\stonic_gen3) is deliberately preserved.
+  ; User data (%APPDATA%\knockdesk) is deliberately preserved.
 SectionEnd
