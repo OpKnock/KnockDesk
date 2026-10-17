@@ -1,0 +1,103 @@
+name: Build Windows installer
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. v3.1.12)'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  nsis:
+    name: Build NSIS offline installer
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout (full, with LFS)
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          persist-credentials: false
+
+      - name: Verify LFS payloads fetched
+        shell: pwsh
+        run: |
+          $exe = 'KnockDesk.exe'
+          $bytes = (Get-Item $exe -ErrorAction Stop).Length
+          if ($bytes -lt 100MB) { throw "KnockDesk.exe is $bytes bytes - LFS payload not fetched" }
+          Write-Output "KnockDesk.exe: $([math]::Round($bytes/1MB,1)) MB"
+
+      - name: Install NSIS
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          $makensis = 'C:\Program Files (x86)\NSIS\makensis.exe'
+          if (-not (Test-Path $makensis)) { throw 'makensis not found after choco install' }
+          & $makensis -VERSION
+
+      - name: Install Python PIL for icon generation
+        shell: pwsh
+        run: python -m pip install Pillow --quiet
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $version = '${{ inputs.version }}'
+          if (-not $version) { $version = '${{ github.ref_name }}' }
+          if (-not $version -or $version -eq 'refs/heads/main') { $version = '3.1.12' }
+          $version = $version -replace '^v', ''
+          Write-Output "Building KnockDesk-Setup-$version-x64.exe"
+          powershell -ExecutionPolicy Bypass -File scripts/build-nsis-installer.ps1 -Version $version
+
+      - name: Verify installer exists and is non-trivial
+        shell: pwsh
+        run: |
+          $out = Get-ChildItem dist\KnockDesk-Setup-*.exe | Select-Object -First 1
+          if (-not $out) { throw 'No installer found in dist/' }
+          $mb = [math]::Round($out.Length / 1MB, 0)
+          if ($mb -lt 500) { throw "Installer is only ${mb} MB — expected >500 MB (LFS payload missing?)" }
+          Write-Output "Installer: $($out.Name), ${mb} MB"
+          $hash = (Get-FileHash $out.FullName -Algorithm SHA256).Hash
+          Write-Output "SHA-256: $hash"
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: knockdesk-windows-installer
+          path: |
+            dist/KnockDesk-Setup-*.exe
+            dist/SHA256SUMS*.txt
+          retention-days: 30
+          compression-level: 0  # installer is already LZMA-compressed
+
+      # Signing is a SEPARATE gated job. The unsigned installer is the
+      # release candidate; the signed one is the release artifact.
+      # Secrets are NEVER embedded in the build.
+      - name: Sign installer (gated: requires cert secrets)
+        if: ${{ secrets.WINDOWS_CERT_PFX_B64 != '' && secrets.WINDOWS_CERT_PASSWORD != '' }}
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PFX_B64: ${{ secrets.WINDOWS_CERT_PFX_B64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          $out = Get-ChildItem dist\KnockDesk-Setup-*.exe | Select-Object -First 1
+          $exe = Get-Item 'KnockDesk.exe'
+          powershell -ExecutionPolicy Bypass -File scripts/sign-release.ps1 -InstallerPath $out.FullName -ExePath $exe.FullName
+
+      - name: Create GitHub Release (tag builds only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/KnockDesk-Setup-*.exe
+            dist/SHA256SUMS*.txt
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
