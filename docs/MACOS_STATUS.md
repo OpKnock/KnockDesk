@@ -10,7 +10,7 @@ node, better-sqlite3 electron-v132 darwin prebuilds).
 
 ## What exists
 
-- Cross-build workspace `C:\Users\wagde\MegaProjects\KnockDesk-MacOs`:
+- Cross-build workspace (a sibling folder of this repo; see its README):
   - `scripts/build-macos.mjs` — orchestrator (downloads, assembly, venv,
     Info.plist patch, zips), arm64 and x64.
   - `scripts/unpack.mjs` — privilege-free ZIP + tar.gz readers that never
