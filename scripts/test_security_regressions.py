@@ -54,7 +54,12 @@ def _read(path: Path) -> str:
 # ---------------------------------------------------------------------------
 
 _GUARD_START = 'url = value.rstrip("/") + "/models"'
-_GUARD_END = "except ValueError:\n            pass"
+_GUARD_END = (
+    'and all(p.startswith(("0x", "0X")) or p.isdigit() for p in parts)\n'
+    "            ):\n"
+    "                return {\"ok\": False, \"reachable\": False, "
+    "\"message\": \"Refused unsafe endpoint URL.\"}"
+)
 _GUARD_MUST_CONTAIN = (
     "169.254.169.254",
     "metadata.google.internal",
@@ -62,6 +67,10 @@ _GUARD_MUST_CONTAIN = (
     "is_link_local",
     "is_reserved",
     "is_multicast",
+    # inet_aton-style numeric alias refusal (decimal/hex/octal spellings of
+    # link-local / loopback addresses that the OS resolver accepts).
+    "0x",
+    "isdigit",
 )
 
 
