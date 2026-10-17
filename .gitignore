@@ -46,3 +46,5 @@ fix-asar*/
 resources/app.rebuilt.asar
 
 asar-v3*
+
+dist/
