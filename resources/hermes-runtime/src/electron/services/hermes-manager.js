@@ -987,20 +987,29 @@ class HermesManager {
    * tor par user ne account badal liya — pakri jati hai.
    */
   async _ensureKnockDeskEnv({ bridgeUrl, bridgeKey, chatId }) {
+    // Dono naam likho: naye KNOCKDESK_* aur purane STONIC_*. Purane machines
+    // par install hone wale stonic* plugins STONIC_BRIDGE_* parhte hain, naye
+    // knockdesk* plugins KNOCKDESK_* — dono ka env chahiye, warna plugin ka
+    // requires_env check fail hota hai aur computer_task jaise tools gayab
+    // ho jate hain (agent "done" bolta hai, kaam nahi hota).
     const desired = {
       KNOCKDESK_BRIDGE_URL: bridgeUrl,
+      STONIC_BRIDGE_URL: bridgeUrl,
       KNOCKDESK_BRIDGE_KEY: bridgeKey,
+      STONIC_BRIDGE_KEY: bridgeKey,
       KNOCKDESK_CHAT_ID: chatId || '',
+      STONIC_CHAT_ID: chatId || '',
       // Pehra do jagah: bridge par bhi (localhost + secret) aur yahan bhi.
       // Hermes sirf usi KnockDesk account se baat karega jis se desktop par
       // sign in kiya gaya hai — koi aur user id aa bhi jaye to ruk jayegi.
       KNOCKDESK_ALLOWED_USERS: chatId || '',
+      STONIC_ALLOWED_USERS: chatId || '',
       // Cron aur `send_message` tool ka pata — is ke baghair Hermes khud se
       // phone par kuch nahi bhej sakta ("deliver=knockdesk" chup-chaap girta).
       KNOCKDESK_HOME_CHANNEL: chatId || '',
+      STONIC_HOME_CHANNEL: chatId || '',
     };
-    // One-time rebrand migration: neeche file-level cleanup purani keys ki
-    // lines .env se nikaal deta hai (API empty-PUTs ko nazar-andaaz karta hai).
+    // NOTE: yahan koi file-level cleanup nahi — dono naam-zaroori hain (upar).
 
     const env = await this.apiFetch('/api/env');
     const rows = (env.ok && ((env.data && env.data.env) || env.data)) || {};
@@ -1027,15 +1036,18 @@ class HermesManager {
     // File-level cleanup: Hermes empty PUTs ko nazar-andaaz karta hai, is
     // liye purani keys API se saaf nahi hotin — file se lines hatao. Agle
     // gateway bounce (neeche `changed`) par saaf env lagoo hoga.
+    // NOTE (rebrand): pehle yahan STONIC_* lines delete hoti thi. Ab dono
+    // naam-zaroori hain (stonic* + knockdesk* plugins dono install hain),
+    // is liye koi cleanup nahi — sirf cache ke hisaab se PUT hoti hai.
     try {
       const envPath = path.join(this.getHermesHome(), '.env');
-      const raw = fs.readFileSync(envPath, 'utf8');
+      const raw = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
       const lines = raw.split('\n');
-      const kept = lines.filter((ln) => !/^\s*STONIC_(BRIDGE_URL|BRIDGE_KEY|CHAT_ID|ALLOWED_USERS|HOME_CHANNEL)\s*=/.test(ln));
+      const kept = lines.filter((ln) => !/^\s*KNOCKDESK_(BRIDGE_URL|BRIDGE_KEY|CHAT_ID|ALLOWED_USERS|HOME_CHANNEL)\s*=\s*$/.test(ln));
       if (kept.length !== lines.length) {
         fs.writeFileSync(envPath, kept.join('\n'));
         changed = true;
-        console.log('[Hermes] Purani STONIC_* keys .env se hata di gayin.');
+        console.log('[Hermes] Khali KNOCKDESK_* lines .env se hata di gayin.');
       }
     } catch { /* agli dafa sahi — gateway purani keys nazar-andaaz karta hai */ }
     try {
