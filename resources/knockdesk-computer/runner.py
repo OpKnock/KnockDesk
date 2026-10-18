@@ -153,9 +153,12 @@ API_KEY = _env("KNOCKDESK_COMPUTER_API_KEY")
 ROUTE = _env("KNOCKDESK_COMPUTER_ROUTE", "cloud").lower()
 # Logical नाम — gateway इन्हें असली model पर मोड़ देता है। Electron हमेशा
 # यह ख़ुद भेजता है; यह default सिर्फ़ runner को अकेले चलाने के लिए है।
-# NOTE: `stonic-computer-planner/grounding` default मान gateway mapping के हैं — न बदलें।
-PLANNER_MODEL = _env("KNOCKDESK_COMPUTER_PLANNER_MODEL", "stonic-computer-planner")
-GROUNDING_MODEL = _env("KNOCKDESK_COMPUTER_GROUNDING_MODEL", "stonic-computer-grounding")
+# NOTE: `knockdesk-computer-planner/grounding` logical names hain — gateway
+# inhein us waqt ke asli model par map karta hai (config.js). Cloud route inhe
+# `knockdesk-computer-planner` bhejta hai; byok mein manager asli naam bhejta
+# hai, to ye default sirf fallback hai.
+PLANNER_MODEL = _env("KNOCKDESK_COMPUTER_PLANNER_MODEL", "knockdesk-computer-planner")
+GROUNDING_MODEL = _env("KNOCKDESK_COMPUTER_GROUNDING_MODEL", "knockdesk-computer-grounding")
 # Grounding के नाप जानबूझ कर 0 हैं — असली क़ीमत उस तस्वीर से निकलती
 # है जो model को भेजी जाती है (देखो __init__)। Agent S3 का अपना help text:
 # "Width of screenshot image after processor rescaling"। यानी यह model की कोई
