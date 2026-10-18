@@ -2345,13 +2345,27 @@ def text_to_speech_tool(
             if edge_available:
                 logger.info("Generating speech with Edge TTS...")
                 try:
-                    import concurrent.futures
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                        pool.submit(
-                            lambda: asyncio.run(_generate_edge_tts(text, file_str, tts_config))
-                        ).result(timeout=60)
-                except RuntimeError:
-                    asyncio.run(_generate_edge_tts(text, file_str, tts_config))
+                    try:
+                        import concurrent.futures
+                        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                            pool.submit(
+                                lambda: asyncio.run(_generate_edge_tts(text, file_str, tts_config))
+                            ).result(timeout=60)
+                    except RuntimeError:
+                        asyncio.run(_generate_edge_tts(text, file_str, tts_config))
+                except Exception as edge_err:
+                    # Microsoft ka muft Edge endpoint aksar 403 "Invalid response
+                    # status" deta hai (region/IP block). Agar Gemini ki key
+                    # mojood hai to wahan se bolo — voice agent chup na rahe.
+                    if (get_env_value("GEMINI_API_KEY") or get_env_value("GOOGLE_API_KEY") or "").strip():
+                        logger.warning(
+                            "Edge TTS fail ho gaya (%s) — Gemini TTS par gir gaya",
+                            str(edge_err)[:120],
+                        )
+                        provider = "gemini"
+                        _generate_gemini_tts(text, file_str, tts_config)
+                    else:
+                        raise
             elif _check_neutts_available():
                 logger.info("Edge TTS not available, falling back to NeuTTS (local)...")
                 provider = "neutts"
