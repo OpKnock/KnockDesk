@@ -19,6 +19,7 @@ concurrent-log-handler==0.9.29
 croniter==6.0.0
 cryptography==49.0.0
 ctranslate2==4.8.2
+ddgs==9.16.0
 distro==1.9.0
 edge-tts==7.2.7
 fastapi==0.139.0
@@ -38,8 +39,8 @@ idna==3.18
 Jinja2==3.1.6
 jiter==0.16.0
 jmespath==1.1.0
-Markdown==3.10.2
 markdown-it-py==4.2.0
+Markdown==3.10.2
 MarkupSafe==3.0.3
 mdurl==0.1.2
 multidict==6.7.1
@@ -49,11 +50,13 @@ openai==2.24.0
 packaging==26.0
 pathspec==1.1.1
 pillow==12.2.0
+pip==26.1.2
 portalocker==3.2.0
 prompt_toolkit==3.0.52
 propcache==0.5.2
 protobuf==7.36.2
 psutil==7.2.2
+ptyprocess>=0.7,<1
 pycparser==3.0
 pydantic==2.13.4
 pydantic_core==2.46.4
@@ -67,9 +70,10 @@ pytz==2026.2
 PyYAML==6.0.3
 requests==2.33.0
 rich==14.3.3
-ruamel.yaml==0.18.17
 ruamel.yaml.clib==0.2.15
+ruamel.yaml==0.18.17
 s3transfer==0.16.1
+setuptools
 six==1.17.0
 sniffio==1.3.1
 socksio==1.0.0
@@ -88,8 +92,5 @@ uvicorn==0.51.0
 watchfiles==1.2.0
 wcwidth==0.8.2
 websockets==15.0.1
-yarl==1.24.2
-ptyprocess>=0.7,<1
-pip==26.1.2
-setuptools
 wheel
+yarl==1.24.2

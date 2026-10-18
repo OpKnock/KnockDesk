@@ -65,7 +65,7 @@ def probe_gemini_tier(
     api_key: str,
     base_url: str = DEFAULT_GEMINI_BASE_URL,
     *,
-    model: str = "gemini-2.5-flash",
+    model: str = "gemini-3.5-flash-lite",
     timeout: float = 10.0,
 ) -> str:
     """Probe a Google AI Studio API key and return its tier.
@@ -896,7 +896,7 @@ class GeminiNativeClient:
     def _create_chat_completion(
         self,
         *,
-        model: str = "gemini-2.5-flash",
+        model: str = "gemini-3.5-flash-lite",
         messages: Optional[List[Dict[str, Any]]] = None,
         stream: bool = False,
         tools: Any = None,
