@@ -19,6 +19,11 @@ jobs:
     name: Build NSIS offline installer
     runs-on: windows-latest
     timeout-minutes: 120
+    # Secrets are not available in step-level `if:` expressions; expose them
+    # through the job environment so the signing step can test for them.
+    env:
+      WINDOWS_CERT_PFX_B64: ${{ secrets.WINDOWS_CERT_PFX_B64 }}
+      WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
     steps:
       - name: Checkout (full, with LFS)
         uses: actions/checkout@v4
@@ -81,11 +86,8 @@ jobs:
       # release candidate; the signed one is the release artifact.
       # Secrets are NEVER embedded in the build.
       - name: 'Sign installer (gated: requires cert secrets)'
-        if: ${{ secrets.WINDOWS_CERT_PFX_B64 != '' && secrets.WINDOWS_CERT_PASSWORD != '' }}
+        if: ${{ env.WINDOWS_CERT_PFX_B64 != '' && env.WINDOWS_CERT_PASSWORD != '' }}
         shell: pwsh
-        env:
-          WINDOWS_CERT_PFX_B64: ${{ secrets.WINDOWS_CERT_PFX_B64 }}
-          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
         run: |
           $out = Get-ChildItem dist\KnockDesk-Setup-*.exe | Select-Object -First 1
           $exe = Get-Item 'KnockDesk.exe'
