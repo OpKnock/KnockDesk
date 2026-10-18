@@ -80,7 +80,7 @@ jobs:
       # Signing is a SEPARATE gated job. The unsigned installer is the
       # release candidate; the signed one is the release artifact.
       # Secrets are NEVER embedded in the build.
-      - name: Sign installer (gated: requires cert secrets)
+      - name: 'Sign installer (gated: requires cert secrets)'
         if: ${{ secrets.WINDOWS_CERT_PFX_B64 != '' && secrets.WINDOWS_CERT_PASSWORD != '' }}
         shell: pwsh
         env:
