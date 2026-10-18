@@ -51,6 +51,64 @@ jobs:
         shell: pwsh
         run: python -m pip install Pillow --quiet
 
+      - name: Rebuild git-ignored payloads (node_modules, dists, venvs)
+        shell: pwsh
+        run: |
+          # The agent runtimes are git-ignored build-host trees. This step
+          # rebuilds them from committed sources so a checkout-only runner can
+          # stage a complete installer. Pins come from requirements-windows-*.txt
+          # (frozen from the shipped venvs); the interpreter is the committed
+          # resources/hermes-runtime/python tree.
+          $ErrorActionPreference = 'Stop'
+          $py = 'resources\hermes-runtime\python\python.exe'
+          if (-not (Test-Path $py)) { throw "embedded python missing: $py" }
+
+          # 1. Regenerate the archive-adjacent extracted trees (*.extracted is
+          #    git-ignored because it is expandable from the archive beside it).
+          $zip = 'resources\python-embedded\python311.zip'
+          if ((Test-Path $zip) -and -not (Test-Path "$zip.extracted")) {
+            Expand-Archive -Path $zip -DestinationPath "$zip.extracted" -Force
+            Write-Output 'regenerated python311.zip.extracted'
+          }
+
+          # 2. node_modules + dashboard/tui bundles for the hermes runtime.
+          Push-Location 'resources\hermes-runtime\src'
+          try {
+            npm install --no-audit --no-fund --prefer-offline
+            if ($LASTEXITCODE -ne 0) { throw 'npm install failed' }
+            npm run build --workspace web
+            if ($LASTEXITCODE -ne 0) { throw 'web build failed' }
+            npm run build --workspace ui-tui
+            if ($LASTEXITCODE -ne 0) { throw 'ui-tui build failed' }
+            New-Item -ItemType Directory -Path 'hermes_cli\tui_dist' -Force | Out-Null
+            Copy-Item 'ui-tui\dist\entry.js' 'hermes_cli\tui_dist\entry.js' -Force
+            Write-Output 'node_modules + dists rebuilt'
+          } finally { Pop-Location }
+
+          # 3. The two venvs (uv, same interpreter + frozen pins).
+          python -m pip install uv --quiet --disable-pip-version-check
+          if ($LASTEXITCODE -ne 0) { throw 'uv install failed' }
+          foreach ($pair in @(
+            @{ venv = 'resources\hermes-runtime\venv'; req = 'scripts\requirements-windows-hermes.txt'; editable = 'resources\hermes-runtime\src' },
+            @{ venv = 'resources\computer-runtime\venv'; req = 'scripts\requirements-windows-computer.txt'; editable = $null }
+          )) {
+            if (Test-Path $pair.venv) { Remove-Item $pair.venv -Recurse -Force }
+            uv venv --python $py $pair.venv
+            if ($LASTEXITCODE -ne 0) { throw "uv venv failed: $($pair.venv)" }
+            # --no-deps: the freeze is the complete closure (frozen from the
+            # shipped venvs); resolving dependencies again would pull extras
+            # the shipped venvs deliberately do not have (gui-agents' OCR/CV
+            # stack, ~76 packages).
+            uv pip install --no-deps --python "$($pair.venv)\Scripts\python.exe" -r $pair.req
+            if ($LASTEXITCODE -ne 0) { throw "uv pip install failed: $($pair.req)" }
+            if ($pair.editable) {
+              uv pip install --python "$($pair.venv)\Scripts\python.exe" -e $pair.editable
+              if ($LASTEXITCODE -ne 0) { throw "uv editable install failed: $($pair.editable)" }
+            }
+            $n = (Get-ChildItem "$($pair.venv)\Lib\site-packages" -Filter '*.dist-info').Count
+            Write-Output "$($pair.venv): $n packages installed"
+          }
+
       - name: Verify runtime payloads made it into the stage
         shell: pwsh
         run: |
