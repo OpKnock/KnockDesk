@@ -203,6 +203,23 @@ function hermesSpawnEnv(extra = {}) {
     } else {
         delete env.HERMES_YOLO_MODE;
     }
+
+    // Local Gemini key (Settings → AI Engine) bhi gateway tak pohanchao.
+    // Gateway ke andar TTS (edge 403 par Gemini fallback) aur kuch agent-side
+    // tools isay env se parhte hain; app isay secret_key.json mein rakhti hai.
+    if (!env.GEMINI_API_KEY && !env.GOOGLE_API_KEY) {
+        try {
+            const { app } = require('electron');
+            const keyStore = require('./key-store');
+            const stored = keyStore.readKey(
+                path.join(app.getPath('userData'), 'secret_key.json'),
+                ['geminiKey', 'apiKey'],
+            );
+            if (stored && stored.saved && stored.value) {
+                env.GEMINI_API_KEY = String(stored.value).trim();
+            }
+        } catch { /* key na ho to chup-chaap chhodo — tools apna error khud dete hain */ }
+    }
     return env;
 }
 
