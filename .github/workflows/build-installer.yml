@@ -109,33 +109,12 @@ jobs:
             Write-Output "$($pair.venv): $n packages installed"
           }
 
-      - name: Verify runtime payloads made it into the stage
-        shell: pwsh
-        run: |
-          # The Hermes venv, the computer-use venv, the hermes src node_modules
-          # and the dashboard dists are git-ignored build-host trees (never
-          # committed). A checkout-only runner cannot stage them, so an
-          # installer built from git alone would ship without the agent
-          # runtimes. Fail loudly instead of packaging a broken installer.
-          $stage = Join-Path $env:TEMP 'kd-nsis-stage'
-          $required = @(
-            'resources\hermes-runtime\venv\Scripts\hermes.exe',
-            'resources\computer-runtime\venv\Scripts\python.exe',
-            'resources\hermes-runtime\src\hermes_cli\web_dist',
-            'resources\hermes-runtime\src\node_modules'
-          )
-          $missing = @($required | Where-Object { -not (Test-Path (Join-Path $stage $_)) })
-          if ($missing.Count -gt 0) {
-            $list = $missing -join ', '
-            throw "Runtime payloads missing from the stage: $list. These trees are git-ignored and exist only on the build host; build the release installer on that host, or commit the payloads via LFS, before running this workflow."
-          }
-          $n = (Get-ChildItem $stage -Recurse -File).Count
-          $mb = [math]::Round(((Get-ChildItem $stage -Recurse -File | Measure-Object Length -Sum).Sum / 1MB), 1)
-          Write-Output "Stage payload verified: $n files, ${mb} MB"
-
       - name: Build installer
         shell: pwsh
         run: |
+          # Stages the payload (the rebuild step above must have run first);
+          # build-nsis-installer.ps1 verifies the runtime payloads after
+          # staging, then compiles.
           $version = '${{ inputs.version }}'
           if (-not $version) { $version = '${{ github.ref_name }}' }
           if (-not $version -or $version -eq 'refs/heads/main') { $version = '3.1.12' }

@@ -78,6 +78,23 @@ $sha | Out-File (Join-Path $dist 'SHA256SUMS.txt') -Encoding utf8
 $sizeMB = [math]::Round(($files | Measure-Object Length -Sum).Sum / 1MB, 1)
 Write-Output "Staged $($files.Count) files, ${sizeMB} MB"
 
+# Payload gate: the agent runtimes are git-ignored build-host trees. A checkout
+# without them (e.g. a plain CI runner that skipped the rebuild step) would
+# stage a payload-less installer: the app spawns hermes.exe and the
+# computer-use python from these trees, so this must fail loudly instead of
+# packaging an installer with a dead agent.
+$required = @(
+  'resources\hermes-runtime\venv\Scripts\hermes.exe',
+  'resources\computer-runtime\venv\Scripts\python.exe',
+  'resources\hermes-runtime\src\hermes_cli\web_dist',
+  'resources\hermes-runtime\src\node_modules'
+)
+$missing = @($required | Where-Object { -not (Test-Path (Join-Path $stage $_)) })
+if ($missing.Count -gt 0) {
+  throw ("Runtime payloads missing from the stage: " + ($missing -join ', ') + ". These trees are git-ignored and exist only on the build host; rebuild them from scripts/requirements-windows-*.txt plus the npm builds (see the CI workflow), or build on the host that holds them.")
+}
+Write-Output 'Runtime payloads verified in stage.'
+
 if (-not (Test-Path $Makensis)) { throw "makensis not found: $Makensis" }
 & $Makensis "/DSTAGE_DIR=$stage" (Join-Path $root 'installer\nsis\knockdesk-setup.nsi')
 $out = Join-Path $dist "KnockDesk-Setup-$Version-x64.exe"
