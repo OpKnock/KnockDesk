@@ -8,11 +8,16 @@
 # via scripts/sign-release.ps1 with a production certificate (never embedded).
 param(
   [string]$Version = '3.1.12',
-  [string]$VersionDisplay = '3.1.12-local',
+  [string]$VersionDisplay = '',
   [string]$Makensis = 'C:\Program Files (x86)\NSIS\makensis.exe'
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
+# Derive the display version from $Version when not supplied: the app's own
+# build channel appends "-local" (see app-update.yml and the updater log), so
+# the Add/Remove Programs entry mirrors it. Hardcoding this made every future
+# release show the previous version in ARP.
+if (-not $VersionDisplay) { $VersionDisplay = "$Version-local" }
 # Short staging path: deep repo paths + nested venv exceed Windows MAX_PATH.
 $stage = Join-Path $env:TEMP 'kd-nsis-stage'
 $assets = Join-Path $root 'staging\nsis-assets'
