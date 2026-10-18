@@ -20,10 +20,12 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 120
     # Secrets are not available in step-level `if:` expressions; expose them
-    # through the job environment so the signing step can test for them.
+    # through the job environment so the signing steps can test for them.
     env:
       WINDOWS_CERT_PFX_B64: ${{ secrets.WINDOWS_CERT_PFX_B64 }}
       WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+      SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+      SIGNPATH_ORGANIZATION_ID: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
     steps:
       - name: Checkout (full, with LFS)
         uses: actions/checkout@v4
@@ -146,6 +148,27 @@ jobs:
       # Signing is a SEPARATE gated job. The unsigned installer is the
       # release candidate; the signed one is the release artifact.
       # Secrets are NEVER embedded in the build.
+      #
+      # Two mutually exclusive paths (docs/ops/signing.md):
+      #   SignPath OSS (free for open source) — secrets: SIGNPATH_API_TOKEN +
+      #     SIGNPATH_ORGANIZATION_ID; SignPath holds the certificate.
+      #   Bring-your-own certificate      — secrets: WINDOWS_CERT_PFX_B64 +
+      #     WINDOWS_CERT_PASSWORD; signed locally with signtool.
+      - name: 'Sign installer (SignPath OSS, free for open source)'
+        if: ${{ env.SIGNPATH_API_TOKEN != '' && env.WINDOWS_CERT_PFX_B64 == '' }}
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORGANIZATION_ID: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+        uses: signpath/github-action-sign@v1
+        with:
+          api-key: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: knockdesk
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: windows-installer
+          input-artifact-paths: dist/KnockDesk-Setup-*.exe
+          wait-for-completion: true
+
       - name: 'Sign installer (gated: requires cert secrets)'
         if: ${{ env.WINDOWS_CERT_PFX_B64 != '' && env.WINDOWS_CERT_PASSWORD != '' }}
         shell: pwsh
