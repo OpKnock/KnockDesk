@@ -68,6 +68,7 @@ const listNew = listPackage(OUT).map(norm).sort();
 // shim reads and executes in the app's windows.
 const PLANNED_NEW = new Set([
   '/dist/idle-throttle.js',
+  '/dist/storage-migration.js',
   '/electron/idle-throttle-inject.js',
   '/electron/services/knockdesk-bridge.js',
   '/electron/services/knockdesk-plugin.js',
