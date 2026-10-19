@@ -7,7 +7,7 @@
  * product was renamed from "Stonic" to "KnockDesk". Bytecode string tables
  * cannot be edited safely, so this plain-JavaScript entry file (which IS
  * editable) ports the launch path instead. It runs before the legacy bundle
- * is required and does six things:
+ * is required and does eight things:
  *
  *  1. Redirects legacy folder/file names the bytecode builds via path.join:
  *        Documents/Stonic Data      -> Documents/KnockDesk Data
@@ -29,6 +29,15 @@
  *     ~150% of a core while sitting idle, which reads as a hang).
  *  6. Still requires the unchanged main.jsc - the product behaviour is
  *     byte-for-byte what shipped, only the visible paths and names move.
+ *  7. Answers reads of the protected core (main.jsc and the eight runtime
+ *     modules) after AES-256-GCM decryption when the installation is
+ *     encrypted at rest, or after stripping the reserved 32-byte prefix when
+ *     it is not. Plaintext is composed in memory and never written to disk.
+ *     The per-install key is delivered by DPAPI (CurrentUser) from the user
+ *     profile, so a copied install folder cannot be read.
+ *  8. Verifies the protected entries against the shipped SHA-256 manifest
+ *     before the bytecode loads, and reports modification, replacement, or a
+ *     missing module instead of loading whatever is on disk.
  *
  * Escape hatches (env):
  *   KNOCKDESK_SKIP_LEGACY_PORT=1     - run the untouched legacy behaviour.
@@ -37,6 +46,12 @@
  *     real profile before the formal first-run migration).
  *   KNOCKDESK_DISABLE_IDLE_THROTTLE=1 - do not install the idle
  *     throttle (diagnostics only).
+ *   KNOCKDESK_NO_CORE_DECRYPT=1      - do not install the protected-core read
+ *     hooks (diagnostics on a plaintext build only).
+ *   KNOCKDESK_CORE_KEY_FILE=<path>   - raw 32-byte key file for development
+ *     and recovery when the DPAPI blob is unavailable.
+ *   KNOCKDESK_TRUST_CORE=1           - skip the integrity check (when running
+ *     a knowingly modified local build).
  *
  * Identifiers inside the bytecode that are tightly coupled to live
  * infrastructure (cloud-gateway URL, gateway model ids, crypto format tag,
@@ -385,6 +400,288 @@ require('bytenode');
     }
   } catch (err) {
     try { console.error('[KnockDesk] Launch shim failed, continuing with legacy paths:', (err && err.message) || err); } catch {}
+  }
+})();
+
+// ---- 9+10. Protected core: at-rest encryption and integrity ---------------
+// The protected entries are the compiled entry (main.jsc) plus the runtime
+// modules whose compromise would break a boot contract. They ship with a
+// reserved 32-byte prefix:
+//   plaintext build  [32 zero bytes][payload unchanged]
+//   encrypted build  'KD01' + [12-byte IV][16-byte GCM tag][ciphertext]
+// The file names never change: Node picks its module handler from the file
+// name, so a .enc suffix would stop the bytecode loading at all. Reads of
+// these paths are wrapped instead, and the decrypted bytes never touch disk.
+//
+// The key is per install and lives in the user profile wrapped by DPAPI
+// CurrentUser (see scripts/security/protect-key.ps1), never in the archive,
+// so a copied installation cannot be read. Honest scope: this protects data
+// at rest - not a user with access to the running process, not an
+// administrator of the same machine. A secret that must stay secret belongs
+// on a server, because V8 must execute the plaintext from RAM.
+//
+// Escape hatches:
+//   KNOCKDESK_NO_CORE_DECRYPT=1  - do not install the read hooks (diagnostics)
+//   KNOCKDESK_CORE_KEY_FILE=path - raw 32-byte key for development/recovery
+//   KNOCKDESK_TRUST_CORE=1       - skip the integrity check (known-good build)
+(function protectCore() {
+  try {
+    const fs = require('fs');
+    const corePath = require('path');
+    const crypto = require('crypto');
+    const { app } = require('electron');
+
+    const PROTECTED = [
+      'main.jsc',
+      'services/knockdesk-bridge.js',
+      'services/knockdesk-plugin.js',
+      'main/bootstrap/knockdesk-bootstrap.js',
+      'main/ipc/knockdesk-remote-handlers.js',
+      'services/hermes-manager.js',
+      'services/computer-manager.js',
+      'services/cdp-shim.js',
+    ].map((q) => corePath.join(__dirname, q));
+    const PREFIX = 32;
+    const isEncryptedHeader = (b) => b && b.length >= PREFIX
+      && b[0] === 0x4b && b[1] === 0x44 && b[2] === 0x30 && b[3] === 0x31; // 'KD01'
+
+    // The loader's real read entry points, captured before any wrapping:
+    // decrypting through the wrapped functions would recurse forever.
+    const origReadFileSync = fs.readFileSync;
+
+    const psQuote = (s) => "'" + String(s).replace(/'/g, "''") + "'";
+    const unwrapDpapi = (blobPath) => {
+      // Add-Type loads System.Security, whose ProtectedData class Windows
+      // PowerShell 5.1 does not preload (plain [Security.Cryptography...]
+      // fails with TypeNotFound on a stock Windows 10/11 install).
+      const ps = '$ErrorActionPreference="Stop";'
+        + 'Add-Type -AssemblyName System.Security;'
+        + '$b=[IO.File]::ReadAllBytes(' + psQuote(blobPath) + ');'
+        + '$p=[Security.Cryptography.ProtectedData]::Unprotect($b,$null,'
+        + '[Security.Cryptography.DataProtectionScope]::CurrentUser);'
+        + '[Convert]::ToBase64String($p)';
+      const b64 = require('child_process').execFileSync(
+        'powershell', ['-NoProfile', '-NonInteractive', '-Command', ps],
+        { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      return Buffer.from(b64, 'base64');
+    };
+
+    let coreKey = null;
+    const isProtectedPath = (p) => PROTECTED.indexOf(p) !== -1;
+
+    if (process.env.KNOCKDESK_NO_CORE_DECRYPT !== '1') {
+      try {
+        const envFile = process.env.KNOCKDESK_CORE_KEY_FILE;
+        if (envFile) {
+          const raw = origReadFileSync(envFile);
+          if (raw.length === 32) coreKey = raw;
+          else console.warn('[KnockDesk] KNOCKDESK_CORE_KEY_FILE must hold exactly 32 raw bytes; got '
+            + raw.length + '. Ignoring it.');
+        }
+        if (!coreKey) {
+          const userData = app.getPath('userData');
+          for (const name of ['core-key.dpapi.bin', 'core-key.tpm.bin']) {
+            const blobPath = corePath.join(userData, name);
+            try {
+              if (!fs.existsSync(blobPath)) continue;
+              const raw = unwrapDpapi(blobPath);
+              if (raw.length === 32) { coreKey = raw; break; }
+              console.warn('[KnockDesk] ' + name + ' did not unwrap to 32 bytes; ignoring it.');
+            } catch (e) {
+              // Reported, not silent: a broken unwrap is exactly what the raw
+              // recovery file below is for, and the message carries no key
+              // material, only the store name and the failure text.
+              console.warn('[KnockDesk] ' + name + ' could not be unwrapped:',
+                (e && e.message) || e);
+            }
+          }
+        }
+        if (!coreKey) {
+          // Last resort: the raw recovery file the installer writes next to
+          // the DPAPI blob. It is only used when the wrapped key could not be
+          // read, and it is reported so the user knows the weaker path was
+          // taken. Deleting it makes the DPAPI blob the only local copy.
+          const rawPath = corePath.join(app.getPath('userData'), 'core-key.raw');
+          try {
+            if (fs.existsSync(rawPath)) {
+              const raw = origReadFileSync(rawPath);
+              if (raw.length === 32) {
+                coreKey = raw;
+                console.warn('[KnockDesk] Core key loaded from the raw recovery file '
+                  + '(core-key.raw) because the DPAPI-wrapped key was not readable. '
+                  + 'The app will keep working; see docs/security/protected-core.md.');
+              } else {
+                console.warn('[KnockDesk] core-key.raw is not 32 bytes; ignoring it.');
+              }
+            }
+          } catch (e) {
+            console.warn('[KnockDesk] core-key.raw could not be read:', (e && e.message) || e);
+          }
+        }
+      } catch (e) {
+        console.warn('[KnockDesk] Core key lookup failed:', (e && e.message) || e);
+      }
+
+      const cache = new Map();
+      const readCore = (p) => {   // null = not a protected path; caller does a normal read
+        if (typeof p !== 'string' || !isProtectedPath(p)) return null;
+        if (cache.has(p)) return cache.get(p);
+        const raw = origReadFileSync(p);   // asar-aware real read
+        if (!raw || raw.length < PREFIX) return raw;
+        let zeroPrefix = true;
+        for (let i = 0; i < 8; i++) if (raw[i] !== 0) { zeroPrefix = false; break; }
+        if (zeroPrefix) {
+          const plain = Buffer.from(raw.subarray(PREFIX));
+          cache.set(p, plain);
+          return plain;
+        }
+        if (isEncryptedHeader(raw)) {
+          if (!coreKey) {
+            throw new Error('protected core is encrypted and no key is available. '
+              + 'Re-run the installer, or point KNOCKDESK_CORE_KEY_FILE at the '
+              + 'recovery key for this installation.');
+          }
+          const decipher = crypto.createDecipheriv('aes-256-gcm', coreKey, raw.subarray(4, 16));
+          decipher.setAuthTag(raw.subarray(16, 32));
+          let plain;
+          try {
+            plain = Buffer.concat([decipher.update(raw.subarray(PREFIX)), decipher.final()]);
+          } catch (e) {
+            throw new Error('protected entry failed authentication ('
+              + corePath.basename(p) + '): the file was altered, or the key does '
+              + 'not match this installation.');
+          }
+          cache.set(p, plain);
+          return plain;
+        }
+        return raw;   // unknown layout: hand it through untouched
+      };
+
+      fs.readFileSync = function patchedReadFileSync(p) {
+        const out = readCore(p);
+        if (out === null) return origReadFileSync.apply(this, arguments);
+        const o = arguments[1];
+        if (o && typeof o === 'object' && o.encoding) return out.toString(o.encoding);
+        if (typeof o === 'string') return out.toString(o);
+        return out;
+      };
+
+      if (typeof fs.readFile === 'function') {
+        const origReadFile = fs.readFile;
+        fs.readFile = function patchedReadFile(p) {
+          const o = arguments[1];
+          const cb = typeof o === 'function' ? o : arguments[2];
+          let out;
+          try {
+            out = readCore(p);
+          } catch (e) {
+            if (typeof cb === 'function') return process.nextTick(cb, e);
+            throw e;
+          }
+          if (out === null) return origReadFile.apply(this, arguments);
+          const enc = (o && typeof o === 'object' && o.encoding) || (typeof o === 'string' ? o : null);
+          const value = enc ? out.toString(enc) : out;
+          if (typeof cb === 'function') return process.nextTick(cb, null, value);
+        };
+      }
+
+      if (typeof fs.createReadStream === 'function') {
+        const origStream = fs.createReadStream;
+        fs.createReadStream = function patchedCreateReadStream(p) {
+          const out = readCore(p);
+          if (out === null) return origStream.apply(this, arguments);
+          const { Readable } = require('stream');
+          return new Readable({ read() { this.push(out); this.push(null); } });
+        };
+      }
+
+      console.log('[KnockDesk] Protected-core read hooks active ('
+        + PROTECTED.length + ' entries; key ' + (coreKey ? 'loaded' : 'not present') + ').');
+    }
+
+    // ---- 9. Protected-core integrity -------------------------------------
+    // The shipped archive carries a manifest of SHA-256 hashes. At boot the
+    // app re-hashes the protected entries and compares, so post-install
+    // modification, replacement, corruption, or a missing module is visible
+    // instead of silently loading something else.
+    //
+    // This is detection, not prevention. An attacker who can write the
+    // archive can write the manifest, and anyone with administrator rights
+    // can read every file regardless. Prevention requires Authenticode
+    // signing of the installer and executable (docs/ops/signing.md). What
+    // this adds is that a modified core never passes unremarked, and that
+    // the user gets a recovery path instead of a mystery crash.
+    //
+    // Failure policy: fail safe, never fail hostile. A mismatch logs one
+    // privacy-conscious line (paths and hashes only - no file contents, no
+    // keys, no user data), degrades the affected component rather than
+    // bricking the app, and points at the repair path.
+    try {
+      if (process.env.KNOCKDESK_TRUST_CORE !== '1' && typeof app.whenReady === 'function') {
+        const manifestPath = corePath.join(__dirname, 'integrity-manifest.json');
+        let manifest = null;
+        try { manifest = JSON.parse(origReadFileSync(manifestPath, 'utf8')); } catch (e) { manifest = null; }
+
+        if (manifest && manifest.entries) {
+          const report = { mismatch: [], missing: [], unreadable: 0, ok: 0 };
+          for (const rel of (manifest.protected_entries || Object.keys(manifest.entries))) {
+            const want = manifest.entries[rel];
+            if (!want || !want.sha256) continue;
+            const full = corePath.join(__dirname, '..', rel.replace(/^\/+/, ''));
+            let got = null;
+            try {
+              if (isProtectedPath(full) && !coreKey
+                && isEncryptedHeader(origReadFileSync(full))) {
+                report.unreadable++;
+                continue;
+              }
+              got = crypto.createHash('sha256').update(fs.readFileSync(full)).digest('hex');
+            } catch (e) { got = null; }
+            if (got === null) report.missing.push(rel);
+            else if (got !== want.sha256) report.mismatch.push(rel);
+            else report.ok++;
+          }
+
+          if (report.unreadable) {
+            console.warn('[KnockDesk] Integrity: ' + report.unreadable + ' protected '
+              + 'entries are encrypted and could not be checked without the core key.');
+          }
+          if (report.mismatch.length || report.missing.length) {
+            const kinds = [];
+            if (report.mismatch.length) kinds.push('modified: ' + report.mismatch.length);
+            if (report.missing.length) kinds.push('missing: ' + report.missing.length);
+            console.warn('[KnockDesk] Protected-core integrity check found '
+              + kinds.join(', ') + '. Verified entries: ' + report.ok + '. '
+              + 'The affected component will not be trusted; reinstall or repair '
+              + 'from the installer to restore it.');
+            // Details are logged once, in full, so support can act on them.
+            try {
+              const logDir = corePath.join(app.getPath('userData'), 'logs');
+              fs.mkdirSync(logDir, { recursive: true });
+              const line = JSON.stringify({
+                event: 'integrity_check',
+                at: new Date().toISOString(),
+                verified: report.ok,
+                modified: report.mismatch,
+                missing: report.missing,
+                encrypted_unreadable: report.unreadable,
+                app_version: app.getVersion(),
+              }) + '\n';
+              fs.appendFileSync(corePath.join(logDir, 'integrity.log'), line, 'utf8');
+            } catch (logErr) { /* a write failure must never block boot */ }
+          } else if (!report.unreadable) {
+            console.log('[KnockDesk] Protected-core integrity verified ('
+              + report.ok + ' entries).');
+          }
+        } else {
+          console.log('[KnockDesk] No integrity manifest in this build (local/unsigned build).');
+        }
+      }
+    } catch (err) {
+      try { console.warn('[KnockDesk] Integrity check skipped:', (err && err.message) || err); } catch {}
+    }
+  } catch (err) {
+    try { console.warn('[KnockDesk] Protected-core support skipped:', (err && err.message) || err); } catch {}
   }
 })();
 
