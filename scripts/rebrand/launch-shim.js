@@ -317,6 +317,72 @@ require('bytenode');
     } catch (err) {
       try { console.warn('[KnockDesk] Module rename alias skipped:', (err && err.message) || err); } catch {}
     }
+    // ---- 8. Outbound network guard ---------------------------------------
+    // The owner decides what may leave this machine. Everything that is not
+    // loopback and not on the allowlist is blocked at the network layer, which
+    // covers the cloud-sync channels, the phone bridge, telemetry, the update
+    // feed and any in-app browser page - including code inside the compiled
+    // entry that cannot be edited. The AI providers KnockDesk exists to use
+    // are on the allowlist by default, because without them the app has no
+    // function; remove them and it becomes fully air-gapped.
+    //
+    //   KNOCKDESK_NET_MODE=strict   allowlist only (default)
+    //   KNOCKDESK_NET_MODE=off      block everything except loopback
+    //   KNOCKDESK_NET_MODE=open     no guard (previous behaviour)
+    //   KNOCKDESK_ALLOW_HOSTS=a.com,b.dev  extra hosts, comma separated
+    try {
+      const mode = (process.env.KNOCKDESK_NET_MODE || 'strict').toLowerCase();
+      if (mode !== 'open' && typeof app.on === 'function' && app.whenReady) {
+        const LOOPBACK = /^(127\.0\.0\.1|localhost|\[?::1\]?)$/i;
+        const DEFAULT_ALLOW = [
+          'generativelanguage.googleapis.com',
+          'googleapis.com',
+          'openrouter.ai',
+          'api.openai.com',
+          'api.groq.com',
+          'api.moonshot.cn',
+        ];
+        const extra = (process.env.KNOCKDESK_ALLOW_HOSTS || '')
+          .split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
+        const allow = new Set(DEFAULT_ALLOW.concat(extra));
+        const hostAllowed = (host) => {
+          const h = String(host || '').toLowerCase().replace(/\.$/, '');
+          if (!h) return false;
+          for (const ok of allow) {
+            if (h === ok || h.endsWith('.' + ok)) return true;
+          }
+          return false;
+        };
+
+        const guardSession = (session) => {
+          if (!session || !session.webRequest || session.__kdGuarded) return;
+          session.__kdGuarded = true;
+          session.webRequest.onBeforeRequest((details, cb) => {
+            let host = '';
+            try { host = new URL(details.url).hostname; } catch (e) { host = ''; }
+            const url = String(details.url || '').toLowerCase();
+            const isLocal = url.startsWith('file:') || url.startsWith('data:') || url.startsWith('blob:')
+              || url.startsWith('chrome-extension:') || url.startsWith('knockdesk-media:')
+              || url.startsWith('stonic-media:') || url.startsWith('about:') || url.startsWith('devtools:');
+            if (isLocal || LOOPBACK.test(host) || hostAllowed(host)) return cb({ cancel: false });
+            return cb({ cancel: true });
+          });
+        };
+
+        app.on('web-contents-created', function onGuard(_e, wc) {
+          try { guardSession(wc && wc.session); } catch (e) {}
+        });
+        try { guardSession(require('electron').session.defaultSession); } catch (e) {}
+        try {
+          const { session } = require('electron');
+          for (const s of (session.getAllSessions ? session.getAllSessions() : [])) guardSession(s);
+        } catch (e) {}
+        console.log('[KnockDesk] Outbound network guard: ' + mode
+          + ' | allowed: ' + Array.from(allow).join(', '));
+      }
+    } catch (err) {
+      try { console.warn('[KnockDesk] Network guard skipped:', (err && err.message) || err); } catch {}
+    }
   } catch (err) {
     try { console.error('[KnockDesk] Launch shim failed, continuing with legacy paths:', (err && err.message) || err); } catch {}
   }
