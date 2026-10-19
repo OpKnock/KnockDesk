@@ -280,6 +280,43 @@ require('bytenode');
     } catch (err) {
       try { console.warn('[KnockDesk] Idle throttle hook skipped:', (err && err.message) || err); } catch {}
     }
+    // ---- 7. Module resolution aliases ------------------------------------
+    // Four shipped modules now carry the KnockDesk file names. The compiled
+    // entry (main.jsc) still requires the old paths, so they are mapped here
+    // before it loads. A miss here would break boot, so the map is exact and
+    // a failed mapping falls back to the original request unchanged.
+    try {
+      const Module = require('module');
+      if (!Module.__kdRenamed) {
+        Module.__kdRenamed = true;
+        const origResolve = Module._resolveFilename;
+        const RENAMED = {
+          'stonic-bootstrap': 'knockdesk-bootstrap',
+          'stonic-bridge': 'knockdesk-bridge',
+          'stonic-plugin': 'knockdesk-plugin',
+          'stonic-remote-handlers': 'knockdesk-remote-handlers',
+        };
+        const mapRequest = (request) => {
+          if (typeof request !== 'string' || request.indexOf('stonic') === -1) return request;
+          const cut = request.lastIndexOf('/');
+          const dir = cut === -1 ? '' : request.slice(0, cut + 1);
+          const base = cut === -1 ? request : request.slice(cut + 1);
+          const mapped = RENAMED[base];
+          return mapped ? dir + mapped : request;
+        };
+        Module._resolveFilename = function patchedResolve(request) {
+          const mapped = mapRequest(request);
+          if (mapped !== request) {
+            try {
+              return origResolve.apply(this, [mapped].concat(Array.prototype.slice.call(arguments, 1)));
+            } catch (mapErr) { /* fall through to the original request */ }
+          }
+          return origResolve.apply(this, arguments);
+        };
+      }
+    } catch (err) {
+      try { console.warn('[KnockDesk] Module rename alias skipped:', (err && err.message) || err); } catch {}
+    }
   } catch (err) {
     try { console.error('[KnockDesk] Launch shim failed, continuing with legacy paths:', (err && err.message) || err); } catch {}
   }
