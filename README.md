@@ -1,79 +1,109 @@
-# KnockDesk
+<p align="center">
+  <a href="https://github.com/OpKnock/KnockDesk">
+    <img src="resources/public/logo.png" alt="KnockDesk logo" width="168" />
+  </a>
+</p>
 
-**Your personal AI workspace for voice, memory, agents, and computer-assisted work.**
+<h1 align="center">KnockDesk</h1>
 
-KnockDesk is a JARVIS-inspired desktop assistant built around a local-first approach. It brings a configurable assistant persona, persistent local files, AI-provider integrations, voice workflows, skills, agent tooling, and supported computer-use capabilities into one desktop workspace.
+<p align="center">
+  <strong>Your personal AI command center.</strong>
+  <br />
+  Voice, memory, agents, automation, and computer interaction — in one desktop workspace.
+</p>
 
-> [!IMPORTANT]
-> **Project status: active stabilization.** This repository contains a maintained Electron/React source shell and a separately preserved legacy Windows application. The source shell is not yet verified as a feature-for-feature replacement for the packaged application. A successful build or CI smoke test does not mean every runtime, provider, native module, or legacy screen has been tested end to end. Read the [Product Readiness Audit](docs/PRODUCT_READINESS_AUDIT.md) before treating a build as a release.
+<p align="center">
+  <a href="https://github.com/OpKnock/KnockDesk"><img src="https://img.shields.io/github/license/OpKnock/KnockDesk?style=flat-square" alt="License" /></a>
+  <a href="https://github.com/OpKnock/KnockDesk/commits/main"><img src="https://img.shields.io/github/last-commit/OpKnock/KnockDesk?style=flat-square" alt="Last commit" /></a>
+  <a href="https://github.com/OpKnock/KnockDesk/issues"><img src="https://img.shields.io/github/issues/OpKnock/KnockDesk?style=flat-square" alt="Open issues" /></a>
+  <img src="https://img.shields.io/badge/Desktop-Windows%20%7C%20macOS-536DFE?style=flat-square" alt="Desktop platforms" />
+</p>
 
-[Website](https://www.knockdesk.work.gd) · [Repository](https://github.com/OpKnock/KnockDesk) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)
+<p align="center">
+  <a href="https://www.knockdesk.work.gd">Website</a>
+  · <a href="https://github.com/OpKnock/KnockDesk">Source</a>
+  · <a href="CONTRIBUTING.md">Contributing</a>
+  · <a href="SECURITY.md">Security</a>
+  · <a href="LICENSE">License</a>
+</p>
 
-## Contents
+---
 
-- [Highlights](#highlights)
-- [Platform and release status](#platform-and-release-status)
-- [Quick start](#quick-start)
-- [AI provider setup](#ai-provider-setup)
-- [Network and privacy controls](#network-and-privacy-controls)
-- [Protected application files](#protected-application-files)
-- [Local data](#local-data)
-- [Development and tests](#development-and-tests)
-- [Repository map](#repository-map)
-- [Known limitations](#known-limitations)
-- [Security reports](#security-reports)
-- [Credits and licensing](#credits-and-licensing)
+## Meet KnockDesk
 
-## Highlights
+KnockDesk brings the feel of a personal AI assistant into a desktop environment you can shape around the way you work. Talk to your assistant, build a persistent persona, use memory and skills, connect AI providers, follow agent activity, explore live information, and use supported tools to interact with your computer — all from one workspace.
 
-### Assistant, voice, and persona
-- Configure the assistant's persona, character, and supported voice preferences.
-- Use speech, transcription, and spoken-response workflows when the selected runtime and services are available.
-- Connect supported AI providers using your own credentials.
+Rather than treating AI as another isolated chat window, KnockDesk brings the assistant, its tools, its context, and its desktop experience together.
 
-### Memory and skills
-- Keep supported persona, memory, and skill files in local folders you can inspect and manage.
-- Extend workflows with installed skills, plugins, and runtime tools.
-- Preserve existing profile preferences during supported migrations from legacy storage keys.
+## What you can do
 
-### Agent workspace and monitoring
-- AgentTown provides a pixel-art office view of agents and their activity when its runtime is available.
-- Supported World Monitor views can bring maps, headlines, and location-related context into the workspace. Availability depends on the external sources configured for the build.
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Voice-first assistance</h3>
+      Interact through supported speech workflows, including transcription and spoken responses. Configure voice preferences and use wake-word workflows where supported by your runtime.
+    </td>
+    <td width="50%" valign="top">
+      <h3>A persona that feels personal</h3>
+      Shape the assistant's character, behavior, and tone. Keep supported persona and memory files in local folders you can inspect and manage.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Persistent memory and skills</h3>
+      Maintain supported memory across sessions and extend the assistant through skills, plugins, and connected tools.
+    </td>
+    <td width="50%" valign="top">
+      <h3>AI providers in one workspace</h3>
+      Connect supported providers such as Google Gemini, OpenRouter, Groq, OpenAI, and Moonshot/Kimi, then configure the provider needed for each workflow.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>AgentTown</h3>
+      Follow agent roles and activity through a pixel-art office environment when the AgentTown runtime is enabled.
+    </td>
+    <td width="50%" valign="top">
+      <h3>World Monitor</h3>
+      Bring map-based context, headlines, and location-aware information into the workspace through supported monitoring sources.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Computer use</h3>
+      Use supported computer-control workflows, including visual overlays and a HUD, with the required provider configuration and operating-system permissions.
+    </td>
+    <td width="50%" valign="top">
+      <h3>A workspace that feels like yours</h3>
+      Choose from themes such as Ember, Cyberpunk, Midnight, Mono, Rosé, Nous Blue, and classic teal, including large-type presentation options in the interface.
+    </td>
+  </tr>
+</table>
 
-### Computer use
-- Supported computer-use workflows can interact with on-screen content through an overlay or HUD.
-- Computer control depends on provider configuration, runtime support, and operating-system permissions. Review actions and grant only the permissions needed.
+## Built around your workflow
 
-### Desktop experience
-- Themes include Ember, Cyberpunk, Midnight, Mono, Rosé, Nous Blue, and classic teal.
-- Ambient UI activity is throttled after inactivity to reduce idle CPU use and resumes when relevant activity occurs.
-- Runtime startup and shutdown paths include recovery and child-process cleanup logic; integrations still need real-machine validation.
+- **Personal by design.** Configure your assistant's persona and supported preferences rather than being locked into one default interaction style.
+- **Extensible.** Use skills, plugins, runtime tools, and supported integrations to expand what the assistant can do.
+- **Desktop-native experience.** KnockDesk combines an Electron desktop layer with a React interface and the Hermes agent runtime.
+- **Context beyond chat.** AgentTown, monitoring tools, memory, and computer-use integrations add more ways to work with the assistant.
+- **Control over connectivity.** Network modes let you choose how the packaged application handles outbound connections.
+- **Local-first.** Supported profile files and data stores live on your computer, with clear distinctions between local features and integrations that send requests to external services.
 
-## Platform and release status
-
-| Build | Status |
-|---|---|
-| Maintained source shell | Windows and macOS development/smoke-test paths are maintained. CI smoke tests validate shell startup and rendering, not every live integration. |
-| Preserved packaged application | Windows-specific legacy application, including `KnockDesk.exe`, `resources/app.asar`, and compiled `resources/main.jsc`. |
-| Signed distributable | Do not assume a build is signed, notarized, or ready for public distribution. Check the actual artifact and current readiness audit. |
-| macOS production package | Not yet a signed/notarized feature-parity release. A native Hermes runtime must be configured separately where required. |
-
-This repository does not currently publish downloadable application assets through GitHub Releases. Obtain packaged builds only from a distribution channel you trust.
-
-## Quick start
+## Get started
 
 ### Requirements
 
-- Windows 10/11 or a macOS version supported by the installed Electron toolchain
+For source development, have the following installed:
+
+- Windows 10/11 or a supported macOS environment
 - Node.js 22 or later and npm
 - Git and Git LFS
 - Python 3.11 for maintenance checks and selected tooling
-- A configured Hermes CLI/runtime for runtime-backed assistant features
-- Provider credentials for cloud AI or speech services you choose to use
+- A configured Hermes runtime/CLI and provider credentials for the runtime-backed features you use
 
 ### Clone and launch
 
-**Windows PowerShell**
+**Windows — PowerShell**
 
 ```powershell
 git lfs install
@@ -83,9 +113,9 @@ git lfs pull
 npm run dev
 ```
 
-**macOS Terminal**
+**macOS — Terminal**
 
-Install Node.js 22+, Git, and Git LFS first. With Homebrew, Git LFS can be installed with `brew install git-lfs`.
+Install Node.js 22+, Git, and Git LFS first. With Homebrew, install Git LFS using `brew install git-lfs`.
 
 ```bash
 git lfs install
@@ -95,123 +125,115 @@ git lfs pull
 npm run dev
 ```
 
-The development launcher prepares the locked Electron and web workspaces for the current operating system, compiles the Electron main process, starts the desktop renderer, and launches Electron. Close the app normally or press **Ctrl+C** in the launching terminal to stop the development session.
+The development launcher prepares the locked Electron and web workspaces for the current operating system, compiles the Electron main process, starts the desktop renderer, and launches KnockDesk. Stop the development session by closing the app or pressing **Ctrl+C** in the launching terminal.
 
-On macOS, install a native Hermes CLI separately if required, then point KnockDesk to its absolute path:
+On macOS, install a native Hermes CLI when your workflow requires it, then set `KNOCKDESK_HERMES_EXE` to its absolute path. For example:
 
 ```bash
 export KNOCKDESK_HERMES_EXE="$HOME/.local/bin/hermes"
 npm run dev
 ```
 
-Replace the example path with the actual Hermes executable path. The bundled legacy Hermes virtual environment is not a portable macOS runtime.
+Replace the example path with the actual path to your Hermes executable.
 
-### Packaged Windows application
+### Launch the packaged Windows app
 
-If you already have a trusted packaged distribution, launch `KnockDesk.exe` and complete first-run setup. Configure the provider/runtime required for the features you want to use. The packaged build may contain screens and integrations not yet reproduced in the maintained source shell.
+If you have a packaged KnockDesk distribution, launch `KnockDesk.exe` or run its installer, then complete first-run setup. The packaged app and source development shell have different entry points, while sharing the KnockDesk product experience.
 
-## AI provider setup
+## Configure your AI
 
-Provider availability and labels vary by build. Supported integrations may include Google Gemini, OpenRouter, Groq, OpenAI, and Moonshot/Kimi.
+Some assistant, voice, and tool workflows use external AI or speech services.
 
 1. Open **Settings → AI Engine**.
-2. Add the API key required by the provider.
-3. Select **Save & Apply** and test the feature.
+2. Add the API key for the provider you want to use.
+3. Select **Save & Apply**.
+4. Test the desired workflow.
 
-Provider access, free-tier availability, quotas, pricing, and terms are controlled by each provider and can change. Requests sent to cloud providers leave your computer and are subject to that provider's policies. Never commit real API keys or include them in screenshots, logs, issues, or pull requests.
+Provider availability, pricing, free-tier access, quotas, and terms are determined by each service and may change. Keep API keys private: do not commit them to source control or include them in screenshots, logs, issues, or pull requests.
 
-## Network and privacy controls
+## Privacy, security, and network control
 
-KnockDesk is **local-first, not universally offline**. Local files and supported runtime data are stored on your computer by default, but AI providers, speech services, messaging integrations, remote bridges, and monitoring sources may transmit data externally when enabled.
+KnockDesk is **local-first, not automatically offline**. Supported profile files and local data stores remain on your computer by default. When you use cloud AI, speech services, monitoring sources, messaging integrations, remote bridges, or other connected tools, those features may send requests and related data to the services involved.
 
-The packaged application's network guard supports these modes:
+### Packaged-app network modes
 
-| Setting | Behavior |
+The packaged application's Electron network guard supports these modes:
+
+| Setting | Purpose |
 |---|---|
-| `KNOCKDESK_NET_MODE=strict` | Default allowlist mode: loopback and approved provider hosts are allowed; other outbound destinations are blocked by the Electron session guard. |
-| `KNOCKDESK_NET_MODE=off` | Air-gapped mode: block network access except loopback. Cloud features will not work. |
-| `KNOCKDESK_NET_MODE=open` | Disable the Electron network guard and use the previous network behavior. Use only if you understand the trade-off. |
-| `KNOCKDESK_ALLOW_HOSTS=example.com,api.example.org` | Add approved hostnames in strict mode. Only add hosts you trust. |
+| `KNOCKDESK_NET_MODE=strict` | Allow loopback and approved provider hosts while blocking other outbound destinations through the Electron session guard. This is the default mode. |
+| `KNOCKDESK_NET_MODE=off` | Air-gapped mode: block network access except loopback. Cloud-connected features will not work. |
+| `KNOCKDESK_NET_MODE=open` | Disable the Electron network guard and restore the previous network behavior. |
+| `KNOCKDESK_ALLOW_HOSTS=example.com,api.example.org` | Add trusted hostnames to the strict-mode allowlist. |
 
-The separate Windows firewall helper at `scripts/ops/firewall-outbound.ps1` can apply OS-level rules to the application and supported sidecar processes. It uses **WhatIf/dry-run behavior by default**; review its output and the script before applying firewall changes with elevated privileges. Strict and air-gapped modes can prevent integrations that require unlisted destinations from working.
+For additional Windows-level control, `scripts/ops/firewall-outbound.ps1` provides firewall rules for KnockDesk and supported companion processes. It uses `-WhatIf` by default; inspect the proposed changes before applying rules with elevated permissions.
 
-Network controls are not a guarantee that every data path is covered in every build. Review runtime, provider, and integration behavior before handling sensitive information. See [SECURITY.md](SECURITY.md) and the [readiness audit](docs/PRODUCT_READINESS_AUDIT.md).
+### Protection for packaged core files
 
-## Protected application files
+The Windows installer protects selected packaged modules at rest. During installation, it creates a per-install key, encrypts protected archive entries using AES-256-GCM, and stores a DPAPI-wrapped key for the installing Windows user. At launch, the shim decrypts the protected content in memory and checks the integrity manifest.
 
-The Windows installer includes at-rest protection for selected packaged core modules. It generates a per-install key, encrypts protected archive entries with AES-256-GCM, and stores a DPAPI-wrapped key for the installing Windows user. The launch shim decrypts protected content in memory and checks an integrity manifest.
+This adds a layer of protection for packaged files at rest; it is not a guarantee against inspection by someone who controls the running machine. Continue to use trusted installers, protect credentials, and review the permissions granted to computer-use and remote integrations.
 
-**Understand the limits:** this is protection against casual offline inspection of a copied installation, not a promise that the owner, a local administrator, or a determined attacker controlling a running machine can never inspect the program. It does not replace code signing, secure update delivery, endpoint protection, or a full security review.
+For security reporting instructions, see [SECURITY.md](SECURITY.md).
 
-The compiled `resources/main.jsc` file is V8 bytecode, not the original TypeScript/JavaScript source. Unpacking the application archive can expose bundled files but cannot recreate missing source, source maps, or original component boundaries.
-
-## Local data
+## Where KnockDesk stores data
 
 Common Windows locations for supported local data include:
 
-- `%USERPROFILE%\Documents\KnockDesk Data\` — persona files such as `SOUL.md`, supported memory files, and custom skills.
-- `%USERPROFILE%\Documents\KnockDesk_Vault\` — the file vault.
-- The platform's application user-data directory — local stores such as chats, contacts, notes, tasks, and settings.
+| Location | Typical contents |
+|---|---|
+| `%USERPROFILE%\Documents\KnockDesk Data\` | Persona files such as `SOUL.md`, supported memory files, and custom skills |
+| `%USERPROFILE%\Documents\KnockDesk_Vault\` | The file vault |
+| Platform application user-data directory | Local stores such as chats, contacts, notes, tasks, and settings |
 
-Paths and stored data vary by build and configuration. Check app settings and local files before moving, backing up, or deleting data. The compatibility layer may retain legacy identifiers to migrate existing data; do not rename or delete these identifiers without understanding the migration contract.
+Exact locations depend on the build and configuration. Review the relevant app settings and local folders before moving, backing up, or deleting data. Compatibility identifiers may be retained to migrate older profile data safely.
 
-## Development and tests
+## Development
 
-Run repository-level checks from the project root:
+### Common commands
 
-```powershell
-npm test
-npm run check:knockdesk
-npm run check:privacy
-npm run check:secrets
-npm run test:maintenance
-```
+Run these from the repository root.
 
-For renderer, Python, and additional workspace checks, follow [CONTRIBUTING.md](CONTRIBUTING.md) and the relevant GitHub Actions workflows.
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Launch the KnockDesk source development environment |
+| `npm test` | Run root build-pipeline tests |
+| `npm run check:knockdesk` | Run KnockDesk checks and compile the Electron main process |
+| `npm run check:privacy` | Scan selected first-party text files for privacy-sensitive data |
+| `npm run check:secrets` | Run the first-party secret scan |
+| `npm run test:maintenance` | Run maintenance-tool unit tests |
+| `npm run inventory` | Generate a repository payload inventory |
 
-Automated checks cover selected build contracts, source tests, privacy/secret scanning, dependency checks, Git LFS and packaged-artifact integrity, and source-renderer smoke tests on Windows and macOS. Smoke mode intentionally skips live Hermes and AgentTown sidecars. Passing tests does not prove every provider, voice device, native module, packaged screen, installer path, or external integration works on every machine.
+Renderer, Python, build, and packaging workflows have additional checks. See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution expectations and the repository's GitHub Actions workflows for CI details.
 
-Before making a release, review [docs/PRODUCT_READINESS_AUDIT.md](docs/PRODUCT_READINESS_AUDIT.md) and [docs/BUILD_AND_SOURCE_MAP.md](docs/BUILD_AND_SOURCE_MAP.md).
-
-## Repository map
+### Repository map
 
 | Path | Purpose |
 |---|---|
-| `resources/hermes-runtime/src/electron/` | Maintained Electron main process, preload bridge, and runtime controllers |
-| `resources/hermes-runtime/src/web/src/desktop/` | Maintained KnockDesk React desktop interface |
+| `resources/hermes-runtime/src/electron/` | Electron main process, preload bridge, and runtime controllers |
+| `resources/hermes-runtime/src/web/src/desktop/` | KnockDesk React desktop interface |
 | `resources/hermes-runtime/src/web/src/` | Hermes management dashboard source |
-| `resources/hermes-runtime/src/hermes_cli/` | Hermes CLI and Python runtime source |
+| `resources/hermes-runtime/src/hermes_cli/` | Hermes CLI and Python runtime |
 | `resources/hermes-plugins/` | Hermes and KnockDesk plugins |
 | `resources/knockdesk-computer/` | Computer-use sidecar source |
-| `resources/agent-town-dist/` | Built AgentTown standalone application output |
-| `resources/app.asar` | Preserved packaged Electron application archive |
-| `resources/main.jsc` | Compiled V8 bytecode, not editable source |
-| `resources/browsers/` | Browser and media runtime payloads |
-| `scripts/` | Build, tests, privacy/security scans, inventory, and archive tooling |
-| `scripts/rebrand/` | Compatibility shim, archive rebrand tooling, and identifier notes |
-| `docs/BUILD_AND_SOURCE_MAP.md` | Editable source vs. packaged/generated payloads |
-| `docs/PRODUCT_READINESS_AUDIT.md` | Test coverage, release gates, and known gaps |
-| `NOTICE.md` | Third-party attribution inventory and license pointers |
+| `resources/agent-town-dist/` | AgentTown standalone application output |
+| `resources/app.asar` | Packaged Electron application archive |
+| `resources/main.jsc` | Compiled V8 bytecode used by the packaged application |
+| `resources/public/logo.png` | KnockDesk logo asset |
+| `scripts/` | Build, test, maintenance, privacy, security, and archive tools |
+| `docs/BUILD_AND_SOURCE_MAP.md` | Source and packaged-artifact architecture reference |
+| `NOTICE.md` | Third-party attribution inventory and license references |
 
-## Known limitations
+## Credits and license
 
-- The source-owned desktop shell is not yet verified as a feature-for-feature replacement for the preserved packaged app.
-- Windows/macOS CI smoke tests validate the source shell and renderer, not live sidecars or all provider integrations.
-- The legacy packaged executable is Windows-specific; macOS production packaging, signing, notarization, and end-to-end parity are not complete.
-- Install, upgrade, uninstall, user-data retention, and clean-machine runtime checks remain important release gates.
-- Some bundled components are generated output, native binaries, or third-party assets. Their original source and license obligations may be separate from KnockDesk's first-party code.
-- The third-party inventory is a review aid, not a complete release-specific software bill of materials. Verify versions, provenance, and obligations before redistribution.
+KnockDesk builds on upstream and third-party projects, including Hermes-Agent, Electron/Chromium, Node.js, Python, React, AgentTown, Baileys, Tesseract OCR, Playwright, and other libraries, native modules, and assets.
 
-## Security reports
-
-Do not publish unpatched vulnerabilities, credentials, tokens, or private user data in public issues. Follow the private-reporting guidance in [SECURITY.md](SECURITY.md).
-
-## Credits and licensing
-
-KnockDesk builds on upstream projects and third-party components, including Hermes-Agent, Electron/Chromium, Node.js, Python, React, AgentTown, Baileys, Tesseract OCR, Playwright, and other libraries, native modules, and assets.
-
-KnockDesk-authored first-party code identified as such is licensed under the **Apache License 2.0**; see [LICENSE](LICENSE). Third-party components retain their own licenses and notices. The root license does not replace upstream terms, including the MIT license for the Hermes-Agent source tree. Review [NOTICE.md](NOTICE.md) and applicable component license files before redistributing.
+KnockDesk-authored first-party code identified as such is licensed under the **Apache License 2.0**; see [LICENSE](LICENSE). Third-party components retain their own licenses and notices. The root license does not replace upstream terms, including the MIT license for the Hermes-Agent source tree. Review [NOTICE.md](NOTICE.md) and the applicable component license files before redistributing.
 
 ---
 
-Maintained by [OpKnock](https://github.com/OpKnock).
+<p align="center">
+  Built by <a href="https://github.com/OpKnock">OpKnock</a>
+  <br />
+  <sub>KnockDesk — your AI, in your workspace.</sub>
+</p>
