@@ -48,11 +48,30 @@ const EXPECTED = new Set([
   '/electron/main/ipc/knockdesk-remote-handlers.js',
   '/electron/main/ipc/stonic-remote-handlers.js',
   '/dist/index.html',
+  '/dist/assets/index-u5ljrpMR-kd90.js',
+  '/electron/services/stonic-bridge.js',
+  '/electron/services/stonic-plugin.js',
+  '/electron/main/bootstrap/stonic-bootstrap.js',
 ]);
 
 // Entries that exist only in NEW. Exactly one is planned: the idle-throttle
 // inject source the launch shim reads at startup.
-const PLANNED_NEW = new Set(['/dist/idle-throttle.js', '/electron/idle-throttle-inject.js']);
+const PLANNED_NEW = new Set([
+  '/dist/idle-throttle.js',
+  '/electron/idle-throttle-inject.js',
+  '/electron/services/knockdesk-bridge.js',
+  '/electron/services/knockdesk-plugin.js',
+  '/electron/main/bootstrap/knockdesk-bootstrap.js',
+  '/electron/main/ipc/knockdesk-remote-handlers.js',
+]);
+// Entries that disappear because their file was renamed. They are reported
+// as MISSING-IN-NEW, which the EXPECTED set also carries.
+const PLANNED_GONE = new Set([
+  '/electron/services/stonic-bridge.js',
+  '/electron/services/stonic-plugin.js',
+  '/electron/main/bootstrap/stonic-bootstrap.js',
+  '/electron/main/ipc/stonic-remote-handlers.js',
+]);
 
 const a = entries(OLD);
 const b = entries(NEW);
@@ -73,7 +92,7 @@ for (const [path, nodeB] of b.map) {
 }
 a.close(); b.close();
 
-const unexpected = diffs.filter(([p]) => !EXPECTED.has(p) && !PLANNED_NEW.has(p));
+const unexpected = diffs.filter(([p]) => !EXPECTED.has(p) && !PLANNED_NEW.has(p) && !PLANNED_GONE.has(p));
 console.log('entries compared:', a.map.size, '| byte-identical:', same, '| diffs:', diffs.length);
 for (const [p, why] of diffs.filter(([p]) => EXPECTED.has(p))) console.log('  planned:', p, `(${why})`);
 if (unexpected.length) {

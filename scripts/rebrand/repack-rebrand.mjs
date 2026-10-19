@@ -66,11 +66,28 @@ const listOld = listPackage(ASAR).map(norm).sort();
 const listNew = listPackage(OUT).map(norm).sort();
 // Exactly one intended addition: the idle-throttle inject file the launch
 // shim reads and executes in the app's windows.
-const PLANNED_NEW = new Set(['/dist/idle-throttle.js', '/electron/idle-throttle-inject.js']);
+const PLANNED_NEW = new Set([
+  '/dist/idle-throttle.js',
+  '/electron/idle-throttle-inject.js',
+  '/electron/services/knockdesk-bridge.js',
+  '/electron/services/knockdesk-plugin.js',
+  '/electron/main/bootstrap/knockdesk-bootstrap.js',
+  '/electron/main/ipc/knockdesk-remote-handlers.js',
+]);
+// Modules that were renamed to the KnockDesk names: they leave the archive
+// under the old name and arrive under the new one, which is planned.
+const PLANNED_GONE = new Set([
+  '/electron/services/stonic-bridge.js',
+  '/electron/services/stonic-plugin.js',
+  '/electron/main/bootstrap/stonic-bootstrap.js',
+  '/electron/main/ipc/stonic-remote-handlers.js',
+]);
 const onlyOld = listOld.filter((p) => !listNew.includes(p));
 const onlyNew = listNew.filter((p) => !listOld.includes(p));
-if (onlyOld.length || onlyNew.some((p) => !PLANNED_NEW.has(p))) {
-  console.error('FAIL: file list differs. onlyOld:', onlyOld.slice(0, 5), 'onlyNew:', onlyNew.slice(0, 5));
+const unexpectedGone = onlyOld.filter((p) => !PLANNED_GONE.has(p));
+const unexpectedNew = onlyNew.filter((p) => !PLANNED_NEW.has(p));
+if (unexpectedGone.length || unexpectedNew.length) {
+  console.error('FAIL: file list differs. gone:', unexpectedGone.slice(0, 5), 'new:', unexpectedNew.slice(0, 5));
   process.exit(1);
 }
 console.log('file list delta: +' + onlyNew.length, '(planned:', [...PLANNED_NEW].join(',') + ') |', listNew.length, 'entries');
@@ -119,9 +136,9 @@ if (bad) { console.error('FAIL: ' + bad + ' patch checks missing'); process.exit
 
 const blob = readFileSync(OUT);
 const head = blob.subarray(0, Math.min(blob.length, 1000000)).toString('utf8');
-const stonic = (head.match(/Stonic AI/gi) || []).length;
+const legacyBrand = (head.match(/Stonic AI/gi) || []).length;
 const knockdesk = (head.match(/KnockDesk/gi) || []).length;
-console.log('CI guard: Stonic AI hits =', stonic, '| KnockDesk hits =', knockdesk);
-if (stonic > 0 || knockdesk === 0) { console.error('FAIL: CI brand guard would trip'); process.exit(1); }
+console.log('CI guard: legacy-brand hits =', legacyBrand, '| KnockDesk hits =', knockdesk);
+if (legacyBrand > 0 || knockdesk === 0) { console.error('FAIL: CI brand guard would trip'); process.exit(1); }
 
 console.log('REBRAND REPACK OK');
