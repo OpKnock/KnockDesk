@@ -20,7 +20,7 @@ privacy scan, 56 source tests). Nothing below is claimed without evidence.
 | Clean shutdown and reopen | PASS | Task-tree kill; orphan-process sweep clean |
 | Repeated cycles | PASS | Three install/launch/uninstall cycles in testing |
 | Missing configuration is handled | PASS | With no provider key the app boots and reports the missing key in Settings; the computer sidecar fails fast with an actionable message (no silent "done") |
-| Idle behaviour | PASS (with note) | The 60-second observation window showed steady resource use. Longer idle soaks are part of the friend's test pass (plan: `docs/MACOS_TEST_PLAN.md`; the Windows soak is the same procedure) |
+| Idle behaviour | PASS (with note) | Verified live for 15 minutes with the window visible: total app CPU settled to 0-3% of one core after the two-minute idle mark and held without spurious resume; full rate returns on the next interaction. Before the fix the ambient UI layer held the GPU process at ~150% of a core (see the fix note below) |
 | No developer-only dependencies | PASS | The installer ships the bundled Python runtime, Hermes venv, and browser payload; first launch needs no terminal |
 
 ### Packaging (evidenced)
@@ -62,6 +62,7 @@ privacy scan, 56 source tests). Nothing below is claimed without evidence.
 | No placeholder pages | PASS | Every advertised surface was launched at least once in testing |
 | Computer control failures are visible, not silent | PASS | The sidecar aborts with the provider-account reason instead of a false completion (PR #35). The published installer was built Oct 19 02:13 and carries every fix merged through PR #39, including the gateway-key injection |
 | Voice output works | PASS | Speech synthesizes through the configured voice path; when the free Microsoft endpoint refuses, the app falls back to the Gemini key, which the gateway receives (PR #39, in this installer) |
+| Idle resource use | PASS | Ambient UI layer now parks after two idle minutes; see the fix note below |
 
 ### Listing metadata (evidenced)
 | Check | Status | Evidence |
@@ -98,6 +99,47 @@ ship with the next installer.
 3. **Extract API key is optional**: web page extraction is search-only until
    an extract provider key is added (Firecrawl/Tavily/Exa/Parallel). Search
    works without one.
+4. **Windows restart + fresh sign-in**: not exercised on this machine (would
+   disrupt the session); the same install path a fresh user gets is covered
+   by the clean-install rows above.
+
+## The idle-CPU fix (ships in the next installer build)
+
+The shipped UI keeps an ambient layer alive — infinite CSS animations (orb
+breathe/pulse/spin, voice-HUD beams, recording ripples) plus a WebGL
+particle globe — for as long as the window is visible. Measured on the
+release build: the GPU process sat at ~150% of a core and one renderer at
+~30-55% of a core, steady, with no user input. That is what users described
+as the app hanging when left idle, and it is a certification item.
+
+Root cause was **not** a hang: the window stayed responsive, closed cleanly,
+reopened, and kept flat memory/handles. It was a continuously-recompositing
+ambient layer. Two measurement facts pinned it down: minimizing the window
+dropped CPU to ~0 (so it is presentation-driven), and pausing the CSS
+animations plus throttling rAF only removed part of it (so part of the loop
+captured its timer references at module scope, which a post-load injection
+cannot reach).
+
+Fix: `scripts/rebrand/idle-throttle.js` is loaded by the app's own
+`dist/index.html` as the first script, so it patches `requestAnimationFrame`,
+`setTimeout`, `setInterval`, and `Element.animate` before the app bundle
+runs. After two idle minutes ambient schedulers drop to a 2 fps floor; any
+input, DOM mutation, media playback, network call, or WebSocket message
+restores full rate within one frame. Nothing is dropped, only slowed, so
+live sessions and streaming replies are unaffected. Escape hatch:
+`KNOCKDESK_DISABLE_IDLE_THROTTLE=1`.
+
+Verified live over 15 minutes: total app CPU went from ~70s per 30s window
+to ~0-1s per 30s (0-3% of a core) at the idle mark, held with no spurious
+resume, and full rate returned on the next interaction. The asar repack
+gates confirm 16,480 of 16,482 entries are byte-identical; only the loader,
+the patched HTML, and the two intended new files differ.
+
+A second install defect was found and fixed at the same time: a stale
+Start-menu shortcut left by the developer install pointed at the repo
+checkout and sorted above the installed entry, so "launch KnockDesk from
+Search" ran the dev build. The installer now deletes that stale shortcut
+and the uninstaller removes it, leaving exactly one entry.
 
 ## Tools and reproduction
 - Mend-AI GOA quick scan of the repository: `runs/C-Users-wagde-MegaProjects-KnockDesk-20261019-035641-2dc7` (0 findings, heuristic mode).
