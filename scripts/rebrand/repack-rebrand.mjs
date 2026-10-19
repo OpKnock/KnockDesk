@@ -55,9 +55,11 @@ const newHeader = getRawHeader(OUT, false).header;
 const countOld = JSON.stringify(oldHeader).match(/"size"/g)?.length ?? 0;
 const countNew = JSON.stringify(newHeader).match(/"size"/g)?.length ?? 0;
 console.log('entry counts:', countOld, '->', countNew);
-// Exactly one planned addition (the idle-throttle inject source); the
-// detailed file-list check below confirms which entries differ.
-if (countNew !== countOld + 2) { console.error('FAIL: entry count mismatch (expected +2: throttle script + inject)'); process.exit(1); }
+// The first repack of the idle throttle adds two entries (dist/idle-throttle.js
+// and electron/idle-throttle-inject.js); later repacks of the same feature add
+// none. The file-list check below is the real gate; here we only reject a count
+// that changed by more than those two planned additions or shrank.
+if (countNew < countOld || countNew - countOld > 2) { console.error('FAIL: entry count mismatch'); process.exit(1); }
 
 const norm = (p) => String(p).replace(/\\/g, '/');
 const listOld = listPackage(ASAR).map(norm).sort();
