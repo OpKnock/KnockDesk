@@ -25,7 +25,10 @@ $dist = Join-Path $root 'dist'
 New-Item $stage, $assets, $dist -ItemType Directory -Force | Out-Null
 
 # Branding icon from the repo logo (regenerated every build, never committed).
-python -c "from PIL import Image; im=Image.open('logo.png'); im.save('staging/nsis-assets/install.ico', sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])"
+# The source has a wide transparent margin that makes shortcuts look tiny, so
+# build-icon.py crops to the visible artwork and writes a 256-first frame set.
+python (Join-Path $root 'scripts\build-icon.py') (Join-Path $root 'logo.png') (Join-Path $assets 'install.ico')
+if ($LASTEXITCODE -ne 0) { throw 'Icon generation failed' }
 
 # Exact runtime set: everything a portable install needs, nothing else.
 # Files at repo root are globbed; directories are copied wholesale so the
@@ -33,7 +36,7 @@ python -c "from PIL import Image; im=Image.open('logo.png'); im.save('staging/ns
 $rootFiles = @('KnockDesk.exe', '*.dll', '*.pak', '*.dat', '*.bin', 'vk_swiftshader*.json', 'wake_word_bg.py', 'resources.pak', 'app-update.yml', 'knockdesk-gen.marker', 'elevate.exe', 'swap-helper.exe', 'main.jsc')
 $rootDirs = @('resources', 'locales')
 $excludeDirs = @('app.asar.extracted', '__pycache__', 'ensurepip')
-$excludeFiles = @('*.log', '*.tmp', '.DS_Store', '*.pyc', '*.pyo')
+$excludeFiles = @('*.log', '*.tmp', '.DS_Store', '*.pyc', '*.pyo', 'app.rebuilt.asar')
 Remove-Item (Join-Path $stage '*') -Recurse -Force -ErrorAction SilentlyContinue
 
 foreach ($pat in $rootFiles) {
