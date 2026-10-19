@@ -14,7 +14,7 @@ account), N/A (does not apply to this product).
 | First launch without dev terminal/IDE/server | PASS | Bundled Python, Hermes venv, and browser payload all ship |
 | Responsive during startup and AI load | PASS | Live run: window opens, sidecars serve |
 | No blank window, freeze, endless spinner | PASS | Window paints; idle soak measured at 0-3% of one core |
-| Works after restart and fresh sign-in | OWNER | Needs a reboot on your machine or the friend's |
+| Works after restart and fresh sign-in | OWNER | Needs a reboot and a fresh sign-in on a real machine |
 | Handles missing config, outages, provider errors | PASS | Boots with no key and reports it; bad key handled; sidecar fails fast with the provider's own reason |
 | Handles expired sessions and failed auth | PASS | Voice session logs the reason and offers restart; no silent "done" |
 | Closes cleanly and reopens | PASS | Task-tree close leaves zero orphans; reopen verified |
@@ -32,7 +32,7 @@ trail and the fix.
 |---|---|---|
 | HTTPS, versioned installer URL | PASS | Release assets under the v3.1.12 tag |
 | Binary not silently replaced after submission | PASS | Immutable release tag + published SHA-256 |
-| Standalone installer, not a downloader | PASS | 779 MB, payload included |
+| Standalone installer, not a downloader | PASS | 780 MB, payload included |
 | Silent install with correct parameters | PASS | `/S` exercised |
 | Appropriate exit codes | PASS | Verified by resulting state, not just the code |
 | No dependence on developer paths or caches | PASS | Clean per-user install verified |

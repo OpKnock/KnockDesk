@@ -27,14 +27,14 @@ node, better-sqlite3 electron-v132 darwin prebuilds).
 - Darwin `.node` builds confirmed present in the payload: robotjs
   (`prebuilds/darwin-x64+arm64`), porcupine + pvrecorder (arm64/x86_64),
   better-sqlite3 prebuilds fetched per arch.
-- Friend test materials: `MACOS_TEST_PLAN.md` + `verify-macos.sh`
+- Real-hardware validation plan: `MACOS_TEST_PLAN.md` + `verify-macos.sh`
   (structural checks: Mach-O magic, modes, symlinks, Info.plist, arch match,
   venv + hermes CLI smoke).
 
 ## Known risks (documented, not hidden)
 
 1. **Unsigned**: first launch needs right-click → Open or `xattr -cr`. The
-   friend's Mac is the Gatekeeper validation for this pass.
+   a real Mac is the Gatekeeper validation for this pass.
 2. **darwin `@napi-rs/canvas` skipped**: zero `require` sites found for it in
    shipped code. If canvas errors appear, rebuild the module for darwin.
 3. **System-wide install to `/Applications`** can leave Resources read-only;
@@ -46,9 +46,9 @@ node, better-sqlite3 electron-v132 darwin prebuilds).
 
 ## Remaining to ship publicly
 
-1. ~~Friend validates on real hardware (both arches if available) →~~
+1. ~~Validate on real hardware (both arches if available) →~~
    ~~`MACOS_TEST_PLAN.md` checklist.~~
-   Friend validation still outstanding; the bundles passed the offline
+   Real-hardware validation still outstanding; the bundles passed the offline
    59/59 structural validation (Mach-O magic, Unix modes, symlinks,
    Info.plist, venv integrity, robotjs/picovoice natives stripped).
 2. Sign + notarize with the Apple Developer account (rcodesign works without a
