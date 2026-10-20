@@ -8,11 +8,13 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const BLOCK = 65536;
 const CAP = 65535;
 
-const LAYOUT = process.argv[2] || 'C:/Users/wagde/MegaProjects/KnockDesk/staging/msix-layout/';
+const LAYOUT = process.argv[2] ||
+  path.join(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), 'staging', 'msix-layout');
 
 let blocks = 0;
 let bytes = 0;

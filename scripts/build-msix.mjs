@@ -43,7 +43,22 @@ const SIGNTOOL = process.env.SIGNTOOL ||
 
 // The publisher must match the signing certificate's subject exactly, or
 // the package will not install: the signature is checked against it.
-const PUBLISHER = 'C=IN, O=N/A, CN=Mehul Wagde, E=wagdemehul@gmail.com';
+//
+// The value lives in installer/msix-publisher.txt, next to the installer
+// configuration, so it is written down once and can be changed for a
+// different certificate without touching the build.
+function readPublisher() {
+  const fromEnv = process.env.KNOCKDESK_PUBLISHER;
+  if (fromEnv) return fromEnv;
+  const file = path.join(ROOT, 'installer', 'msix-publisher.txt');
+  if (fs.existsSync(file)) {
+    const v = fs.readFileSync(file, 'utf8').trim();
+    if (v) return v;
+  }
+  throw new Error(
+    'The publisher identity is not set. Put it in installer/msix-publisher.txt ' +
+    'or pass KNOCKDESK_PUBLISHER. It must match the signing certificate.');
+}
 
 // ---------------------------------------------------------------- layout ---
 // The same exclusions the NSIS installer applies. __pycache__ and .pyc
@@ -225,7 +240,7 @@ function countFiles(dir) {
 // -------------------------------------------------------------- manifest ---
 const MANIFEST = `<?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10">
-  <Identity Name="KnockDesk.DesktopApp" Publisher="${PUBLISHER}" Version="${VERSION}.0" ProcessorArchitecture="x64" />
+  <Identity Name="KnockDesk.DesktopApp" Publisher="${readPublisher()}" Version="${VERSION}.0" ProcessorArchitecture="x64" />
   <Properties>
     <DisplayName>KnockDesk</DisplayName>
     <PublisherDisplayName>OpKnock</PublisherDisplayName>
