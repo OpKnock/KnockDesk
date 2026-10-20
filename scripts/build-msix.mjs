@@ -27,8 +27,9 @@ const ASSETS = path.join(ROOT, 'staging', 'msix-assets');
 const ICON = path.join(ROOT, 'staging', 'nsis-assets', 'install.ico');
 const MASTER = path.join(ROOT, 'resources', 'public', 'knockdesk-logo-1024.png');
 
-const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
-const VERSION = pkg.version;
+// The release version. The NSIS installer script keeps the same value in
+// its own $Version parameter, so the two packages always match.
+const VERSION = process.env.KNOCKDESK_VERSION || '3.1.12';
 
 const args = process.argv.slice(2);
 const ASSETS_ONLY = args.includes('--assets-only');
@@ -50,10 +51,117 @@ const PUBLISHER = 'C=IN, O=N/A, CN=Mehul Wagde, E=wagdemehul@gmail.com';
 const EXCLUDE_DIRS = new Set(['__pycache__', 'ensurepip', 'app.asar.extracted']);
 const EXCLUDE_FILES = /\.(log|tmp|pyc|pyo)$/i;
 
+// The Appx block map stores each file's data in 64 KB blocks and the
+// format caps the map at 65,535 blocks. The full payload needs about
+// 86,000, so it cannot be signed as one package.
+//
+// The way under the cap is to remove what the runtime never reads.
+//
+// The Hermes tree is where the bloat is. Its node_modules holds 18,000
+// small files, and every small file costs a whole block, so 267 MB costs
+// 21,000 blocks. Most of it is build tooling: the linter, the type
+// checker, the test runner, the bundler and their own dependencies. The
+// app serves the built output, not the sources, so none of it runs on a
+// user's machine.
+//
+// The virtualenvs carry the same shape: pip's vendored copies and the
+// test suites the installer pulled in.
+const TRIM = [
+  // Build tooling in the Hermes web app's dependency tree.
+  { tree: 'resources/hermes-runtime/src/node_modules', drop: [
+    '@babel', '@eslint', '@eslint-community', '@humanwhocodes', '@humanfs',
+    '@oxc-project', '@rolldown', '@tailwindcss', '@types', '@typescript-eslint',
+    '@vitejs', '@vitest', 'eslint', 'typescript', 'vitest', 'caniuse-lite',
+    'browserslist', 'electron-to-chromium', 'node-releases',
+    'update-browserslist-db', 'eslint-plugin-react', 'eslint-plugin-react-hooks',
+    'eslint-plugin-react-refresh', 'eslint-plugin-storybook', 'eslint-config-prettier',
+    'eslint-plugin-prettier', 'prettier', 'postcss', 'postcss-value-parser',
+    'autoprefixer', 'vite', 'vite-node', 'lightningcss', 'esbuild', '@esbuild',
+    'rollup', 'rollup-plugin-dts', 'rollup-plugin-esbuild', 'jsdom', 'happy-dom',
+    'storybook', 'telejson', 'chalk', 'ansi-styles', 'supports-color', 'has-flag',
+    'color-convert', 'color-name', 'debug', 'ms', 'picocolors', 'picomatch',
+    'micromatch', 'braces', 'fill-range', 'to-regex-range', 'is-number', 'glob',
+    'minimatch', 'rimraf', 'del', 'execa', 'cross-spawn', 'npm-run-path', 'which',
+    'read-pkg', 'read-pkg-up', 'find-up', 'locate-path', 'p-locate', 'p-limit',
+    'yocto-queue', 'pify', 'is-ci', 'ci-info', 'string-width', 'strip-ansi',
+    'strip-final-newline', 'mri', 'open', 'lru-cache', 'semver', 'make-dir',
+    'write-file-atomic', 'signal-exit', 'onetime', 'is-stream', 'merge-stream',
+    'shebang-command', 'shebang-regex', 'mimic-fn', 'path-exists', 'fs-extra',
+    'universalify', 'graceful-fs', 'jsonfile', 'at-least-node', 'source-map',
+    'source-map-js', 'magic-string', '@jridgewell', 'tslib', 'jiti', 'mlly',
+    'pathe', 'unimport', 'unplugin', 'local-pkg', 'pkg-types', 'confbox',
+    'std-env', 'acorn', 'acorn-walk', 'estree-walker', 'is-reference',
+    'is-promise', 'mrmime', 'periscopic', 'magicast',
+  ] },
+  // The Hermes virtualenv carries pip's vendored copies and test suites.
+  { tree: 'resources/hermes-runtime/venv', drop: [
+    'Lib/site-packages/pip/_vendor',
+    'Lib/site-packages/pip/tests',
+    'Lib/site-packages/pip/test',
+    'Lib/site-packages/setuptools/tests',
+    'Lib/site-packages/setuptools/_vendor',
+    'Lib/site-packages/setuptools/test',
+    'Lib/site-packages/setuptools/_distutils/tests',
+    'Lib/site-packages/wheel/tests',
+    'Lib/site-packages/wheel/vendored',
+    'Lib/site-packages/pkg_resources/tests',
+    'Lib/site-packages/_distutils_hack',
+    'Lib/site-packages/distutils-precedence.pth',
+    'Lib/site-packages/distutils-precedence.py',
+    'Lib/site-packages/pytest',
+    'Lib/site-packages/_pytest',
+    'Lib/site-packages/iniconfig',
+    'Lib/site-packages/pluggy',
+    'Lib/site-packages/tox',
+    'Lib/site-packages/nox',
+  ] },
+  // The computer-use virtualenv carries the same shape.
+  { tree: 'resources/computer-runtime/venv', drop: [
+    'Lib/site-packages/pip/_vendor',
+    'Lib/site-packages/pip/tests',
+    'Lib/site-packages/pip/test',
+    'Lib/site-packages/setuptools/tests',
+    'Lib/site-packages/setuptools/_vendor',
+    'Lib/site-packages/setuptools/test',
+    'Lib/site-packages/setuptools/_distutils/tests',
+    'Lib/site-packages/wheel/tests',
+    'Lib/site-packages/wheel/vendored',
+    'Lib/site-packages/pkg_resources/tests',
+    'Lib/site-packages/_distutils_hack',
+    'Lib/site-packages/distutils-precedence.pth',
+    'Lib/site-packages/distutils-precedence.py',
+    'Lib/site-packages/pytest',
+    'Lib/site-packages/_pytest',
+    'Lib/site-packages/iniconfig',
+    'Lib/site-packages/pluggy',
+  ] },
+  // The Agent Town build ships its own dependency tree.
+  { tree: 'resources/agent-town-dist/node_modules', drop: [
+    '.cache', '.vite', 'typescript', 'esbuild', '@esbuild', '@types',
+    '@typescript-eslint', 'eslint', 'vitest', '@vitest', 'vite', '@vitejs',
+    'prettier', 'postcss', 'autoprefixer', 'tailwindcss', '@tailwindcss',
+    'rollup', '@rollup', 'chai', 'jsdom', 'happy-dom',
+  ] },
+];
+
 function isExcluded(rel) {
   if (!rel) return false;
   if (rel.split('/').some((p) => EXCLUDE_DIRS.has(p))) return true;
-  return EXCLUDE_FILES.test(rel);
+  if (EXCLUDE_FILES.test(rel)) return true;
+  for (const t of TRIM) {
+    if (!rel.startsWith(t.tree + '/')) continue;
+    const rest = rel.slice(t.tree.length + 1);
+    for (const d of t.drop) {
+      if (d.endsWith('*')) {
+        // A prefix match on the first segment below the tree.
+        const head = rest.split('/')[0];
+        if (head.startsWith(d.slice(0, -1))) return true;
+      } else if (rest === d || rest.startsWith(d + '/')) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 function buildLayout() {
@@ -66,7 +174,7 @@ function buildLayout() {
     if (name === 'resources') continue; // handled below, with the icons
     copyTree(path.join(STAGE, name), path.join(LAYOUT, name), '');
   }
-  copyTree(path.join(STAGE, 'resources'), path.join(LAYOUT, 'resources'), 'resources');
+  copyTree(path.join(STAGE, 'resources'), path.join(LAYOUT, 'resources'), '');
 
   // The store icons.
   fs.mkdirSync(path.join(LAYOUT, 'assets'), { recursive: true });

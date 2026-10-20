@@ -20,7 +20,7 @@
 # full payload (48,436 files) and the KnockDesk mark as its store icons.
 # It is larger than the installer because the installer uses one solid
 # compression stream and the package format does not.
-B4188B6011E41C795032F4B1A24541C3CD01847D1F13B1C200BD3D16662D6FF6  KnockDesk-3.1.12-x64.msix
+12FB792D2B922E2DADE888A8D462CD836847B6C5A757A7444469509863DC9034  KnockDesk-3.1.12-x64.msix
 #
 # macOS cross-builds (unsigned and un-notarized, structurally validated,
 # awaiting real hardware validation on a Mac). Right-click the app and choose
