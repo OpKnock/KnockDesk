@@ -33,7 +33,7 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.18.4",
-    "sanitize-html": "^2.17.7",
+    "sanitize-html": "^2.18.1",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.1",
     "unicode-animations": "^1.0.3"
@@ -52,7 +52,7 @@
     "three": "^0.180.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.56.1",
-    "vite": "^8.0.16",
+    "vite": "^8.3.4",
     "vitest": "^4.1.11"
   }
 }
