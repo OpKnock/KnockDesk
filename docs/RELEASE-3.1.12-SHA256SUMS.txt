@@ -11,7 +11,7 @@
 # Windows shows the publisher as unknown. Choose More info, then Run anyway.
 # The SHA-256 below is the integrity check.
 669CEDA4D8C7252D84614959CCA32EE98C1226EE73DE443848D663EA33B3C9E5  KnockDesk-Setup-3.1.12-x64.exe
-E5EFD92CEBCE93F2FF6801DF7E1F1C4969CDADD3E70A89B20D32B61FA4BECD48  KnockDesk-3.1.12-x64.msix
+B4188B6011E41C795032F4B1A24541C3CD01847D1F13B1C200BD3D16662D6FF6  KnockDesk-3.1.12-x64.msix
 #
 # macOS cross-builds (unsigned and un-notarized, structurally validated,
 # awaiting real hardware validation on a Mac). Right-click the app and choose
