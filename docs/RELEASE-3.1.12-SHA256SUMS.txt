@@ -1,12 +1,20 @@
-# KnockDesk 3.1.12 release artifacts (2026-10-19)
-# Windows installer (NSIS, per-user, unsigned). Built from main containing
-# the SSRF guard, the CDP token gate, the naming cleanup, the shortcut icon
-# fix, the web-search package, the computer-use false-success fix, the
-# legacy-plugin env fix, the TTS fallback, the gateway Gemini key
-# injection, and the idle CPU throttle.
-23E2680B15F8DC551956CA269931C33AEDEC0B70347EAA0330661259C638403F  KnockDesk-Setup-3.1.12-x64.exe
-33A447878A116379006103BD520F6F864A3DEAFC7DA7CA95717A47833F0F2F6A  KnockDesk-3.1.12-x64.msix
-# macOS cross-builds (unsigned, structurally validated, awaiting real
-# hardware validation on a Mac)
+# KnockDesk 3.1.12 release artifacts (2026-10-20)
+#
+# Windows installer (NSIS, per-user). Built from main containing the SSRF
+# guard, the CDP token gate, the naming cleanup, the shortcut icon fix, the
+# web-search package, the computer-use false-success fix, the legacy-plugin
+# env fix, the TTS fallback, the gateway Gemini key injection, the idle CPU
+# throttle, the protected core, and the rebrand.
+#
+# Authenticode-signed and RFC 3161-timestamped. The certificate chains to
+# Codegic Root CA G2, which is not in the Microsoft Trusted Root Program, so
+# Windows shows the publisher as unknown. Choose More info, then Run anyway.
+# The SHA-256 below is the integrity check.
+669CEDA4D8C7252D84614959CCA32EE98C1226EE73DE443848D663EA33B3C9E5  KnockDesk-Setup-3.1.12-x64.exe
+E5EFD92CEBCE93F2FF6801DF7E1F1C4969CDADD3E70A89B20D32B61FA4BECD48  KnockDesk-3.1.12-x64.msix
+#
+# macOS cross-builds (unsigned and un-notarized, structurally validated,
+# awaiting real hardware validation on a Mac). Right-click the app and choose
+# Open the first time.
 C5D1DE21BB019A4E73D9F2257BD23BEB1F875BEE5BF992D13DBEF42617D57D8F  KnockDesk-3.1.12-macOS-arm64.zip
 BDD86415978A85FC43ABD9A40A0A6EFC3BCB1C95919A68887CC8D3E4B9A1409B  KnockDesk-3.1.12-macOS-x64.zip
