@@ -349,13 +349,39 @@ require('bytenode');
       const mode = (process.env.KNOCKDESK_NET_MODE || 'strict').toLowerCase();
       if (mode !== 'open' && typeof app.on === 'function' && app.whenReady) {
         const LOOPBACK = /^(127\.0\.0\.1|localhost|\[?::1\]?)$/i;
+        // Every host the app itself loads, not just the AI providers. The
+        // guard used to list only the APIs, which silently broke three
+        // first-party features that open their own webviews:
+        //   - World Monitor (worldmonitor.app) reported "offline"
+        //   - the tutorial videos (youtube.com / youtu.be) never loaded
+        //   - Moonshot's international endpoint api.moonshot.ai was blocked
+        //     while the .cn one was allowed
         const DEFAULT_ALLOW = [
+          // AI providers
           'generativelanguage.googleapis.com',
           'googleapis.com',
+          'aistudio.google.com',
+          'aiplatform.googleapis.com',
           'openrouter.ai',
           'api.openai.com',
           'api.groq.com',
+          'console.groq.com',
           'api.moonshot.cn',
+          'api.moonshot.ai',
+          // bundled webview features
+          'worldmonitor.app',
+          'www.worldmonitor.app',
+          'youtube.com',
+          'www.youtube.com',
+          'youtu.be',
+          'm.youtube.com',
+          // docs and links the UI opens directly
+          'react.dev',
+          'www.w3.org',
+          'docs.expo.dev',
+          'fonts.googleapis.com',
+          'mail.google.com',
+          'www.google.com',
         ];
         const extra = (process.env.KNOCKDESK_ALLOW_HOSTS || '')
           .split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
