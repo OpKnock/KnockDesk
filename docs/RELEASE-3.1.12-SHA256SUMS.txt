@@ -1,4 +1,4 @@
-# KnockDesk 3.1.12 release artifacts (2026-10-20)
+# KnockDesk 3.1.12 release artifacts (2026-10-21)
 #
 # Windows installer (NSIS, per-user). Built from main containing the SSRF
 # guard, the CDP token gate, the naming cleanup, the shortcut icon fix, the
@@ -11,6 +11,15 @@
 # Windows shows the publisher as unknown. Choose More info, then Run anyway.
 # The SHA-256 below is the integrity check.
 669CEDA4D8C7252D84614959CCA32EE98C1226EE73DE443848D663EA33B3C9E5  KnockDesk-Setup-3.1.12-x64.exe
+#
+# Windows MSIX package. Rebuilt on 2026-10-21. The package that shipped
+# before this was a 24-entry shell: it carried the Electron runtime and the
+# app archive but not locales/, not resources.pak, and none of the
+# resources/ tree, so it could not launch. It also shipped three 1x1
+# placeholder pixels as the store icons. The rebuilt package carries the
+# full payload (48,436 files) and the KnockDesk mark as its store icons.
+# It is larger than the installer because the installer uses one solid
+# compression stream and the package format does not.
 B4188B6011E41C795032F4B1A24541C3CD01847D1F13B1C200BD3D16662D6FF6  KnockDesk-3.1.12-x64.msix
 #
 # macOS cross-builds (unsigned and un-notarized, structurally validated,
