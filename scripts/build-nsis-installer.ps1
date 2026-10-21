@@ -79,12 +79,17 @@ foreach ($lf in @($longPaths)) {
 if ($removed -gt 0) { Write-Output "Removed $removed files with paths >250 chars (NSIS MAX_PATH guard)" }
 
 # Checksums for the staged payload (shipped next to the installer).
+#
+# This is a per-file manifest of the installer's contents, tens of thousands
+# of lines. It is NOT the release's SHA256SUMS.txt, which lists the release
+# artifacts themselves. They used to share a name, and this file silently
+# replaced the release list on every installer build.
 $files = Get-ChildItem $stage -Recurse -File | Sort-Object FullName
 $sha = foreach ($f in $files) {
   $h = (Get-FileHash $f.FullName -Algorithm SHA256).Hash
   "$h  $($f.FullName.Substring($stage.Length + 1))"
 }
-$sha | Out-File (Join-Path $dist 'SHA256SUMS.txt') -Encoding utf8
+$sha | Out-File (Join-Path $dist 'SHA256SUMS-files.txt') -Encoding utf8
 $sizeMB = [math]::Round(($files | Measure-Object Length -Sum).Sum / 1MB, 1)
 Write-Output "Staged $($files.Count) files, ${sizeMB} MB"
 
