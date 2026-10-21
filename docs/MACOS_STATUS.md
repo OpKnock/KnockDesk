@@ -58,8 +58,14 @@ node, better-sqlite3 electron-v132 darwin prebuilds).
    DONE in release v3.1.12 (2026-10-18): both zips published at
    https://github.com/OpKnock/KnockDesk/releases/tag/v3.1.12 with
    SHA-256:
-   - arm64 `C5D1DE21BB019A4E73D9F2257BD23BEB1F875BEE5BF992D13DBEF42617D57D8F`
-   - x64   `BDD86415978A85FC43ABD9A40A0A6EFC3BCB1C95919A68887CC8D3E4B9A1409B`
+   - arm64 `5A31E1F3AE147FF522455248A852A76C870A54DA80305EA2332A6D067FD04CE7`
+   - x64   `501C3E3F4441CD13E4FB53F59F076D03EFBFADF6AEB54F7F76E8AE594FA09838`
    The website /download macOS card now offers both bundles. After signing,
    re-zip and re-publish the signed bundles in the next release.
+
+   Re-published 2026-10-21: both bundles were rebuilt so they carry the
+   same application archive as the Windows packages, and both passed the
+   59/59 structural validation again. The digests above are the ones
+   currently on the release; the ones from the 2026-10-18 build
+   (`C5D1DE21…` and `BDD86415…`) were replaced by them.
 4. Optional `.dmg` packaging later; zip distribution is fine for now.
