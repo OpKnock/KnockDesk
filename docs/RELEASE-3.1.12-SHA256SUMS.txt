@@ -33,7 +33,7 @@
 # mark as its store icons. It is larger than the installer because the
 # installer uses one solid compression stream and the package format does
 # not.
-6CE0EB2250DDDBC7110E7ACDE5F61F8251BF7FEA495CF373D1AF2A7C8D9586FA  KnockDesk-3.1.12-x64.msix
+2BD649B7D49B0F62E885968CAAE1264EDC2B19EE36385F1349638372E5572DB6  KnockDesk-3.1.12-x64.msix
 #
 # macOS cross-builds (unsigned and un-notarized, structurally validated,
 # awaiting real hardware validation on a Mac). Right-click the app and choose
