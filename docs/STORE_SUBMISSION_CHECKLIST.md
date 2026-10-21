@@ -1,6 +1,6 @@
 # KnockDesk — Microsoft Store Submission Checklist
 
-Date: 2026-10-17. Version: 3.1.12-local. Status per item: VERIFIED / FAILED / BLOCKED / N/A.
+Date: 2026-10-21 (revised; originally 2026-10-17). Version: 3.1.12. Status per item: VERIFIED / FAILED / BLOCKED / N/A.
 
 ## Package Identity and Versioning
 
@@ -8,16 +8,21 @@ Date: 2026-10-17. Version: 3.1.12-local. Status per item: VERIFIED / FAILED / BL
 |------|--------|-------|
 | Version scheme (semver) | VERIFIED | 3.1.12 in exe metadata + package.json + NSIS VIAddVersionKey |
 | Architecture declared | VERIFIED | x64 (NSIS installer targets 64-bit) |
-| Package identity (Publisher/Name) | BLOCKED | Requires Partner Center account + reserved name "KnockDesk" |
+| Package identity (Publisher/Name) | VERIFIED | `OpKnock.KnockDesk` / `CN=13E3D3C2-988F-4109-AD0E-42DE8604237C` — the values Partner Center assigned. `scripts/build-msix.mjs --store` declares them. |
+| Package family name | VERIFIED | Derived by Windows from the identity name and publisher (`OpKnock.KnockDesk_f3e3af4par97c`). It is never written by hand. |
+| MSIX version number | VERIFIED | `3.1.12.0` — the four-part form Partner Center expects. Partner Center must not already hold an equal or higher version. |
 | Version sync across exe/installer/about | VERIFIED | FileVersionInfo: 3.1.12; NSIS: 3.1.12; app displays 3.1.12-local |
+| Target device family | VERIFIED | `Windows.Desktop` only. Windows.Core is IoT Core and the Store rejects it for a desktop app; Universal, Xbox, Holographic and Team are not appropriate either. |
 
 ## Packaging Approach
 
 | Item | Status | Notes |
 |------|--------|-------|
-| NSIS offline installer (not MSIX) | VERIFIED | See docs/PACKAGING_DECISION.md — MSIX blocked by unsigned status + 2.7GB payload + bytecode main |
-| Standalone (no web downloader) | VERIFIED | All 2.7GB payload embedded in installer |
-| MSIX packaging | N/A | Deferred until signing + payload reduction; see PACKAGING_DECISION.md |
+| NSIS offline installer | VERIFIED | The direct download. See docs/PACKAGING_DECISION.md. |
+| Standalone (no web downloader) | VERIFIED | The whole payload is embedded in the installer |
+| MSIX packaging | VERIFIED | `scripts/build-msix.mjs --store` builds the Store submission package from the same staging tree as the installer, so both carry the same payload. |
+| Store package is submitted unsigned | VERIFIED | Microsoft signs the package once it accepts the submission. `--store` refuses to run when `SIGN_PFX` or `SIGN_PFX_PASSWORD` is set, so a personal certificate can never contradict the declared publisher. |
+| Payload is not trimmed | VERIFIED | Nothing is dropped from the payload. An earlier build removed about 267 MB of build tooling on the belief that the block map is capped at 65,535 blocks; that is the ZIP32 entry limit, not a block-map limit, and the package packs and unpacks with over 78,000 blocks. The package now carries exactly what the installer carries. |
 
 ## Installation Artifacts
 
@@ -43,9 +48,9 @@ Date: 2026-10-17. Version: 3.1.12-local. Status per item: VERIFIED / FAILED / BL
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Production signing certificate | BLOCKED | Not purchased. `scripts/sign-release.ps1` is cert-gated (refuses without one). |
-| Timestamp server | BLOCKED | Depends on certificate |
-| Signature verification post-build | BLOCKED | Depends on certificate |
+| Store package signing | VERIFIED | Not our job: the Store package is submitted unsigned and Microsoft signs it. |
+| Release installer signing | VERIFIED | The NSIS installer and the sideload MSIX are Authenticode-signed and RFC 3161-timestamped with the release certificate. |
+| Certificate trust | VERIFIED | The certificate chains to Codegic Root CA G2, which is not in the Windows trusted root list. The EXE installs with a SmartScreen prompt the user can accept. The MSIX cannot: `Add-AppxPackage` rejects it with 0x800B010A. That is exactly why the MSIX that ships is the Store package. |
 | No self-signed certs in repo | VERIFIED | sign-release.ps1 refuses self-signed; no .pfx files tracked |
 
 ## System Requirements
@@ -93,36 +98,56 @@ Date: 2026-10-17. Version: 3.1.12-local. Status per item: VERIFIED / FAILED / BL
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Account creation | BLOCKED | User action required |
-| App name reservation | BLOCKED | User action required |
-| Package upload | BLOCKED | Requires installer to be signed first |
+| Account creation | VERIFIED | The Partner Center account exists: the identity `OpKnock.KnockDesk` was assigned to it. |
+| App name reservation | VERIFIED | "KnockDesk" is reserved on the account. |
+| Package upload | READY | `dist/KnockDesk-3.1.12-x64.msix`, built with `--store`. |
+| Device family selection | READY | Select the Windows desktop family only. The package declares `Windows.Desktop` and nothing else. |
+| Restricted capabilities | READY | `runFullTrust` is declared and is a restricted capability: Partner Center asks for a justification in the submission options. See "runFullTrust justification" below. |
 | Test notes for certification | BLOCKED | Draft below; needs user review |
-| Restricted capabilities | N/A | No camera/mic declared as capabilities; app requests at runtime via Electron APIs |
 | External services disclosure | BLOCKED | Needs listing of Google Gemini / OpenRouter / user-configured AI providers |
+
+### runFullTrust justification (paste into the submission options)
+
+> KnockDesk is a Windows desktop AI assistant that requires full-trust execution to provide desktop integration, launch and manage local processes, interact with supported desktop applications, and perform user-authorized computer automation. The runFullTrust capability is necessary for these core desktop features. The application does not use this capability to bypass Windows security controls, and computer automation is performed according to user permissions and authorization.
 
 ## WACK (Windows App Certification Kit)
 
 | Item | Status | Notes |
 |------|--------|-------|
 | WACK installed | VERIFIED | `C:\Program Files (x86)\Windows Kits\10\App Certification Kit\appcert.exe` |
-| WACK against NSIS installer | BLOCKED | WACK requires a signed app package (MSIX/AppX); NSIS installers are Win32 and tested via the standard Store onboarding flow, not WACK. See "Notes" below. |
-| Crash-free launch | VERIFIED | Smoke test passes: boot, splash, main window, idle 60s, clean shutdown, no orphans |
+| WACK against the MSIX package | NOT TESTED | WACK validates MSIX/AppX packages, so it is now applicable. It has not been run against the Store package: WACK rejects an unsigned package, and the Store package is unsigned by design. Run it against a signed sideload build if a local WACK pass is wanted. |
+| Crash-free launch | VERIFIED | Smoke test passes against the unpacked package: the app launches, the window paints, the splash shows the KnockDesk brand, the main page is served on the local server, and it shuts down. |
 
-**WACK note**: WACK validates MSIX/AppX packages. For unpackaged Win32 apps
-distributed via the Store's "MSIX from EXE" or standalone EXE path, Microsoft
-performs its own validation during submission. Our NSIS installer falls under
-the standalone-EXE path. WACK is NOT APPLICABLE to this packaging choice.
-If MSIX packaging is pursued later (after signing), WACK becomes applicable.
+## Package contents verified against the runtime inventory
+
+The unpacked package was compared with the staging tree the installer uses.
+Every runtime path the app needs is present in the package:
+
+| Runtime | Present |
+|---|---|
+| `resources/app.asar` and `app.asar.unpacked` | yes |
+| `better-sqlite3` native module | yes |
+| `@jitsi/robotjs` native module (desktop automation) | yes, with the Windows prebuild |
+| Hermes virtualenv and `hermes.exe` | yes |
+| Hermes CLI sources (`hermes_cli`) | yes |
+| computer-use virtualenv | yes |
+| `pytesseract` and the bundled tesseract | yes |
+| `resources/knockdesk-computer` and the Hermes plugin | yes |
+| Porcupine / PvRecorder (voice) | yes |
+| Bundled Chromium and the agent browser | yes |
+| Agent Town server and static build | yes |
+| The store icons, under `Assets\` | yes |
+| `locales/`, `resources.pak` | yes |
 
 ## Remaining Blockers (user action required)
 
-1. **Purchase code-signing certificate** (OV/EV from DigiCert/Sectigo/etc.)
-2. **Create Partner Center account** and reserve "KnockDesk" name
-3. **Provide support URL** for Store listing
-4. **Host privacy policy** at a public URL
-5. **Capture screenshots** at required resolutions
-6. **Review and approve** the draft description below
-7. **Test on clean Windows machines** (VM or physical, no dev tools)
+1. **Upload the Store package** — `dist/KnockDesk-3.1.12-x64.msix` — to Partner Center, select the desktop device family only, and paste the `runFullTrust` justification above.
+2. **Provide support URL** for Store listing
+3. **Host privacy policy** at a public URL
+4. **Capture screenshots** at required resolutions
+5. **Review and approve** the draft description below
+6. **Test on clean Windows machines** (VM or physical, no dev tools)
+7. **Real-hardware validation of the macOS bundles** (see docs/MACOS_STATUS.md)
 
 ## Draft Store Description (for review)
 

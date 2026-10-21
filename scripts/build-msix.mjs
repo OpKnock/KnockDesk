@@ -14,6 +14,11 @@
  *   node scripts/build-msix.mjs                 build the package
  *   node scripts/build-msix.mjs --assets-only   regenerate the icons only
  *   node scripts/build-msix.mjs --skip-sign     build without signing
+ *   node scripts/build-msix.mjs --store         build the Store submission
+ *                                               package: the identity and
+ *                                               publisher Partner Center
+ *                                               assigned, submitted unsigned
+ *                                               so Microsoft can sign it
  */
 import { execFileSync, execSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -35,7 +40,39 @@ const args = process.argv.slice(2);
 const ASSETS_ONLY = args.includes('--assets-only');
 const SKIP_SIGN = args.includes('--skip-sign');
 
-const OUT = path.join(ROOT, 'dist', `KnockDesk-${VERSION}-x64.msix`);
+// --store builds the package for submission to the Microsoft Store.
+//
+// Microsoft Partner Center assigns the package identity and the publisher
+// distinguished name. A submitted package must declare exactly those
+// values: Microsoft compares them byte for byte, including capitalisation
+// and punctuation, and the package family name is derived from them.
+//
+// The publisher is NOT the signing certificate's subject. Microsoft signs
+// the package itself once it accepts the submission, so the submitted
+// package is unsigned. Signing it with a personal certificate first would
+// make the manifest's publisher inconsistent with the certificate and the
+// package would be rejected.
+const STORE_MODE = args.includes('--store');
+const STORE_IDENTITY = 'OpKnock.KnockDesk';
+const STORE_PUBLISHER = 'CN=13E3D3C2-988F-4109-AD0E-42DE8604237C';
+
+// The Store package is the one that goes to Partner Center, so it keeps the
+// plain name. The signed one is a sideload build for direct installation
+// and is named for what it is.
+const OUT = path.join(ROOT, 'dist',
+  STORE_MODE ? `KnockDesk-${VERSION}-x64.msix` : `KnockDesk-${VERSION}-x64-sideload.msix`);
+
+// A Store package must not be signed with a personal certificate: the
+// manifest declares the publisher Partner Center assigned, and the
+// certificate would contradict it. Fail loudly rather than ship a package
+// that looks like a Store package and is not.
+if (STORE_MODE && (process.env.SIGN_PFX || process.env.SIGN_PFX_PASSWORD)) {
+  throw new Error(
+    'A --store build is submitted unsigned: Microsoft signs it. ' +
+    'SIGN_PFX / SIGN_PFX_PASSWORD are set, which would sign it with a ' +
+    'personal certificate and contradict the publisher the manifest declares. ' +
+    'Unset them, or build without --store.');
+}
 const MAKEAPPX = process.env.MAKEAPPX ||
   'C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/makeappx.exe';
 const SIGNTOOL = process.env.SIGNTOOL ||
@@ -47,7 +84,20 @@ const SIGNTOOL = process.env.SIGNTOOL ||
 // The value lives in installer/msix-publisher.txt, next to the installer
 // configuration, so it is written down once and can be changed for a
 // different certificate without touching the build.
+//
+// The Store package is the exception: it declares the publisher Partner
+// Center assigned, and it is submitted unsigned so Microsoft can sign it.
 function readPublisher() {
+  if (STORE_MODE) {
+    if (process.env.KNOCKDESK_PUBLISHER &&
+        process.env.KNOCKDESK_PUBLISHER !== STORE_PUBLISHER) {
+      throw new Error(
+        'KNOCKDESK_PUBLISHER is set to ' + JSON.stringify(process.env.KNOCKDESK_PUBLISHER) +
+        ' but a --store build must declare the publisher Partner Center assigned: ' +
+        JSON.stringify(STORE_PUBLISHER) + '. Unset the variable, or build without --store.');
+    }
+    return STORE_PUBLISHER;
+  }
   const fromEnv = process.env.KNOCKDESK_PUBLISHER;
   if (fromEnv) return fromEnv;
   const file = path.join(ROOT, 'installer', 'msix-publisher.txt');
@@ -66,98 +116,21 @@ function readPublisher() {
 const EXCLUDE_DIRS = new Set(['__pycache__', 'ensurepip', 'app.asar.extracted']);
 const EXCLUDE_FILES = /\.(log|tmp|pyc|pyo)$/i;
 
-// The Appx block map stores each file's data in 64 KB blocks and the
-// format caps the map at 65,535 blocks. The full payload needs about
-// 86,000, so it cannot be signed as one package.
+// Nothing is trimmed from the payload.
 //
-// The way under the cap is to remove what the runtime never reads.
+// An earlier version of this script dropped about 267 MB of build tooling
+// (the linter, the type checker, the test runner, the bundler, and pip's
+// vendored copies) on the belief that the Appx block map is capped at
+// 65,535 blocks. That belief is wrong: the 65,535 figure is the ZIP32
+// limit on the number of entries in the archive's central directory, not a
+// limit on the block map. This package's block map lists 78,158 blocks and
+// makeappx packs and unpacks it without complaint.
 //
-// The Hermes tree is where the bloat is. Its node_modules holds 18,000
-// small files, and every small file costs a whole block, so 267 MB costs
-// 21,000 blocks. Most of it is build tooling: the linter, the type
-// checker, the test runner, the bundler and their own dependencies. The
-// app serves the built output, not the sources, so none of it runs on a
-// user's machine.
-//
-// The virtualenvs carry the same shape: pip's vendored copies and the
-// test suites the installer pulled in.
-const TRIM = [
-  // Build tooling in the Hermes web app's dependency tree.
-  { tree: 'resources/hermes-runtime/src/node_modules', drop: [
-    '@babel', '@eslint', '@eslint-community', '@humanwhocodes', '@humanfs',
-    '@oxc-project', '@rolldown', '@tailwindcss', '@types', '@typescript-eslint',
-    '@vitejs', '@vitest', 'eslint', 'typescript', 'vitest', 'caniuse-lite',
-    'browserslist', 'electron-to-chromium', 'node-releases',
-    'update-browserslist-db', 'eslint-plugin-react', 'eslint-plugin-react-hooks',
-    'eslint-plugin-react-refresh', 'eslint-plugin-storybook', 'eslint-config-prettier',
-    'eslint-plugin-prettier', 'prettier', 'postcss', 'postcss-value-parser',
-    'autoprefixer', 'vite', 'vite-node', 'lightningcss', 'esbuild', '@esbuild',
-    'rollup', 'rollup-plugin-dts', 'rollup-plugin-esbuild', 'jsdom', 'happy-dom',
-    'storybook', 'telejson', 'chalk', 'ansi-styles', 'supports-color', 'has-flag',
-    'color-convert', 'color-name', 'debug', 'ms', 'picocolors', 'picomatch',
-    'micromatch', 'braces', 'fill-range', 'to-regex-range', 'is-number', 'glob',
-    'minimatch', 'rimraf', 'del', 'execa', 'cross-spawn', 'npm-run-path', 'which',
-    'read-pkg', 'read-pkg-up', 'find-up', 'locate-path', 'p-locate', 'p-limit',
-    'yocto-queue', 'pify', 'is-ci', 'ci-info', 'string-width', 'strip-ansi',
-    'strip-final-newline', 'mri', 'open', 'lru-cache', 'semver', 'make-dir',
-    'write-file-atomic', 'signal-exit', 'onetime', 'is-stream', 'merge-stream',
-    'shebang-command', 'shebang-regex', 'mimic-fn', 'path-exists', 'fs-extra',
-    'universalify', 'graceful-fs', 'jsonfile', 'at-least-node', 'source-map',
-    'source-map-js', 'magic-string', '@jridgewell', 'tslib', 'jiti', 'mlly',
-    'pathe', 'unimport', 'unplugin', 'local-pkg', 'pkg-types', 'confbox',
-    'std-env', 'acorn', 'acorn-walk', 'estree-walker', 'is-reference',
-    'is-promise', 'mrmime', 'periscopic', 'magicast',
-  ] },
-  // The Hermes virtualenv carries pip's vendored copies and test suites.
-  { tree: 'resources/hermes-runtime/venv', drop: [
-    'Lib/site-packages/pip/_vendor',
-    'Lib/site-packages/pip/tests',
-    'Lib/site-packages/pip/test',
-    'Lib/site-packages/setuptools/tests',
-    'Lib/site-packages/setuptools/_vendor',
-    'Lib/site-packages/setuptools/test',
-    'Lib/site-packages/setuptools/_distutils/tests',
-    'Lib/site-packages/wheel/tests',
-    'Lib/site-packages/wheel/vendored',
-    'Lib/site-packages/pkg_resources/tests',
-    'Lib/site-packages/_distutils_hack',
-    'Lib/site-packages/distutils-precedence.pth',
-    'Lib/site-packages/distutils-precedence.py',
-    'Lib/site-packages/pytest',
-    'Lib/site-packages/_pytest',
-    'Lib/site-packages/iniconfig',
-    'Lib/site-packages/pluggy',
-    'Lib/site-packages/tox',
-    'Lib/site-packages/nox',
-  ] },
-  // The computer-use virtualenv carries the same shape.
-  { tree: 'resources/computer-runtime/venv', drop: [
-    'Lib/site-packages/pip/_vendor',
-    'Lib/site-packages/pip/tests',
-    'Lib/site-packages/pip/test',
-    'Lib/site-packages/setuptools/tests',
-    'Lib/site-packages/setuptools/_vendor',
-    'Lib/site-packages/setuptools/test',
-    'Lib/site-packages/setuptools/_distutils/tests',
-    'Lib/site-packages/wheel/tests',
-    'Lib/site-packages/wheel/vendored',
-    'Lib/site-packages/pkg_resources/tests',
-    'Lib/site-packages/_distutils_hack',
-    'Lib/site-packages/distutils-precedence.pth',
-    'Lib/site-packages/distutils-precedence.py',
-    'Lib/site-packages/pytest',
-    'Lib/site-packages/_pytest',
-    'Lib/site-packages/iniconfig',
-    'Lib/site-packages/pluggy',
-  ] },
-  // The Agent Town build ships its own dependency tree.
-  { tree: 'resources/agent-town-dist/node_modules', drop: [
-    '.cache', '.vite', 'typescript', 'esbuild', '@esbuild', '@types',
-    '@typescript-eslint', 'eslint', 'vitest', '@vitest', 'vite', '@vitejs',
-    'prettier', 'postcss', 'autoprefixer', 'tailwindcss', '@tailwindcss',
-    'rollup', '@rollup', 'chai', 'jsdom', 'happy-dom',
-  ] },
-];
+// The trimming bought nothing and cost certainty: every dropped package
+// had to be argued safe. The NSIS installer ships the whole tree, so
+// trimming here also made the two Windows packages carry different
+// contents. The package now carries exactly what the installer carries.
+const TRIM = [];
 
 function isExcluded(rel) {
   if (!rel) return false;
@@ -299,9 +272,13 @@ const DISPLAY_NAME = 'KnockDesk';
 const PUBLISHER_DISPLAY_NAME = process.env.KNOCKDESK_PUBLISHER_DISPLAY || 'OpKnock';
 const DEFAULT_LANGUAGE = 'en-us';
 
+// The package identity name. A Store build uses the name Partner Center
+// assigned to the account; a sideload build uses the application's own.
+const IDENTITY_NAME = STORE_MODE ? STORE_IDENTITY : 'KnockDesk.DesktopApp';
+
 const MANIFEST = `<?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities" IgnorableNamespaces="uap rescap">
-  <Identity Name="KnockDesk.DesktopApp" Publisher="${readPublisher()}" Version="${VERSION}.0" ProcessorArchitecture="x64" />
+  <Identity Name="${IDENTITY_NAME}" Publisher="${readPublisher()}" Version="${VERSION}.0" ProcessorArchitecture="x64" />
   <Properties>
     <DisplayName>${DISPLAY_NAME}</DisplayName>
     <PublisherDisplayName>${PUBLISHER_DISPLAY_NAME}</PublisherDisplayName>
@@ -345,6 +322,13 @@ function pack() {
 
 // ------------------------------------------------------------------ sign ---
 function sign() {
+  if (STORE_MODE) {
+    // A Store package is submitted unsigned. Microsoft signs it once it
+    // accepts the submission, and signing it here with a personal
+    // certificate would contradict the publisher the manifest declares.
+    console.log('== signing skipped: this is a Store package, Microsoft signs it ==');
+    return;
+  }
   if (SKIP_SIGN) {
     console.log('== signing skipped ==');
     return;
