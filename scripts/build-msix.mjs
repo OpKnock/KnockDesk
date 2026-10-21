@@ -191,10 +191,12 @@ function buildLayout() {
   }
   copyTree(path.join(STAGE, 'resources'), path.join(LAYOUT, 'resources'), '');
 
-  // The store icons.
-  fs.mkdirSync(path.join(LAYOUT, 'assets'), { recursive: true });
+  // The store icons. The folder is named "Assets" with a capital A, the
+  // way Microsoft's own manifests spell it. The Store's validator looks
+  // the logo up by part name, and it does not fold case.
+  fs.mkdirSync(path.join(LAYOUT, 'Assets'), { recursive: true });
   for (const name of fs.readdirSync(ASSETS)) {
-    fs.copyFileSync(path.join(ASSETS, name), path.join(LAYOUT, 'assets', name));
+    fs.copyFileSync(path.join(ASSETS, name), path.join(LAYOUT, 'Assets', name));
   }
 
   // The installer icon sits at the package root. The NSIS stage already
@@ -204,7 +206,37 @@ function buildLayout() {
     console.log('   root icon:', fs.statSync(ICON).size, 'B');
   }
 
+  // An MSIX is signed as a whole, and the Appx signer refuses a package
+  // that contains an executable or a DLL carrying its own signature: the
+  // inner signature is computed over the file as it is and is already
+  // stale once the package is written. Two modules in the embedded
+  // Python runtime are signed, the Tcl and Tk libraries, and they are
+  // what stopped the package from signing. Stripping the signature
+  // changes nothing about the code, and the package's own signature
+  // covers the file from then on.
+  stripSignedBinaries();
+
   console.log('   layout files:', countFiles(LAYOUT));
+}
+
+/**
+ * Clear the Authenticode signature from every signed binary in the
+ * layout. The helper reports what it changed.
+ */
+function stripSignedBinaries() {
+  const script = path.join(ROOT, 'scripts', 'strip-pe-signatures.py');
+  if (!fs.existsSync(script)) {
+    console.log('   (no signature stripper, skipping)');
+    return;
+  }
+  try {
+    const out = execFileSync('python', [script, LAYOUT], { encoding: 'utf8' });
+    for (const line of out.split(/\r?\n/).filter((l) => l.trim())) {
+      console.log('   ' + line.trim());
+    }
+  } catch (e) {
+    console.log('   (could not strip signatures: ' + (e.message || '').slice(0, 60) + ')');
+  }
 }
 
 function copyTree(src, dest, prefix) {
@@ -238,27 +270,56 @@ function countFiles(dir) {
 }
 
 // -------------------------------------------------------------- manifest ---
+// The Store's validator checks four things that are easy to get wrong:
+//
+//   - the package must declare a language. Without a <Resources> section
+//     naming one, the validator reports that no language is supported,
+//     reports the default language as unsupported, and reads the
+//     display names as empty, because it has no language to resolve
+//     them against.
+//   - <Resources> comes AFTER <Dependencies>. The manifest is a
+//     sequence, not a set, and the packer rejects the other order.
+//   - the language tag is lower case, "en-us", the way the packages
+//     Microsoft ships use.
+//   - the logo paths are part names and use a backslash, the way
+//     Microsoft's own manifests write them, and the folder is spelled
+//     "Assets" with a capital A. The Store's validator looks the logo up
+//     by part name and does not fold case.
+//
+// The publisher display name is the one shown in the Store listing. It
+// has to match the display name on the Partner Center account, so it
+// comes from the same file as the publisher identity.
+const DISPLAY_NAME = 'KnockDesk';
+const PUBLISHER_DISPLAY_NAME = process.env.KNOCKDESK_PUBLISHER_DISPLAY || 'OpKnock';
+const DEFAULT_LANGUAGE = 'en-us';
+
 const MANIFEST = `<?xml version="1.0" encoding="utf-8"?>
-<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10">
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities" IgnorableNamespaces="uap rescap">
   <Identity Name="KnockDesk.DesktopApp" Publisher="${readPublisher()}" Version="${VERSION}.0" ProcessorArchitecture="x64" />
   <Properties>
-    <DisplayName>KnockDesk</DisplayName>
-    <PublisherDisplayName>OpKnock</PublisherDisplayName>
+    <DisplayName>${DISPLAY_NAME}</DisplayName>
+    <PublisherDisplayName>${PUBLISHER_DISPLAY_NAME}</PublisherDisplayName>
     <Description>Local-first desktop AI assistant with voice, personas, memory, skills and resident agents.</Description>
-    <Logo>assets\\StoreLogo.png</Logo>
+    <Logo>Assets\\StoreLogo.png</Logo>
   </Properties>
   <Dependencies>
     <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+    <TargetDeviceFamily Name="Windows.Core" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+    <TargetDeviceFamily Name="Windows.Team" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+    <TargetDeviceFamily Name="Windows.Holographic" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
   </Dependencies>
+  <Resources>
+    <Resource Language="${DEFAULT_LANGUAGE}" />
+  </Resources>
   <Applications>
     <Application Id="KnockDesk" Executable="KnockDesk.exe" EntryPoint="Windows.FullTrustApplication">
-      <uap:VisualElements xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
-        DisplayName="KnockDesk" Description="Local-first AI assistant" BackgroundColor="transparent"
-        Square150x150Logo="assets\\Square150x150Logo.png" Square44x44Logo="assets\\Square44x44Logo.png" />
+      <uap:VisualElements DisplayName="${DISPLAY_NAME}" Description="Local-first AI assistant" BackgroundColor="transparent"
+        Square150x150Logo="Assets\\Square150x150Logo.png" Square44x44Logo="Assets\\Square44x44Logo.png" />
     </Application>
   </Applications>
   <Capabilities>
-    <rescap:Capability xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities" Name="runFullTrust" />
+    <rescap:Capability Name="runFullTrust" />
     <Capability Name="internetClient" />
   </Capabilities>
 </Package>
