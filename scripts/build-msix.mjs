@@ -11,14 +11,17 @@
  * shows the KnockDesk mark rather than a placeholder.
  *
  * Usage:
- *   node scripts/build-msix.mjs                 build the package
- *   node scripts/build-msix.mjs --assets-only   regenerate the icons only
- *   node scripts/build-msix.mjs --skip-sign     build without signing
- *   node scripts/build-msix.mjs --store         build the Store submission
+ *   node scripts/build-msix.mjs                 build the Store submission
  *                                               package: the identity and
  *                                               publisher Partner Center
  *                                               assigned, submitted unsigned
  *                                               so Microsoft can sign it
+ *   node scripts/build-msix.mjs --skip-sign     build without signing
+ *   node scripts/build-msix.mjs --sideload      build the sideload package:
+ *                                               the application's own
+ *                                               identity, signed with a
+ *                                               personal certificate
+ *   node scripts/build-msix.mjs --assets-only   regenerate the icons only
  */
 import { execFileSync, execSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -40,7 +43,7 @@ const args = process.argv.slice(2);
 const ASSETS_ONLY = args.includes('--assets-only');
 const SKIP_SIGN = args.includes('--skip-sign');
 
-// --store builds the package for submission to the Microsoft Store.
+// The Store package is the default.
 //
 // Microsoft Partner Center assigns the package identity and the publisher
 // distinguished name. A submitted package must declare exactly those
@@ -52,15 +55,20 @@ const SKIP_SIGN = args.includes('--skip-sign');
 // package is unsigned. Signing it with a personal certificate first would
 // make the manifest's publisher inconsistent with the certificate and the
 // package would be rejected.
-const STORE_MODE = args.includes('--store');
+//
+// Building the wrong identity is the single easiest way to get a package
+// rejected, so the Store identity is what you get unless you ask for
+// something else. --sideload is the opt-in for the personal identity.
 const STORE_IDENTITY = 'OpKnock.KnockDesk';
 const STORE_PUBLISHER = 'CN=13E3D3C2-988F-4109-AD0E-42DE8604237C';
+const SIDELOAD_MODE = args.includes('--sideload');
+const STORE_MODE = !SIDELOAD_MODE;
 
 // The Store package is the one that goes to Partner Center, so it keeps the
 // plain name. The signed one is a sideload build for direct installation
 // and is named for what it is.
 const OUT = path.join(ROOT, 'dist',
-  STORE_MODE ? `KnockDesk-${VERSION}-x64.msix` : `KnockDesk-${VERSION}-x64-sideload.msix`);
+  SIDELOAD_MODE ? `KnockDesk-${VERSION}-x64-sideload.msix` : `KnockDesk-${VERSION}-x64.msix`);
 
 // A Store package must not be signed with a personal certificate: the
 // manifest declares the publisher Partner Center assigned, and the
@@ -68,10 +76,10 @@ const OUT = path.join(ROOT, 'dist',
 // that looks like a Store package and is not.
 if (STORE_MODE && (process.env.SIGN_PFX || process.env.SIGN_PFX_PASSWORD)) {
   throw new Error(
-    'A --store build is submitted unsigned: Microsoft signs it. ' +
+    'A Store package is submitted unsigned: Microsoft signs it. ' +
     'SIGN_PFX / SIGN_PFX_PASSWORD are set, which would sign it with a ' +
     'personal certificate and contradict the publisher the manifest declares. ' +
-    'Unset them, or build without --store.');
+    'Unset them, or build with --sideload.');
 }
 const MAKEAPPX = process.env.MAKEAPPX ||
   'C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/makeappx.exe';
@@ -93,8 +101,8 @@ function readPublisher() {
         process.env.KNOCKDESK_PUBLISHER !== STORE_PUBLISHER) {
       throw new Error(
         'KNOCKDESK_PUBLISHER is set to ' + JSON.stringify(process.env.KNOCKDESK_PUBLISHER) +
-        ' but a --store build must declare the publisher Partner Center assigned: ' +
-        JSON.stringify(STORE_PUBLISHER) + '. Unset the variable, or build without --store.');
+        ' but a Store package must declare the publisher Partner Center assigned: ' +
+        JSON.stringify(STORE_PUBLISHER) + '. Unset the variable, or build with --sideload.');
     }
     return STORE_PUBLISHER;
   }
@@ -272,8 +280,8 @@ const DISPLAY_NAME = 'KnockDesk';
 const PUBLISHER_DISPLAY_NAME = process.env.KNOCKDESK_PUBLISHER_DISPLAY || 'OpKnock';
 const DEFAULT_LANGUAGE = 'en-us';
 
-// The package identity name. A Store build uses the name Partner Center
-// assigned to the account; a sideload build uses the application's own.
+// The package identity name. A Store package uses the name Partner Center
+// assigned to the account; a sideload package uses the application's own.
 const IDENTITY_NAME = STORE_MODE ? STORE_IDENTITY : 'KnockDesk.DesktopApp';
 
 const MANIFEST = `<?xml version="1.0" encoding="utf-8"?>
