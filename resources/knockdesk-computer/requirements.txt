@@ -3,6 +3,8 @@
 # scipy, sklearn, pandas, selenium bhi maangta hai (~700 MB) magar s3 unhein
 # kabhi import nahi karta — is liye `--no-deps` se install hota hai aur
 # dependencies yahan haath se likhi hain (scripts/setup-computer-runtime.js).
+# filelock>=4.2.1: Pin to fix CVE-2026-1129xx vulnerabilities (transitive via CacheControl)
+filelock>=4.2.1
 gui-agents==0.3.2
 openai>=1.50,<3
 anthropic>=0.40
