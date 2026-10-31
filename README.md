@@ -166,7 +166,7 @@ The packaged application's Electron network guard supports these modes:
 | `KNOCKDESK_NET_MODE=open` | Disable the Electron network guard and restore the previous network behavior. |
 | `KNOCKDESK_ALLOW_HOSTS=example.com,api.example.org` | Add trusted hostnames to the strict-mode allowlist. |
 
-For additional Windows-level control, `scripts/ops/firewall-outbound.ps1` provides firewall rules for KnockDesk and supported companion processes. It uses `-WhatIf` by default; inspect the proposed changes before applying rules with elevated permissions.
+For additional Windows-level control, `scripts/ops/firewall-outbound.ps1` provides firewall rules for KnockDesk and supported companion processes. It uses `-WhatIf` by default; inspect the proposed changes before applying rules with elevated permissions
 
 ### Protection for packaged core files
 
