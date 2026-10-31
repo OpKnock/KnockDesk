@@ -1,0 +1,23 @@
+# KnockDesk Computer sidecar — Agent S3 ke liye SIRF wo packages jo uska s3 code
+# asal mein import karta hai. gui-agents ka apna setup.py paddleocr, cv2,
+# scipy, sklearn, pandas, selenium bhi maangta hai (~700 MB) magar s3 unhein
+# kabhi import nahi karta — is liye `--no-deps` se install hota hai aur
+# dependencies yahan haath se likhi hain (scripts/setup-computer-runtime.js).
+gui-agents==0.3.2
+openai>=1.50,<3
+anthropic>=0.40
+backoff>=2.2
+numpy>=1.26,<3
+pillow>=10
+pyautogui>=0.9.54
+# Saaf likha hua, halanke pyautogui ise mouseinfo ke zariye khud le aata hai.
+# Agent S ka `type` action Unicode matn clipboard se bhejta hai — pyperclip na
+# ho to uska fallback Linux ka `apt-get` chalane ki koshish karta hai, jo
+# Windows par nakaam hoti hai. Transitive dependency par bharosa karne ka
+# matlab hai ke kisi din wo hate aur Urdu/emoji typing chup-chaap toot jaye.
+pyperclip>=1.8
+pytesseract>=0.3.13
+tiktoken>=0.7
+pywin32>=306; platform_system == "Windows"
+pywinauto>=0.6.8; platform_system == "Windows"
+pyobjc; platform_system == "Darwin"

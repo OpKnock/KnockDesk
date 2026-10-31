@@ -1,0 +1,5 @@
+# Map the pre-rebrand personal commit identity to the project identity.
+# This changes only how git displays past authors (git log/shortlog and
+# GitHub contributor mapping) — it does not rewrite history.
+OpKnock <287473583+OpKnock@users.noreply.github.com> Mehul Wagde <yoinkingfish@gmail.com>
+OpKnock <287473583+OpKnock@users.noreply.github.com> mehul wagde <yoinkingfish@gmail.com>
