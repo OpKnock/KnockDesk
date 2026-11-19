@@ -182,7 +182,20 @@ function resolveHermesExe() {
  * `_ensureApprovalBypass()`.
  */
 function hermesSpawnEnv(extra = {}) {
-    return { ...process.env, HERMES_YOLO_MODE: '1', ...extra };
+    const env = { ...process.env, ...extra };
+    const explicitOptIn =
+        process.env.KNOCKDESK_ALLOW_UNAPPROVED_COMMANDS === '1' ||
+        extra.KNOCKDESK_ALLOW_UNAPPROVED_COMMANDS === '1';
+
+    // Keep Hermes' approval gate enabled by default. Unattended command
+    // execution is an explicit per-launch opt-in, never an implicit app default.
+    delete env.KNOCKDESK_ALLOW_UNAPPROVED_COMMANDS;
+    if (explicitOptIn) {
+        env.HERMES_YOLO_MODE = '1';
+    } else {
+        delete env.HERMES_YOLO_MODE;
+    }
+    return env;
 }
 
 module.exports = { resolveHermesExe, getBundledHermesExe, findRuntimeRoot, hermesSpawnEnv };
