@@ -161,14 +161,20 @@ async function createWindow(): Promise<BrowserWindow> {
     await mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   }
 
-  // Do not hold the window hidden while the Python runtime warms up on first run.
-  void initializeServices(mainWindow).catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error('[KnockDesk] Service initialization failed:', error);
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('knockdesk-startup-error', message);
-    }
-  });
+  // CI smoke mode verifies Electron + the React renderer without installing or
+  // launching the personal Hermes runtime. It is never enabled for normal runs.
+  if (process.env.KNOCKDESK_SMOKE_MODE === '1') {
+    console.log('[KnockDesk] Renderer smoke mode: sidecars intentionally disabled.');
+  } else {
+    // Do not hold the window hidden while the Python runtime warms up on first run.
+    void initializeServices(mainWindow).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[KnockDesk] Service initialization failed:', error);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('knockdesk-startup-error', message);
+      }
+    });
+  }
 
   return mainWindow;
 }
