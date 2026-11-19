@@ -5,7 +5,7 @@ import {
   Home, Layers3, LoaderCircle, MessageSquare, Network, RefreshCw,
   Settings2, ShieldCheck, Sparkles, Terminal, Zap,
 } from "lucide-react";
-import type { KnockDeskAgentTownState, KnockDeskRuntimeState } from "./bridge";
+import type { KnockDeskAgentTownState, KnockDeskRuntimeState, KnockDeskDesktopAPI } from "./bridge";
 
 type Page = "home" | "assistant" | "sessions" | "agenttown" | "memory" | "settings" | "system";
 type ToastState = { type: "ok" | "error" | "info"; message: string } | null;
@@ -32,8 +32,8 @@ const pageTitles: Record<Page, { title: string; subtitle: string }> = {
   settings: { title: "Settings & keys", subtitle: "Manage providers and runtime configuration." },
 };
 
-function getApi() {
-  return window.electronAPI;
+function getApi(): KnockDeskDesktopAPI | undefined {
+  return window.knockdeskAPI;
 }
 
 function errorMessage(error: unknown): string {
@@ -100,7 +100,7 @@ function EmbeddedView({
       if (message.channel === "knockdesk ai:open-external") {
         const target = message.args?.[0];
         if (typeof target === "string" && safeUrl(target)) {
-          void getApi()?.invoke("system-open", { target }).catch((error: unknown) => onError(errorMessage(error)));
+          void getApi()?.openExternal(target).catch((error: unknown) => onError(errorMessage(error)));
         }
       }
     });
@@ -147,15 +147,15 @@ function KnockDeskApp() {
       return;
     }
     try {
-      const next = await api.invoke("hermes:get-state") as KnockDeskRuntimeState;
+      const next = await api.getRuntimeState();
       setRuntime(next || { state: "idle" });
       const [hermesPreloadPath, nextAgentTown] = await Promise.all([
-        api.invoke("hermes:get-preload-path").catch(() => null),
-        api.invoke("agenttown:get-state").catch(() => ({ state: "idle" })),
+        api.getHermesPreloadPath().catch(() => null),
+        api.getAgentTownState().catch(() => ({ state: "idle" })),
       ]);
       setHermesPreload(typeof hermesPreloadPath === "string" ? hermesPreloadPath : null);
       setAgentTown(nextAgentTown || { state: "idle" });
-      const agentPreloadPath = await api.invoke("agenttown:get-preload-path").catch(() => null);
+      const agentPreloadPath = await api.getAgentTownPreloadPath().catch(() => null);
       setAgentTownPreload(typeof agentPreloadPath === "string" ? agentPreloadPath : null);
     } catch (error) {
       setRuntime({ state: "error", error: errorMessage(error) });
@@ -164,7 +164,7 @@ function KnockDeskApp() {
 
   const refreshMemory = useCallback(async () => {
     try {
-      const result = await getApi()?.invoke("hermes:memory-read");
+      const result = await getApi()?.readMemory();
       setMemory(result || { available: false, memory: "", user: "" });
     } catch (error) {
       setToast({ type: "error", message: errorMessage(error) });
@@ -174,7 +174,7 @@ function KnockDeskApp() {
   const refreshSystem = useCallback(async () => {
     setSystemBusy(true);
     try {
-      const result = await getApi()?.invoke("get-detailed-system-info");
+      const result = await getApi()?.getSystemInfo();
       setSystemInfo(result && typeof result === "object" ? result : { details: result });
     } catch (error) {
       setToast({ type: "error", message: errorMessage(error) });
@@ -186,9 +186,9 @@ function KnockDeskApp() {
   useEffect(() => {
     void refreshRuntime();
     const api = getApi();
-    const offHermes = api?.on("hermes-state", (state: KnockDeskRuntimeState) => setRuntime(state));
-    const offAgentTown = api?.on("agenttown-state", (state: KnockDeskAgentTownState) => setAgentTown(state));
-    const offStartupError = api?.on("knockdesk-startup-error", (message: string) => showError(String(message || "Service initialization failed.")));
+    const offHermes = api?.onRuntimeState((state: KnockDeskRuntimeState) => setRuntime(state));
+    const offAgentTown = api?.onAgentTownState((state: KnockDeskAgentTownState) => setAgentTown(state));
+    const offStartupError = api?.onStartupError((message: string) => showError(String(message || "Service initialization failed.")));
     const timer = window.setInterval(() => { void refreshRuntime(); }, 4000);
     const clockTimer = window.setInterval(() => setClock(new Date()), 30_000);
     return () => {
@@ -218,7 +218,7 @@ function KnockDeskApp() {
     if (runtime.state !== "ready") {
       setToast({ type: "info", message: "The assistant is starting. The chat view will connect when the runtime is ready." });
       try {
-        const result = await getApi()?.invoke("hermes:start");
+        const result = await getApi()?.startRuntime();
         if (result) setRuntime(result as KnockDeskRuntimeState);
       } catch (error) {
         setToast({ type: "error", message: errorMessage(error) });
@@ -230,7 +230,7 @@ function KnockDeskApp() {
     setPage("agenttown");
     if (agentTown.state !== "ready") {
       try {
-        const result = await getApi()?.invoke("agenttown:start");
+        const result = await getApi()?.startAgentTown();
         if (result) setAgentTown(result as KnockDeskAgentTownState);
       } catch (error) {
         setToast({ type: "error", message: errorMessage(error) });
@@ -243,7 +243,7 @@ function KnockDeskApp() {
     if (!instruction || memoryBusy) return;
     setMemoryBusy(true);
     try {
-      const result = await getApi()?.invoke("hermes:memory-request", { instruction });
+      const result = await getApi()?.requestMemory(instruction);
       if (result?.ok === false) throw new Error(result.error || "Memory update was rejected.");
       setMemoryInstruction("");
       setToast({ type: "ok", message: "Memory request sent to Hermes." });
