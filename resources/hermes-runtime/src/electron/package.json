@@ -12,7 +12,7 @@
     "bytenode": "bytenode --compile dist/main.js --output dist/main.jsc",
     "bytenode:verify": "node -e \"require('bytenode'); require('./dist/main.jsc'); console.log('main.jsc loads successfully')\"",
     "build:bytecode": "npm run compile && npm run bytenode",
-    "build:desktop": "node ../../../../../build-electron-main.mjs"
+    "build:staged": "node ../../../../build-electron-main.mjs"
   },
   "dependencies": {
     "electron": "^32.0.0"
