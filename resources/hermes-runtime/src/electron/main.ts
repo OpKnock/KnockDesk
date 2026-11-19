@@ -5,7 +5,7 @@
  * are local sidecars embedded by the renderer; the UI never blocks on a backend
  * startup timeout.
  */
-import { app, BrowserWindow, dialog } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import * as path from 'node:path';
 
 import {
@@ -83,6 +83,19 @@ async function createWindow(): Promise<BrowserWindow> {
   setMainWindow(mainWindow);
   if (!ipcHandlersRegistered) {
     registerDomainHandlers();
+    ipcMain.handle('knockdesk:open-external', async (_event, target: unknown) => {
+      let parsed: URL;
+      try {
+        parsed = new URL(String(target));
+      } catch {
+        throw new Error('Invalid external URL');
+      }
+      if (!['https:', 'http:', 'mailto:'].includes(parsed.protocol)) {
+        throw new Error('Unsupported external URL protocol');
+      }
+      await shell.openExternal(parsed.toString());
+      return true;
+    });
     ipcHandlersRegistered = true;
   }
 
