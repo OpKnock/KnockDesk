@@ -92,3 +92,28 @@ test('Hermes command approval is on by default; unattended mode requires explici
     else process.env.KNOCKDESK_ALLOW_UNAPPROVED_COMMANDS = previousOptIn;
   }
 });
+
+test('source-owned Electron startup has no Axios dependency', () => {
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  assert.ok(main.includes('DesktopHermesRuntime'));
+  assert.ok(main.includes('DesktopAgentTownRuntime'));
+  assert.ok(!main.includes("services/hermes-manager.js"));
+  assert.ok(!main.includes("services/agenttown-manager.js"));
+  const build = readFileSync(script, 'utf8');
+  for (const file of ['services/desktop-hermes-runtime.js', 'services/desktop-agenttown-runtime.js']) {
+    assert.ok(build.includes(file), 'build must validate ' + file);
+  }
+});
+
+test('dependency-free runtime controllers expose stable idle states without starting services', () => {
+  const require = createRequire(import.meta.url);
+  const { DesktopHermesRuntime } = require(resolve(root, 'resources/hermes-runtime/src/electron/services/desktop-hermes-runtime.js'));
+  const { DesktopAgentTownRuntime } = require(resolve(root, 'resources/hermes-runtime/src/electron/services/desktop-agenttown-runtime.js'));
+  const hermes = new DesktopHermesRuntime();
+  const agentTown = new DesktopAgentTownRuntime();
+  assert.equal(hermes.getState().state, 'idle');
+  assert.equal(hermes.getState().port, 9119);
+  assert.equal(agentTown.getState().state, 'idle');
+  assert.equal(agentTown.getState().port, 3010);
+  assert.equal(typeof hermes.readMemoryFiles().memory, 'string');
+});
