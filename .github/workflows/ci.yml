@@ -16,6 +16,17 @@ env:
   GIT_LFS_SKIP_SMUDGE: 0
 
 jobs:
+  electron-build-script:
+    name: Electron build script safety
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate script and staging isolation
+        run: node --test scripts/build-pipeline.test.mjs
+
   # 1. Quick lint / type checks (fast, no heavy deps)
   lint-and-typecheck:
     name: Lint & Typecheck
