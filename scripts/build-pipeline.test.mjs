@@ -27,3 +27,17 @@ test('build script never writes directly to production ASAR or bytecode', () => 
   assert.doesNotMatch(source, /cpSync\([^\n]*resources[/\\]app\.asar/);
   assert.match(source, /staging\/electron-main/);
 });
+
+test('preload points to emitted preload.js and renderer uses HTTP origin', () => {
+  const paths = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main/shared/paths.ts'), 'utf8');
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  assert.ok(paths.includes("path.resolve(__dirname, '../../preload.js')"));
+  assert.ok(main.includes('await hermesManager.start()'));
+  assert.ok(main.includes('manager.baseUrl'));
+});
+
+test('staging script includes CommonJS services', () => {
+  const source = readFileSync(script, 'utf8');
+  assert.ok(source.includes('copyRuntimeJs'));
+  assert.ok(source.includes('services/hermes-manager.js'));
+});
