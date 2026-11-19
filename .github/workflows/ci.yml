@@ -26,6 +26,8 @@ jobs:
           node-version: "22"
       - name: Validate script and staging isolation
         run: node --test scripts/build-pipeline.test.mjs
+      - name: Compile and stage maintained Electron sources
+        run: node build-electron-main.mjs
 
   # 1. Quick lint / type checks (fast, no heavy deps)
   lint-and-typecheck:
