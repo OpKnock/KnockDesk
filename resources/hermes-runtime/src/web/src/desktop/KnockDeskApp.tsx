@@ -184,7 +184,7 @@ function KnockDeskApp() {
   }, []);
 
   useEffect(() => {
-    void refreshRuntime();
+    const initialRefresh = window.setTimeout(() => { void refreshRuntime(); }, 0);
     const api = getApi();
     const offHermes = api?.onRuntimeState((state: KnockDeskRuntimeState) => setRuntime(state));
     const offAgentTown = api?.onAgentTownState((state: KnockDeskAgentTownState) => setAgentTown(state));
@@ -192,6 +192,7 @@ function KnockDeskApp() {
     const timer = window.setInterval(() => { void refreshRuntime(); }, 4000);
     const clockTimer = window.setInterval(() => setClock(new Date()), 30_000);
     return () => {
+      window.clearTimeout(initialRefresh);
       window.clearInterval(timer);
       window.clearInterval(clockTimer);
       offHermes?.();
@@ -209,8 +210,14 @@ function KnockDeskApp() {
   }, [toast]);
 
   useEffect(() => {
-    if (page === "memory" && !memory) void refreshMemory();
-    if (page === "system" && !systemInfo) void refreshSystem();
+    const timers: number[] = [];
+    if (page === "memory" && !memory) {
+      timers.push(window.setTimeout(() => { void refreshMemory(); }, 0));
+    }
+    if (page === "system" && !systemInfo) {
+      timers.push(window.setTimeout(() => { void refreshSystem(); }, 0));
+    }
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [page, memory, systemInfo, refreshMemory, refreshSystem]);
 
   const openAssistant = useCallback(async () => {
