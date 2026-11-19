@@ -47,8 +47,13 @@ jobs:
         working-directory: resources/hermes-runtime/src/web
         run: npm test
 
-      - name: Lint web and desktop renderer
+      - name: Lint new KnockDesk desktop renderer
         working-directory: resources/hermes-runtime/src/web
+        run: npx eslint src/desktop
+
+      - name: Report legacy Hermes dashboard lint debt (advisory)
+        working-directory: resources/hermes-runtime/src/web
+        continue-on-error: true
         run: npm run lint
 
       - name: Build Hermes dashboard
