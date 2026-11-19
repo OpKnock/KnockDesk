@@ -4,7 +4,7 @@
   "description": "KnockDesk Electron Main Process",
   "private": true,
   "type": "commonjs",
-  "main": "dist/main.js",
+  "main": "dist/bootstrap.js",
   "scripts": {
     "dev": "tsx watch main.ts",
     "build": "npm run compile",
