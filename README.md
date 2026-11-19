@@ -39,39 +39,52 @@ For diagnostics, launch with the remote-debugging flag (development only):
 .\KnockDesk.exe --remote-debugging-port=9222 --remote-allow-origins=*
 ```
 
-## Build from source (maintained components)
+## Build and run the source-owned KnockDesk desktop shell
 
-Requirements: Windows 10/11, Python 3.11, Node.js 22+.
+Requirements: Windows 10/11, Node.js 22+, Python 3.11 for the optional smoke test.
 
-**Important:** The checked-in TypeScript Electron entrypoint and Hermes web
-dashboard have not been proven equivalent to the original packaged desktop UI.
-Source builds must not replace `resources/main.jsc`, `resources/app.asar`,
-or `KnockDesk.exe` until runtime feature parity is tested.
+The maintained source-owned shell has a separate React renderer under
+`resources/hermes-runtime/src/web/src/desktop/`. It does not patch or replace
+the original packaged `resources/app.asar`, `resources/main.jsc`, or
+`KnockDesk.exe`. It provides a maintainable desktop surface for the Hermes
+chat/session UI, memory requests, runtime diagnostics, and the optional
+AgentTown visualizer. It is not a byte-for-byte recreation of the original
+shipped dashboard.
+
+### One-command development
+
+From the repository root:
 
 ```powershell
-# From the repository root: validate the staging build script
-node --test scripts/build-pipeline.test.mjs
-node build-electron-main.mjs --dry-run
-
-# Compile the maintained Electron main-process sources to staging/
-node build-electron-main.mjs
-
-# Build the separate Hermes web dashboard (NOT the shipped desktop UI)
-cd resources/hermes-runtime/src/web
-npm install
-npm run build
-npm test
+npm run dev
 ```
 
-The Electron script stages JavaScript and hand-written CommonJS dependencies in
-`staging/electron-main/dist/`; it does not produce a replacement `main.jsc`
-or a distributable installer. The maintained Electron entrypoint loads the
-Hermes dashboard over `http://127.0.0.1:9119` after its local backend starts;
-for development it uses the Vite server on port 5173. This corrects the
-API/token origin mismatch but does not recreate the shipped KnockDesk UI.
-The Vite dashboard targets `hermes_cli/web_dist/`, which is served by
-the Hermes Python dashboard. Replacing the packaged renderer requires
-a separate compatibility migration.
+The script installs the committed Electron/web workspace dependencies,
+compiles the Electron main process, starts Vite on `127.0.0.1:5174`, and
+launches the desktop shell. Use `Ctrl+C` to stop the development processes.
+
+Hermes requires a valid bundled runtime or an existing Hermes CLI installation.
+The source tree does not commit `resources/hermes-runtime/venv/`; if the
+runtime cannot be found, KnockDesk still opens and reports the runtime issue
+instead of silently exiting. AgentTown is optional and starts only when opened.
+
+### Validate and stage a build
+
+```powershell
+npm test
+npm run build:knockdesk
+```
+
+The build uses the lockfile at
+`resources/hermes-runtime/src/package-lock.json` and stages a verified source
+layout under `staging/electron-main/dist/`. It does not create a signed
+installer or overwrite the existing shipped binaries. GitHub Actions also
+builds the renderer and runs a Windows Electron smoke test.
+
+`npm run build` inside `resources/hermes-runtime/src/web` builds the separate
+Hermes Python-served management dashboard into `hermes_cli/web_dist/`. The
+KnockDesk desktop renderer is built separately by
+`npm run build:desktop --workspace web` from the workspace root.
 
 ## Validate
 
