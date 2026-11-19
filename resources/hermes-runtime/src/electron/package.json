@@ -4,13 +4,14 @@
   "description": "KnockDesk Electron Main Process",
   "private": true,
   "type": "commonjs",
-  "main": "dist/main.jsc",
+  "main": "dist/main.js",
   "scripts": {
     "dev": "tsx watch main.ts",
-    "build": "npm run compile && npm run bytenode",
+    "build": "npm run compile",
     "compile": "tsc --project tsconfig.build.json",
     "bytenode": "bytenode --compile dist/main.js --output dist/main.jsc",
-    "bytenode:verify": "node -e \"require('bytenode'); require('./dist/main.jsc'); console.log('main.jsc loads successfully')\""
+    "bytenode:verify": "node -e \"require('bytenode'); require('./dist/main.jsc'); console.log('main.jsc loads successfully')\"",
+    "build:bytecode": "npm run compile && npm run bytenode"
   },
   "dependencies": {
     "electron": "^32.0.0"
