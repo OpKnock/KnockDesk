@@ -83,6 +83,9 @@ jobs:
       - name: Compile maintained Python sources
         run: python -m compileall -q resources/knockdesk-computer resources/hermes-plugins scripts
 
+      - name: Install Ruff
+        run: python -m pip install --disable-pip-version-check ruff
+
       - name: Lint the repository secret scanner
         run: ruff check scripts/secret-scan.py
 
