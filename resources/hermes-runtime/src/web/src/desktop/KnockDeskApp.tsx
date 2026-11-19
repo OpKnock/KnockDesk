@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import type { KnockDeskAgentTownState, KnockDeskRuntimeState, KnockDeskDesktopAPI } from "./bridge";
 
-type Page = "home" | "assistant" | "sessions" | "agenttown" | "memory" | "settings" | "system";
+type Page = "home" | "assistant" | "sessions" | "files" | "models" | "logs" | "cron" | "skills" | "plugins" | "mcp" | "pairing" | "channels" | "webhooks" | "docs" | "agenttown" | "memory" | "settings" | "system";
 type ToastState = { type: "ok" | "error" | "info"; message: string } | null;
 type MemoryState = { available?: boolean; memory?: string; user?: string };
 type SystemInfo = Record<string, unknown>;
@@ -16,7 +16,18 @@ const nav: Array<{ id: Page; label: string; icon: typeof Home; group: string }> 
   { id: "home", label: "Overview", icon: Home, group: "WORKSPACE" },
   { id: "assistant", label: "AI Assistant", icon: MessageSquare, group: "WORKSPACE" },
   { id: "sessions", label: "Sessions", icon: Layers3, group: "WORKSPACE" },
+  { id: "files", label: "Files", icon: FileText, group: "WORKSPACE" },
+  { id: "models", label: "Models", icon: Cpu, group: "WORKSPACE" },
+  { id: "logs", label: "Logs", icon: Terminal, group: "WORKSPACE" },
+  { id: "cron", label: "Scheduled jobs", icon: Clock3, group: "WORKSPACE" },
   { id: "agenttown", label: "AgentTown", icon: Network, group: "WORKSPACE" },
+  { id: "skills", label: "Skills", icon: Sparkles, group: "MANAGE" },
+  { id: "plugins", label: "Plugins", icon: Zap, group: "MANAGE" },
+  { id: "mcp", label: "MCP tools", icon: Terminal, group: "MANAGE" },
+  { id: "pairing", label: "Pairing", icon: ShieldCheck, group: "MANAGE" },
+  { id: "channels", label: "Channels", icon: Network, group: "MANAGE" },
+  { id: "webhooks", label: "Webhooks", icon: Activity, group: "MANAGE" },
+  { id: "docs", label: "Documentation", icon: FileText, group: "MANAGE" },
   { id: "memory", label: "Memory", icon: Brain, group: "MANAGE" },
   { id: "system", label: "System health", icon: Activity, group: "MANAGE" },
   { id: "settings", label: "Settings & keys", icon: Settings2, group: "MANAGE" },
@@ -26,10 +37,37 @@ const pageTitles: Record<Page, { title: string; subtitle: string }> = {
   home: { title: "Your command center", subtitle: "A clear view of your local AI workspace." },
   assistant: { title: "AI Assistant", subtitle: "Chat with your local Hermes agent runtime." },
   sessions: { title: "Sessions", subtitle: "Continue a conversation or review recent work." },
+  files: { title: "Files", subtitle: "Browse files exposed by the Hermes dashboard." },
+  models: { title: "Models", subtitle: "Review and select available AI models." },
+  logs: { title: "Logs", subtitle: "Inspect runtime and agent activity." },
+  cron: { title: "Scheduled jobs", subtitle: "Review scheduled automation." },
+  skills: { title: "Skills", subtitle: "Manage skills available to the assistant." },
+  plugins: { title: "Plugins", subtitle: "Review installed extensions." },
+  mcp: { title: "MCP tools", subtitle: "Inspect Model Context Protocol integrations." },
+  pairing: { title: "Pairing", subtitle: "Manage desktop pairing sessions." },
+  channels: { title: "Channels", subtitle: "Configure messaging integrations." },
+  webhooks: { title: "Webhooks", subtitle: "Review webhook integrations." },
+  docs: { title: "Documentation", subtitle: "Browse the runtime's built-in guidance." },
   agenttown: { title: "AgentTown", subtitle: "Visualize agent activity in your workspace." },
   memory: { title: "Memory", subtitle: "Review and update the memory files managed by Hermes." },
   system: { title: "System health", subtitle: "Check the runtime and your local machine." },
   settings: { title: "Settings & keys", subtitle: "Manage providers and runtime configuration." },
+};
+
+const HERMES_ROUTES: Partial<Record<Page, string>> = {
+  assistant: "/chat",
+  sessions: "/sessions",
+  files: "/files",
+  models: "/models",
+  logs: "/logs",
+  cron: "/cron",
+  skills: "/skills",
+  plugins: "/plugins",
+  mcp: "/mcp",
+  pairing: "/pairing",
+  channels: "/channels",
+  webhooks: "/webhooks",
+  docs: "/docs",
 };
 
 function getApi(): KnockDeskDesktopAPI | undefined {
@@ -263,8 +301,9 @@ function KnockDeskApp() {
   };
 
   const runtimeUrl = useMemo(() => {
-    if (!runtime.url) return null;
-    try { return new URL(page === "sessions" ? "/sessions" : "/chat", runtime.url).toString(); }
+    const route = HERMES_ROUTES[page];
+    if (!runtime.url || !route) return null;
+    try { return new URL(route, runtime.url).toString(); }
     catch { return null; }
   }, [page, runtime.url]);
 
@@ -412,7 +451,7 @@ function KnockDeskApp() {
             </div>
           )}
 
-          {(page === "assistant" || page === "sessions") && (
+          {(["assistant", "sessions", "files", "models", "logs", "cron", "skills", "plugins", "mcp", "pairing", "channels", "webhooks", "docs"] as Page[]).includes(page) && (
             <div className="embedded-page">
               <div className="embedded-toolbar"><div><span className="eyebrow"><MessageSquare size={13} /> HERMES WORKSPACE</span><h1>{title.title}</h1></div><button className="secondary-button" onClick={() => void refreshRuntime()}><RefreshCw size={14} /> Refresh status</button></div>
               {runtime.state === "error" && <div className="inline-alert"><CircleAlert size={16} /><span>{runtime.error || "The Hermes runtime is unavailable."}</span><button onClick={() => void openAssistant()}>Restart</button></div>}
