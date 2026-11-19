@@ -133,7 +133,7 @@ def main() -> int:
 
                 page.get_by_role("button", name="System health").click()
                 page.get_by_text("Device report").wait_for(timeout=5000)
-                page.get_by_text("logicalProcessors", exact=False).wait_for(timeout=5000)
+                page.get_by_text("logical Processors", exact=False).wait_for(timeout=5000)
                 page.wait_for_timeout(500)
                 if page_errors:
                     raise AssertionError("Renderer JavaScript errors: " + " | ".join(page_errors))
