@@ -39,33 +39,35 @@ For diagnostics, launch with the remote-debugging flag (development only):
 .\KnockDesk.exe --remote-debugging-port=9222 --remote-allow-origins=*
 ```
 
-## Build from source
+## Build from source (maintained components)
 
 Requirements: Windows 10/11, Python 3.11, Node.js 22+.
 
-```bash
-# Web dashboard
+**Important:** The checked-in TypeScript Electron entrypoint and Hermes web
+dashboard have not been proven equivalent to the original packaged desktop UI.
+Source builds must not replace `resources/main.jsc`, `resources/app.asar`,
+or `KnockDesk.exe` until runtime feature parity is tested.
+
+```powershell
+# From the repository root: validate the staging build script
+node --test scripts/build-pipeline.test.mjs
+node build-electron-main.mjs --dry-run
+
+# Compile the maintained Electron main-process sources to staging/
+node build-electron-main.mjs
+
+# Build the separate Hermes web dashboard (NOT the shipped desktop UI)
 cd resources/hermes-runtime/src/web
-npm ci --prefer-offline --no-audit
-npm run build        # tsc -b && vite build
-npm test             # vitest run
-
-# Electron main process
-cd ../electron
-npm ci --prefer-offline --no-audit
-npx tsc --noEmit
-npm run compile      # tsc --project tsconfig.build.json
-npm run bytenode     # bytenode --compile dist/main.js --output dist/main.jsc
-
-# Terminal UI
-cd ../ui-tui
 npm install
 npm run build
-npm run typecheck
-
-# Repack the distributable bundle
-npx asar pack resources/app.asar.unpacked resources/app.asar
+npm test
 ```
+
+The Electron script stages JavaScript in `staging/electron-main/`; it does
+not produce a replacement `main.jsc` or a distributable installer.
+The Vite dashboard targets `hermes_cli/web_dist/`, which is served by
+the Hermes Python dashboard. Replacing the packaged renderer requires
+a separate compatibility migration.
 
 ## Validate
 
