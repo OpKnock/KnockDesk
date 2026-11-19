@@ -132,6 +132,7 @@ class AgentTownManager {
   // bundle. Set STONIC_AGENTTOWN_BUNDLED=1 to exercise the shipped path in dev.
   resolveRuntime() {
     const bundledCandidates = [
+      process.env.STONIC_AGENTTOWN_BUNDLED === '1' ? process.env.STONIC_AGENTTOWN_DIR : null,
       process.resourcesPath ? path.join(process.resourcesPath, 'agent-town-dist') : null,
       path.resolve(__dirname, '..', '..', 'agent-town-dist'),
     ];
