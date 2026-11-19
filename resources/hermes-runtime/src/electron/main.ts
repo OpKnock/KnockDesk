@@ -1,35 +1,26 @@
 /**
- * KnockDesk Electron main process.
+ * KnockDesk main process for the maintained, source-owned desktop UI.
  *
- * The main window loads the source-owned desktop renderer. Hermes and AgentTown
- * are local sidecars embedded by the renderer; the UI never blocks on a backend
- * startup timeout.
+ * The renderer receives a narrow bridge. Legacy UI IPC is deliberately not
+ * registered here; only the features shown in the maintained renderer are
+ * exposed, and external command execution keeps Hermes' approval gate enabled.
  */
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import * as os from 'node:os';
 import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
-import {
-  registerDomainHandlers,
-  setMainWindow,
-  setHermesManager,
-  setKnockDeskBridge,
-  setAgentTownManager,
-} from './main/ipc/index.js';
-import { ensureKnockDeskDirectories } from './main/bootstrap/knockdesk-bootstrap.js';
-import { KnockDeskBridge } from './services/knockdesk-bridge.js';
-import {
+const { ensureKnockDeskDirectories } = require('./main/bootstrap/knockdesk-bootstrap.js');
+const {
   ensureKnockDeskPlugin,
-  ensureKnockDeskComputerPlugin,
   ensureKnockDeskMemoryPlugin,
-} from './services/knockdesk-plugin.js';
-import { HermesManager } from './services/hermes-manager.js';
-import { AgentTownManager } from './services/agenttown-manager.js';
-import { registerDesktopHandlers } from './services/desktop-manager.js';
+} = require('./services/knockdesk-plugin.js');
+const { HermesManager } = require('./services/hermes-manager.js');
+const { AgentTownManager } = require('./services/agenttown-manager.js');
 
 let mainWindow: BrowserWindow | null = null;
-let hermesManager: InstanceType<typeof HermesManager> | null = null;
-let agentTownManager: InstanceType<typeof AgentTownManager> | null = null;
-let knockDeskBridge: InstanceType<typeof KnockDeskBridge> | null = null;
+let hermesManager: any = null;
+let agentTownManager: any = null;
 let ipcHandlersRegistered = false;
 let servicesPromise: Promise<void> | null = null;
 
@@ -47,7 +38,92 @@ if (!gotTheLock) {
   });
 }
 
+function stateFallback(state = 'starting', error: string | null = null) {
+  return { state, error, url: null, port: 0, external: false };
+}
+
+function registerDesktopIpc(): void {
+  if (ipcHandlersRegistered) return;
+
+  ipcMain.handle('knockdesk:open-external', async (_event, target: unknown) => {
+    let parsed: URL;
+    try {
+      parsed = new URL(String(target));
+    } catch {
+      throw new Error('Invalid external URL');
+    }
+    if (!['https:', 'http:', 'mailto:'].includes(parsed.protocol)) {
+      throw new Error('Unsupported external URL protocol');
+    }
+    await shell.openExternal(parsed.toString());
+    return true;
+  });
+
+  ipcMain.handle('knockdesk:runtime:get-state', () =>
+    hermesManager ? hermesManager.getState() : stateFallback());
+
+  ipcMain.handle('knockdesk:runtime:start', async () => {
+    if (!hermesManager) return stateFallback('starting', 'Hermes is still initializing.');
+    return hermesManager.start();
+  });
+
+  ipcMain.handle('knockdesk:runtime:preload', () => {
+    const filename = path.join(__dirname, 'hermes-preload.js');
+    return pathToFileURL(filename).toString();
+  });
+
+  ipcMain.handle('knockdesk:agenttown:get-state', () =>
+    agentTownManager ? agentTownManager.getState() : stateFallback('idle'));
+
+  ipcMain.handle('knockdesk:agenttown:start', async () => {
+    if (!agentTownManager) return stateFallback('starting', 'AgentTown is still initializing.');
+    return agentTownManager.start();
+  });
+
+  ipcMain.handle('knockdesk:agenttown:preload', () => {
+    const filename = path.join(__dirname, 'agenttown-preload.js');
+    return pathToFileURL(filename).toString();
+  });
+
+  ipcMain.handle('knockdesk:memory:read', () => {
+    if (!hermesManager) return { available: false, memory: '', user: '' };
+    return hermesManager.readMemoryFiles();
+  });
+
+  ipcMain.handle('knockdesk:memory:update', async (_event, instruction: unknown) => {
+    if (!hermesManager) return { ok: false, error: 'Hermes is not ready yet.' };
+    if (typeof instruction !== 'string' || !instruction.trim()) {
+      return { ok: false, error: 'Enter a memory instruction first.' };
+    }
+    if (instruction.length > 4000) {
+      return { ok: false, error: 'Memory instructions must be 4,000 characters or fewer.' };
+    }
+    return hermesManager.memoryRequest(instruction.trim());
+  });
+
+  ipcMain.handle('knockdesk:system:info', () => {
+    const cpus = os.cpus();
+    return {
+      platform: process.platform,
+      operatingSystem: os.type(),
+      release: os.release(),
+      architecture: os.arch(),
+      cpuModel: cpus[0]?.model ?? 'Unknown',
+      logicalProcessors: cpus.length,
+      totalMemoryBytes: os.totalmem(),
+      availableMemoryBytes: os.freemem(),
+      systemUptimeSeconds: os.uptime(),
+      nodeVersion: process.versions.node,
+      electronVersion: process.versions.electron,
+    };
+  });
+
+  ipcHandlersRegistered = true;
+}
+
 async function createWindow(): Promise<BrowserWindow> {
+  registerDesktopIpc();
+
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 940,
@@ -78,27 +154,6 @@ async function createWindow(): Promise<BrowserWindow> {
   mainWindow.once('ready-to-show', () => mainWindow?.show());
   mainWindow.on('closed', () => { mainWindow = null; });
 
-  // Register IPC exactly once. macOS can reopen windows without restarting
-  // the process; ipcMain.handle rejects duplicate registrations.
-  setMainWindow(mainWindow);
-  if (!ipcHandlersRegistered) {
-    registerDomainHandlers();
-    ipcMain.handle('knockdesk:open-external', async (_event, target: unknown) => {
-      let parsed: URL;
-      try {
-        parsed = new URL(String(target));
-      } catch {
-        throw new Error('Invalid external URL');
-      }
-      if (!['https:', 'http:', 'mailto:'].includes(parsed.protocol)) {
-        throw new Error('Unsupported external URL protocol');
-      }
-      await shell.openExternal(parsed.toString());
-      return true;
-    });
-    ipcHandlersRegistered = true;
-  }
-
   if (process.env.NODE_ENV === 'development') {
     const rendererUrl = process.env.KNOCKDESK_RENDERER_URL || 'http://127.0.0.1:5174/desktop.html';
     await mainWindow.loadURL(rendererUrl);
@@ -106,8 +161,7 @@ async function createWindow(): Promise<BrowserWindow> {
     await mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   }
 
-  // Show the interface first; do not leave a blank, hidden window while Hermes
-  // takes time to boot. Sidecar initialization reports its own failures to UI.
+  // Do not hold the window hidden while the Python runtime warms up on first run.
   void initializeServices(mainWindow).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     console.error('[KnockDesk] Service initialization failed:', error);
@@ -122,36 +176,32 @@ async function createWindow(): Promise<BrowserWindow> {
 async function initializeServices(window: BrowserWindow): Promise<void> {
   if (!servicesPromise) servicesPromise = initializeServicesOnce(window);
   await servicesPromise;
-
-  // The window may have been closed and recreated while sidecars were starting.
   if (hermesManager) hermesManager.mainWindow = window;
-  if (agentTownManager) agentTownManager.mainWindow = window;
+  if (agentTownManager) {
+    agentTownManager.mainWindow = window;
+    agentTownManager.setHermesManager(hermesManager);
+  }
 }
 
 async function initializeServicesOnce(window: BrowserWindow): Promise<void> {
   ensureKnockDeskDirectories(app);
   await ensureKnockDeskPlugin();
-  await ensureKnockDeskComputerPlugin();
   await ensureKnockDeskMemoryPlugin();
 
   hermesManager = new HermesManager();
   hermesManager.mainWindow = window;
-  setHermesManager(hermesManager);
 
   agentTownManager = new AgentTownManager();
   agentTownManager.mainWindow = window;
-  setAgentTownManager(agentTownManager);
+  agentTownManager.setHermesManager(hermesManager);
 
-  registerDesktopHandlers();
-
-  knockDeskBridge = new KnockDeskBridge({ userDataDir: app.getPath('userData') });
-  setKnockDeskBridge(knockDeskBridge);
-  await knockDeskBridge.start();
-
-  // HermesManager.start() waits for the HTTP API to become ready (up to several
-  // minutes on first boot), so intentionally do not await it in window startup.
+  // This manager performs bounded readiness polling and reports state events.
   void hermesManager.start().catch((error: unknown) => {
     console.error('[KnockDesk] Hermes start failed:', error);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('knockdesk-startup-error',
+        error instanceof Error ? error.message : String(error));
+    }
   });
 }
 
@@ -171,7 +221,6 @@ app.on('activate', () => {
 });
 
 app.on('before-quit', async () => {
-  await knockDeskBridge?.stop?.();
   await hermesManager?.stop?.();
   await agentTownManager?.stop?.();
 });
@@ -185,4 +234,4 @@ process.on('unhandledRejection', (reason) => {
   console.error('[KnockDesk] Unhandled rejection:', reason);
 });
 
-export { app, mainWindow, hermesManager, agentTownManager, knockDeskBridge };
+export { app, mainWindow, hermesManager, agentTownManager };
