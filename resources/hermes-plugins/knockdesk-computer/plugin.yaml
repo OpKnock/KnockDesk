@@ -1,0 +1,21 @@
+name: knockdesk-computer
+label: KnockDesk Computer Use
+kind: standalone
+version: 1.0.0
+description: >
+  Hermes को `computer_task` tool देता है — screen पर इंसान की तरह mouse
+  और keyboard चलाने वाला Agent S3 (KnockDesk desktop app के अंदर चलता है)।
+  यह plugin ख़ुद कुछ नहीं चलाता; सिर्फ़ desktop app के local bridge
+  (127.0.0.1) को काम देता है और नतीजे का इंतज़ार करता है। सिर्फ़ httpx
+  चाहिए, जो Hermes के पास पहले से है।
+author: KnockDesk
+
+requires_env:
+  - name: STONIC_BRIDGE_URL
+    description: "KnockDesk desktop app का local bridge (desktop app ख़ुद लिखती है)।"
+    prompt: "KnockDesk bridge URL"
+    password: false
+  - name: STONIC_BRIDGE_KEY
+    description: "Bridge का shared secret (desktop app ख़ुद लिखती है)।"
+    prompt: "KnockDesk bridge key"
+    password: true

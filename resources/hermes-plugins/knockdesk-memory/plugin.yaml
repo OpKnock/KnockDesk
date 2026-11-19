@@ -1,0 +1,17 @@
+name: knockdesk-memory
+label: KnockDesk Memory
+# `exclusive` = Hermes की वह क़िस्म जिस में एक वक़्त में एक ही provider चलता
+# है (memory)। इस क़िस्म का plugin `plugins.enabled` से नहीं, सिर्फ़ config के
+# `memory.provider: knockdesk-memory` से चलता है। कोई और क़िस्म लिखने पर
+# Hermes का आम loader इसे ख़ुद load करने की कोशिश करता, और उस के context
+# पर `register_memory_provider` होता ही नहीं।
+kind: exclusive
+version: 1.0.0
+description: >
+  KnockDesk Memory Core को Hermes का memory provider बना देता है: agent वही
+  याददाश्त पढ़ता और लिखता है जो KnockDesk का voice assistant इस्तेमाल करता है।
+  यह plugin ख़ुद कुछ store नहीं करता; सिर्फ़ KnockDesk desktop app के local bridge
+  (127.0.0.1, STONIC_BRIDGE_URL + STONIC_BRIDGE_KEY) से बात करता है। Desktop
+  app बंद हो या याददाश्त बंद हो तो चुप रहता है और Hermes अपनी built-in
+  memory के साथ पहले जैसा चलता है। सिर्फ़ Python की standard library।
+author: KnockDesk

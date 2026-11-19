@@ -1,0 +1,19 @@
+name: inventory
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  inventory:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python scripts/inventory.py
+      - run: dir KnockDesk.exe

@@ -1,0 +1,43 @@
+name: knockdesk-platform
+label: KnockDesk Mobile
+kind: platform
+version: 1.2.0
+description: >
+  KnockDesk mobile app को Hermes का एक messaging platform
+  बना देता है — बिल्कुल वैसे ही जैसे WhatsApp, Telegram या Discord हैं।
+
+  यह adapter ख़ुद internet से बात नहीं करता। वह KnockDesk desktop app के
+  अंदर चलते हुए एक छोटे से local bridge (127.0.0.1) से जुड़ा रहता है,
+  और desktop app ही Supabase Realtime के ज़रिए phone तक संदेश पहुँचाती
+  है। बिल्कुल वही तरीक़ा जो WhatsApp adapter का है (वह भी एक local Node
+  bridge से बात करता है) — इस से Hermes के Python packages में एक भी
+  नई चीज़ add नहीं करनी पड़ती। सिर्फ़ httpx चाहिए, जो पहले से है।
+author: KnockDesk
+
+requires_env:
+  - name: STONIC_BRIDGE_URL
+    description: "KnockDesk desktop app का local bridge (जैसे: http://127.0.0.1:8749)। Desktop app यह ख़ुद लिखती है।"
+    prompt: "KnockDesk bridge URL"
+    password: false
+  - name: STONIC_BRIDGE_KEY
+    description: "Bridge का shared secret। Desktop app यह ख़ुद बनाती और लिखती है।"
+    prompt: "KnockDesk bridge key"
+    password: true
+
+optional_env:
+  - name: STONIC_CHAT_ID
+    description: "KnockDesk account का user id — यही इस chat की पहचान है।"
+    prompt: "KnockDesk chat id"
+    password: false
+  - name: STONIC_ALLOWED_USERS
+    description: "वह KnockDesk user id जिन्हें बात करने की इजाज़त है (comma से अलग)।"
+    prompt: "Allowed KnockDesk users"
+    password: false
+  - name: STONIC_ALLOW_ALL_USERS
+    description: "हर उस व्यक्ति को इजाज़त जो bridge तक पहुँच जाए (सिर्फ़ development के लिए)।"
+    prompt: "Allow all users? (true/false)"
+    password: false
+  - name: STONIC_HOME_CHANNEL
+    description: "Cron और notifications किस chat पर जाएँ (default: STONIC_CHAT_ID)।"
+    prompt: "Home channel"
+    password: false

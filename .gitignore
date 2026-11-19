@@ -1,0 +1,37 @@
+# Build/runtime junk (regenerable).
+*.log
+__pycache__/
+*.pyc
+.tmp/
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+.ruff_cache/
+# NOTE: do NOT ignore *.exe — KnockDesk.exe ships via LFS.
+
+# Extracted archive trees (regenerable from the archives beside them).
+*.extracted/
+*-unpacked/
+
+# Local scratch (never commit).
+design-preview/
+staging/
+*.old-*
+.staging*/
+
+# Generated build output (rebuild via npm scripts).
+resources/hermes-runtime/src/electron/dist/
+resources/hermes-runtime/src/electron/build-output/
+
+# Local backup snapshots live OUTSIDE the repo (../KnockDesk-backups/).
+# The patterns below are guards in case one is ever copied back in.
+_app-asar-*.asar
+_frontend-*.zip
+_KnockDesk.exe.backup*
+_README-pre-opensource-*.md
+_stray-quarantine/
+asar-ui/
+asar-v2/
+asar-work/
+fix-asar*/

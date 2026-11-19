@@ -1,0 +1,8 @@
+# KnockDesk validation scripts dependencies
+# Install: pip install -r scripts/requirements.txt
+
+playwright>=1.40
+aiohttp>=3.9
+psutil>=5.9
+ruff>=0.5
+mypy>=1.10
