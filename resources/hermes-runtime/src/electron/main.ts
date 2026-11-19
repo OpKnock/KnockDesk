@@ -183,10 +183,7 @@ async function initializeServices(window: BrowserWindow): Promise<void> {
   if (!servicesPromise) servicesPromise = initializeServicesOnce(window);
   await servicesPromise;
   if (hermesManager) hermesManager.mainWindow = window;
-  if (agentTownManager) {
-    agentTownManager.mainWindow = window;
-    agentTownManager.setHermesManager(hermesManager);
-  }
+  if (agentTownManager) agentTownManager.mainWindow = window;
 }
 
 async function initializeServicesOnce(window: BrowserWindow): Promise<void> {
