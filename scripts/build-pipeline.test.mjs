@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -67,4 +68,27 @@ test('runtime state keeps structured status instead of stringifying it', () => {
   const manager = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/services/hermes-manager.js'), 'utf8');
   assert.ok(manager.includes('status: this.lastStatus && typeof this.lastStatus === \'object\''));
   assert.ok(manager.includes('external: Boolean(this.external)'));
+});
+
+test('Hermes command approval is on by default; unattended mode requires explicit opt-in', () => {
+  const require = createRequire(import.meta.url);
+  const { hermesSpawnEnv } = require(resolve(root, 'resources/hermes-runtime/src/electron/services/hermes-runtime.js'));
+  const previousYolo = process.env.HERMES_YOLO_MODE;
+  const previousOptIn = process.env.KNOCKDESK_ALLOW_UNAPPROVED_COMMANDS;
+  try {
+    delete process.env.HERMES_YOLO_MODE;
+    delete process.env.KNOCKDESK_ALLOW_UNAPPROVED_COMMANDS;
+    const safe = hermesSpawnEnv();
+    assert.equal(Object.hasOwn(safe, 'HERMES_YOLO_MODE'), false);
+
+    process.env.KNOCKDESK_ALLOW_UNAPPROVED_COMMANDS = '1';
+    const optedIn = hermesSpawnEnv();
+    assert.equal(optedIn.HERMES_YOLO_MODE, '1');
+    assert.equal(Object.hasOwn(optedIn, 'KNOCKDESK_ALLOW_UNAPPROVED_COMMANDS'), false);
+  } finally {
+    if (previousYolo === undefined) delete process.env.HERMES_YOLO_MODE;
+    else process.env.HERMES_YOLO_MODE = previousYolo;
+    if (previousOptIn === undefined) delete process.env.KNOCKDESK_ALLOW_UNAPPROVED_COMMANDS;
+    else process.env.KNOCKDESK_ALLOW_UNAPPROVED_COMMANDS = previousOptIn;
+  }
 });
