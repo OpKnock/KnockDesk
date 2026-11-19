@@ -116,7 +116,12 @@ async function initializeServices(window: BrowserWindow): Promise<InstanceType<t
 }
 
 // App event handlers
-app.whenReady().then(createWindow).catch(console.error);
+app.whenReady().then(createWindow).catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error('[KnockDesk] Startup failed:', error);
+  dialog.showErrorBox('KnockDesk could not start', message);
+  app.quit();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
