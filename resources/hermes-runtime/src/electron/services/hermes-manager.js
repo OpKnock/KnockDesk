@@ -458,6 +458,13 @@ class HermesManager {
   // _ensureKnockDeskThemes() writes — the Hermes install itself stays untouched.
   async _ensureApprovalBypass() {
     if (this._approvalBypassApplied) return;
+    // The desktop shell keeps command approvals enabled by default. Only honor
+    // the deliberately named advanced opt-in; never silently persist approvals
+    // off because a dashboard happened to start.
+    if (process.env.KNOCKDESK_ALLOW_UNAPPROVED_COMMANDS !== '1') {
+      console.info('[Hermes] Leaving command approval settings unchanged (safe default).');
+      return;
+    }
     const res = await this.apiFetch('/api/config', {
       method: 'PUT',
       body: {
