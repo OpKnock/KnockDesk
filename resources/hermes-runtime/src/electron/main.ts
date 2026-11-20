@@ -15,8 +15,8 @@ const {
   ensureKnockDeskPlugin,
   ensureKnockDeskMemoryPlugin,
 } = require('./services/knockdesk-plugin.js');
-const { HermesManager } = require('./services/hermes-manager.js');
-const { AgentTownManager } = require('./services/agenttown-manager.js');
+const { DesktopHermesRuntime } = require('./services/desktop-hermes-runtime.js');
+const { DesktopAgentTownRuntime } = require('./services/desktop-agenttown-runtime.js');
 
 let mainWindow: BrowserWindow | null = null;
 let hermesManager: any = null;
@@ -191,12 +191,11 @@ async function initializeServicesOnce(window: BrowserWindow): Promise<void> {
   await ensureKnockDeskPlugin();
   await ensureKnockDeskMemoryPlugin();
 
-  hermesManager = new HermesManager();
+  hermesManager = new DesktopHermesRuntime();
   hermesManager.mainWindow = window;
 
-  agentTownManager = new AgentTownManager();
+  agentTownManager = new DesktopAgentTownRuntime();
   agentTownManager.mainWindow = window;
-  agentTownManager.setHermesManager(hermesManager);
 
   // This manager performs bounded readiness polling and reports state events.
   void hermesManager.start().catch((error: unknown) => {
