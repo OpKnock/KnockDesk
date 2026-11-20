@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Scan first-party text sources for likely accidentally committed API keys.
 
 The scanner reports only a redacted match, never the full source line. It skips
