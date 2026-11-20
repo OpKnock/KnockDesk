@@ -15,7 +15,7 @@
     "build:staged": "node ../../../../build-electron-main.mjs"
   },
   "dependencies": {
-    "electron": "^32.0.0"
+    "electron": "44.7.2"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
