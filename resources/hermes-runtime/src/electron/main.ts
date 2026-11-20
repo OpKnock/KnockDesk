@@ -188,7 +188,13 @@ async function createWindow(): Promise<BrowserWindow> {
 }
 
 async function initializeServices(window: BrowserWindow): Promise<void> {
-  if (!servicesPromise) servicesPromise = initializeServicesOnce(window);
+  if (!servicesPromise) {
+    servicesPromise = initializeServicesOnce(window).catch((error: unknown) => {
+      // A failed first-run setup must not poison every subsequent Retry action.
+      servicesPromise = null;
+      throw error;
+    });
+  }
   await servicesPromise;
   if (hermesManager) hermesManager.mainWindow = window;
   if (agentTownManager) agentTownManager.mainWindow = window;
