@@ -62,6 +62,9 @@ async function main() {
   const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   run(npm, ['ci', '--workspace', 'electron', '--workspace', 'web',
     '--include-workspace-root=false', '--no-audit'], runtimeRoot);
+  // Electron 42+ downloads its platform binary on demand instead of during npm install.
+  // Make that step explicit so both fresh clones and CI have a runnable executable.
+  run(npm, ['exec', '--workspace', 'electron', '--', 'install-electron', '--no'], runtimeRoot);
   run(npm, ['run', 'compile', '--workspace', 'electron'], runtimeRoot);
 
   if (!existsSync(viteEntry)) throw new Error('Vite binary is missing after npm ci: ' + viteEntry);
