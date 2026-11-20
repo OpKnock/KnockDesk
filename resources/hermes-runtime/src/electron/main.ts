@@ -18,12 +18,13 @@ const {
 } = require('./services/knockdesk-plugin.js');
 const { DesktopHermesRuntime } = require('./services/desktop-hermes-runtime.js');
 const { DesktopAgentTownRuntime } = require('./services/desktop-agenttown-runtime.js');
+const { createRetryableInitializer } = require('./services/retryable-initializer.js');
+const initializeServicesOnceWithRetry = createRetryableInitializer(initializeServicesOnce);
 
 let mainWindow: BrowserWindow | null = null;
 let hermesManager: any = null;
 let agentTownManager: any = null;
 let ipcHandlersRegistered = false;
-let servicesPromise: Promise<void> | null = null;
 
 app.disableHardwareAcceleration();
 app.setAppUserModelId('com.knockdesk.app');
@@ -188,14 +189,7 @@ async function createWindow(): Promise<BrowserWindow> {
 }
 
 async function initializeServices(window: BrowserWindow): Promise<void> {
-  if (!servicesPromise) {
-    servicesPromise = initializeServicesOnce(window).catch((error: unknown) => {
-      // A failed first-run setup must not poison every subsequent Retry action.
-      servicesPromise = null;
-      throw error;
-    });
-  }
-  await servicesPromise;
+  await initializeServicesOnceWithRetry(window);
   if (hermesManager) hermesManager.mainWindow = window;
   if (agentTownManager) agentTownManager.mainWindow = window;
 }
