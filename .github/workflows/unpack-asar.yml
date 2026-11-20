@@ -2,6 +2,12 @@ name: Unpack KnockDesk ASAR
 
 on:
   workflow_dispatch:
+  # Self-test the extraction pipeline when its definition changes. Normal pushes
+  # do not rebuild/upload the large archive; use workflow_dispatch on demand.
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/unpack-asar.yml"
 
 permissions:
   contents: read
