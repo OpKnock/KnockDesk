@@ -271,7 +271,7 @@ test('development and Windows smoke flows install the Electron 44 binary on dema
 test('failed first-run initialization clears the cached promise so the user can retry', () => {
   const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
   assert.match(main, /createRetryableInitializer/);
-  assert.match(main, /initializeServicesOnceWithRetry\\(window\\)/);
+  assert.match(main, /initializeServicesOnceWithRetry\(window\)/);
 });
 
 test('retryable initializer deduplicates concurrent startup requests', async () => {
