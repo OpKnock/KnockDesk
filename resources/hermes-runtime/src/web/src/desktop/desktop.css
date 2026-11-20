@@ -38,7 +38,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .kd-workspace-pill { display: flex; align-items: center; gap: 9px; border: 1px solid var(--line-soft); background: rgba(255,255,255,.018); padding: 10px 11px; border-radius: 10px; color: #c4d0df; font-size: 11px; font-weight: 600; margin: 0 3px 25px; }
 .kd-workspace-pill svg:last-child { margin-left: auto; color: var(--text-3); }
 .pulse-dot, .local-chip span, .footer-dot, .nav-status-dot { border-radius: 50%; width: 7px; height: 7px; background: var(--green); box-shadow: 0 0 12px rgba(102,217,165,.35); flex-shrink: 0; }
-.kd-nav { display: flex; flex-direction: column; gap: 22px; }
+.kd-nav { display: flex; flex: 1 1 auto; min-height: 0; overflow-y: auto; flex-direction: column; gap: 22px; padding-right: 2px; scrollbar-width: thin; scrollbar-color: #273647 transparent; }
 .kd-nav-group { display: flex; flex-direction: column; gap: 4px; }
 .kd-nav-label { color: #6f7e93; font: 500 9px "DM Mono", monospace; letter-spacing: 1.35px; padding: 0 10px 8px; }
 .kd-nav-item { min-height: 39px; width: 100%; display: flex; align-items: center; gap: 11px; border: 1px solid transparent; border-radius: 9px; padding: 0 10px; background: transparent; color: #9aa8bc; font-size: 12px; font-weight: 600; text-align: left; cursor: pointer; transition: background .16s ease, color .16s ease, border-color .16s ease; }
