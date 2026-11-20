@@ -82,13 +82,13 @@ async function main() {
     KNOCKDESK_RENDERER_URL: rendererUrl,
     KNOCKDESK_NODE_MODULES: vendorModules,
     NODE_PATH: nodePathParts.join(delimiter),
-    STONIC_AGENTTOWN_DIR: join(repoRoot, 'resources/agent-town-dist'),
-    STONIC_AGENTTOWN_BUNDLED: '1',
+    KNOCKDESK_AGENTTOWN_DIR: join(repoRoot, 'resources/agent-town-dist'),
+    KNOCKDESK_AGENTTOWN_BUNDLED: '1',
   };
 
   const hermesExe = join(repoRoot, 'resources/hermes-runtime',
     process.platform === 'win32' ? 'venv/Scripts/hermes.exe' : 'venv/bin/hermes');
-  if (existsSync(hermesExe)) env.STONIC_HERMES_EXE = hermesExe;
+  if (existsSync(hermesExe)) env.KNOCKDESK_HERMES_EXE = hermesExe;
 
   let vite;
   let electron;

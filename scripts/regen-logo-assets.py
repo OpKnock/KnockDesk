@@ -2,7 +2,7 @@
 from PIL import Image
 import os
 
-ROOT = 'C:/Users/wagde/MegaProjects/KnockDesk'
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MASTER = ROOT + '/resources/public/knockdesk-logo-1024.png'
 
 im = Image.open(MASTER).convert('RGBA')

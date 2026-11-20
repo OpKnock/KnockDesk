@@ -480,7 +480,7 @@ class KnockDeskAdapter(BasePlatformAdapter):
     #  उस पर यह methods बुलाता है। जो adapter इन्हें नहीं लिखता, उसके लिए
     #  वह file एक सादी सी text लकीर बन कर रह जाती है:
     #
-    #      "📎 File: C:\\Users\\...\\report.pdf"
+    #      "📎 File: C:\\Users\\<account>\\report.pdf"
     #
     #  यानी phone पर एक ऐसा रास्ता जो उस पर खुलता ही नहीं। बिल्कुल यही
     #  पहले हो रहा था — user "वह file भेजो" कहता और उसे file का पता

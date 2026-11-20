@@ -135,11 +135,12 @@ function getBundledHermesExe() {
  *
  * Order: explicit override → the Hermes we ship → a hand-installed Hermes →
  * PATH. Shipping ours first is what makes a fresh install work with no setup;
- * a developer who wants their own build sets STONIC_HERMES_EXE.
+ * developers can set KNOCKDESK_HERMES_EXE (STONIC_HERMES_EXE remains a legacy alias).
  */
 function resolveHermesExe() {
     const candidates = [];
-    if (process.env.STONIC_HERMES_EXE) candidates.push(process.env.STONIC_HERMES_EXE);
+    const explicitExe = process.env.KNOCKDESK_HERMES_EXE || process.env.STONIC_HERMES_EXE;
+    if (explicitExe) candidates.push(explicitExe);
 
     const bundled = getBundledHermesExe();
     if (bundled) candidates.push(bundled);

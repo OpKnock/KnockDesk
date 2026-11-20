@@ -4,15 +4,15 @@ import sys
 import io
 import zipfile
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-ROOT = 'C:/Users/wagde/MegaProjects/KnockDesk'
-SKIP_DIRS = ('venv', '__pycache__', '.git', '.next')
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SKIP_DIRS = ('venv', '.venv', '__pycache__', '.git', '.next', 'staging')
 ARCH_EXTS = ('.asar', '.zip', '.whl', '.pak')
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 def walk_files():
     out = []
     for root, dirs, files in os.walk(ROOT):
-        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.endswith('.extracted') and not d.endswith('-unpacked')]
         for f in files:
             out.append(os.path.join(root, f))
     return out
@@ -91,19 +91,23 @@ myst = [os.path.relpath(p, ROOT) for p in walk_files()
 if myst:
     gaps.append('new-pack-types: ' + '; '.join(myst[:10]))
 
-# ---- 4. required docs + revert snapshots exist (backups live in ../KnockDesk-backups) ----
-for rel in ['NOTICE.md', 'README.md', 'LICENSE',
-            '../KnockDesk-backups/README-pre-opensource-20261014.md',
-            '../KnockDesk-backups/frontend-v1-20261014.zip',
-            '../KnockDesk-backups/app-asar-v1-working-20261014.asar']:
-    if not os.path.exists(os.path.join(ROOT, rel)):
+# ---- 4. required project docs; private backups are checked only when configured ----
+for rel in ['NOTICE.md', 'README.md', 'LICENSE']:
+    if not os.path.isfile(os.path.join(ROOT, rel)):
         gaps.append('missing-required: ' + rel)
 
-# ---- 5. README stays public-safe (no rebrand talk, no private paths) ----
+backup_dir = os.environ.get('KNOCKDESK_BACKUP_DIR')
+if backup_dir:
+    for name in ['README-pre-opensource-20261014.md',
+                 'frontend-v1-20261014.zip',
+                 'app-asar-v1-working-20261014.asar']:
+        if not os.path.exists(os.path.join(backup_dir, name)):
+            gaps.append('missing-configured-backup: ' + name)
+
+# ---- 5. README stays public-safe; absolute-path scans are handled centrally ----
 try:
     readme = open(os.path.join(ROOT, 'README.md'), encoding='utf-8').read()
-    bad = [w for w in ['rebrand', 'C:\\Users\\wagde', 'KnockDesk-ops', 'surgery']
-           if w in readme]
+    bad = [w for w in ['rebrand', 'KnockDesk-ops', 'surgery'] if w in readme]
     if bad:
         gaps.append('readme-clean: ' + '; '.join(bad))
 except Exception as e:
