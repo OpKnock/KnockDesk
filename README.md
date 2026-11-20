@@ -121,7 +121,7 @@ This scan does not remove identity from Git commit history or from the GitHub ac
 | resources/hermes-runtime/python/ | Embedded Python runtime and installed packages |
 | resources/browsers/ | Browser/FFmpeg payloads |
 | scripts/ | Build, unpack, validation and maintenance tooling |
-| docs/INVENTORY.md | Generated repository file inventory |
+| docs/INVENTORY.md | How to generate/download the file-by-file inventory |
 | .github/workflows/ | CI and inventory workflows |
 
 See [Build and source map](docs/BUILD_AND_SOURCE_MAP.md) for the authoritative source-vs-binary distinctions.
