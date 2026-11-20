@@ -275,7 +275,7 @@ test('failed first-run initialization clears the cached promise so the user can 
 });
 
 test('retryable initializer deduplicates concurrent startup requests', async () => {
-  const { createRetryableInitializer } = require(resolve(
+  const { createRetryableInitializer } = createRequire(import.meta.url)(resolve(
     root, 'resources/hermes-runtime/src/electron/services/retryable-initializer.js'
   ));
   let release;
@@ -297,7 +297,7 @@ test('retryable initializer deduplicates concurrent startup requests', async () 
 });
 
 test('retryable initializer permits a new attempt after rejection', async () => {
-  const { createRetryableInitializer } = require(resolve(
+  const { createRetryableInitializer } = createRequire(import.meta.url)(resolve(
     root, 'resources/hermes-runtime/src/electron/services/retryable-initializer.js'
   ));
   let calls = 0;
@@ -313,7 +313,7 @@ test('retryable initializer permits a new attempt after rejection', async () => 
 });
 
 test('retryable initializer rejects a missing callback clearly', () => {
-  const { createRetryableInitializer } = require(resolve(
+  const { createRetryableInitializer } = createRequire(import.meta.url)(resolve(
     root, 'resources/hermes-runtime/src/electron/services/retryable-initializer.js'
   ));
   assert.throws(() => createRetryableInitializer(null), /initialize must be a function/);
