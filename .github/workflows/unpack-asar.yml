@@ -25,31 +25,38 @@ jobs:
       - name: Verify archive is not an LFS pointer
         shell: pwsh
         run: |
-          @'
-          from pathlib import Path
-          archive = Path("resources/app.asar")
-          if not archive.is_file():
-              raise SystemExit("resources/app.asar is missing; verify Git LFS access.")
-          with archive.open("rb") as handle:
-              prefix = handle.read(80)
-          if prefix.startswith(b"version https://git-lfs.github.com/spec/v1"):
-              raise SystemExit("resources/app.asar is still an LFS pointer.")
-          print(f"Archive payload present: {archive.stat().st_size:,} bytes")
-          '@ | python -
+          $archive = "resources/app.asar"
+          if (-not (Test-Path -LiteralPath $archive -PathType Leaf)) {
+            throw "resources/app.asar is missing; verify Git LFS access."
+          }
+          $stream = [System.IO.File]::OpenRead($archive)
+          try {
+            $buffer = New-Object byte[] 80
+            $count = $stream.Read($buffer, 0, $buffer.Length)
+          } finally {
+            $stream.Dispose()
+          }
+          $prefix = [System.Text.Encoding]::UTF8.GetString($buffer, 0, $count)
+          if ($prefix.StartsWith("version https://git-lfs.github.com/spec/v1")) {
+            throw "resources/app.asar is still a Git LFS pointer."
+          }
+          Write-Host ("Archive payload present: {0:N0} bytes" -f (Get-Item $archive).Length)
 
       - name: List and extract original ASAR
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force staging | Out-Null
           npx --yes asar list resources/app.asar | Out-File -Encoding utf8 staging/asar-file-list.txt
+          if ($LASTEXITCODE -ne 0) { throw "ASAR listing failed." }
           npx --yes asar extract resources/app.asar staging/app.asar.extracted
-          @'
-          # KnockDesk ASAR extraction
-
-          Generated inspection copy of resources/app.asar.
-          Minified bundles remain minified; this process does not reconstruct missing source or V8 bytecode.
-          The original archive was not modified.
-          '@ | Out-File -Encoding utf8 staging/app.asar.extracted/EXTRACTION-README.md
+          if ($LASTEXITCODE -ne 0) { throw "ASAR extraction failed." }
+          @(
+            "# KnockDesk ASAR extraction",
+            "",
+            "Generated inspection copy of resources/app.asar.",
+            "Minified bundles remain minified; this process does not reconstruct missing source or V8 bytecode.",
+            "The original archive was not modified."
+          ) | Set-Content -Encoding utf8 staging/app.asar.extracted/EXTRACTION-README.md
 
       - name: Upload extracted files
         uses: actions/upload-artifact@v4
