@@ -258,3 +258,11 @@ test('source runtime accepts KnockDesk environment names and retains legacy alia
   assert.ok(agentTown.includes('process.env.KNOCKDESK_AGENTTOWN_DIR'));
   assert.ok(agentTown.includes('process.env.STONIC_AGENTTOWN_DIR'));
 });
+
+
+test('development and Windows smoke flows install the Electron 44 binary on demand', () => {
+  const dev = readFileSync(resolve(root, 'scripts/dev-knockdesk.mjs'), 'utf8');
+  const ci = readFileSync(resolve(root, '.github/workflows/ci.yml'), 'utf8');
+  assert.ok(dev.includes("'install-electron', '--no'"));
+  assert.ok(ci.includes('npm exec --workspace electron -- install-electron --no'));
+});
