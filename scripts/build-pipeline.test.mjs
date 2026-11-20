@@ -209,3 +209,19 @@ test('staging bundles the plugin source used by its first-run installer', () => 
   assert.ok(build.includes("'knockdesk-computer/plugin.yaml'"));
   assert.ok(build.includes("'knockdesk-memory/plugin.yaml'"));
 });
+
+test('runtime startup cannot spawn or mark ready after shutdown begins', () => {
+  const hermes = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/services/desktop-hermes-runtime.js'), 'utf8');
+  const agentTown = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/services/desktop-agenttown-runtime.js'), 'utf8');
+  assert.ok(hermes.includes('const firstProbe = await this._probe().catch(() => null);\n    if (this.stopping)'));
+  assert.ok(hermes.includes('const status = await this._probe().catch(() => null);\n      if (this.stopping)'));
+  assert.ok(agentTown.includes('const adopted = await probe(this.baseUrl).catch(() => null);\n    if (this.stopping)'));
+  assert.ok(agentTown.includes('const available = await isPortAvailable(candidate);\n      if (this.stopping)'));
+  assert.ok(agentTown.includes('const ready = await probe(this.baseUrl).catch(() => null);\n      if (this.stopping)'));
+});
+
+test('memory UI reports success only when IPC explicitly returns ok=true', () => {
+  const ui = readFileSync(resolve(root, 'resources/hermes-runtime/src/web/src/desktop/KnockDeskApp.tsx'), 'utf8');
+  assert.ok(ui.includes('if (!result || result.ok !== true)'));
+  assert.ok(ui.includes('The secure desktop bridge did not confirm a memory update.'));
+});
