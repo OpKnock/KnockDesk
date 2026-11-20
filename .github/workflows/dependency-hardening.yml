@@ -35,6 +35,9 @@ jobs:
           cache: npm
           cache-dependency-path: resources/hermes-runtime/src/package-lock.json
 
+      - name: Upgrade npm for workspace lockfile reliability
+        run: npm install --global npm@11
+
       - name: Refresh vulnerable dependency set
         working-directory: resources/hermes-runtime/src
         shell: bash
