@@ -1,0 +1,62 @@
+name: Unpack KnockDesk ASAR
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  extract:
+    name: Extract packaged app for inspection
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository and fetch LFS payloads
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Verify archive is not an LFS pointer
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+          archive = Path("resources/app.asar")
+          if not archive.is_file():
+              raise SystemExit("resources/app.asar is missing; verify Git LFS access.")
+          with archive.open("rb") as handle:
+              prefix = handle.read(80)
+          if prefix.startswith(b"version https://git-lfs.github.com/spec/v1"):
+              raise SystemExit("resources/app.asar is still an LFS pointer.")
+          print(f"Archive payload present: {archive.stat().st_size:,} bytes")
+          '@ | python -
+
+      - name: List and extract original ASAR
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force staging | Out-Null
+          npx --yes asar list resources/app.asar | Out-File -Encoding utf8 staging/asar-file-list.txt
+          npx --yes asar extract resources/app.asar staging/app.asar.extracted
+          @'
+          # KnockDesk ASAR extraction
+
+          Generated inspection copy of resources/app.asar.
+          Minified bundles remain minified; this process does not reconstruct missing source or V8 bytecode.
+          The original archive was not modified.
+          '@ | Out-File -Encoding utf8 staging/app.asar.extracted/EXTRACTION-README.md
+
+      - name: Upload extracted files
+        uses: actions/upload-artifact@v4
+        with:
+          name: KnockDesk-ASAR-extracted-${{ github.sha }}
+          path: |
+            staging/app.asar.extracted/
+            staging/asar-file-list.txt
+          if-no-files-found: error
+          retention-days: 7

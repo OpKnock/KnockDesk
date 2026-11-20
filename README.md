@@ -9,7 +9,7 @@ This repository contains two related but distinct desktop experiences:
 - **Packaged distribution:** KnockDesk.exe, resources/app.asar, and resources/main.jsc. These files form the currently shipped application. The compiled renderer and V8 bytecode are not the original TypeScript/React source.
 - **Source-owned desktop shell:** resources/hermes-runtime/src/electron/main.ts and resources/hermes-runtime/src/web/src/desktop/. This shell has its own build, test and Windows smoke-test path. It is maintainable source, but it is **not yet a feature-for-feature replacement** for every screen and behavior in the packaged UI.
 
-The source build produces a staging directory, not a signed installer or a release that replaces the existing binaries. CI results and known limitations are documented in [Build and source map](docs/BUILD_AND_SOURCE_MAP.md).
+The source build produces a staging directory, not a signed installer or a release that replaces the existing binaries. CI results and known limitations are documented in [Build and source map](docs/BUILD_AND_SOURCE_MAP.md) and the [Product-readiness audit](docs/PRODUCT_READINESS_AUDIT.md).
 
 ## Capabilities
 
@@ -86,7 +86,7 @@ The default extraction goes to resources/app.asar.extracted/, which is ignored b
 npm run repack:asar
 ~~~
 
-The rebuilt archive is written to resources/app.rebuilt.asar. The original resources/app.asar is never overwritten by the helper. See [Build and source map](docs/BUILD_AND_SOURCE_MAP.md) for boundaries between source, generated output, bytecode, binary payloads and external services.
+The rebuilt archive is written to resources/app.rebuilt.asar. The original resources/app.asar is never overwritten by the helper. You can also run the manual [Unpack KnockDesk ASAR workflow](https://github.com/OpKnock/KnockDesk/actions/workflows/unpack-asar.yml) to produce a downloadable extraction artifact for seven days; this is generated output, not recovered original source. See [Build and source map](docs/BUILD_AND_SOURCE_MAP.md) for boundaries between source, generated output, bytecode, binary payloads and external services.
 
 Unpacking an ASAR makes the bundled files inspectable; it does not recover TypeScript, React source maps, or the source for V8 bytecode. For durable dashboard changes, prefer the maintained source under resources/hermes-runtime/src/web/src/desktop/.
 
