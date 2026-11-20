@@ -14,6 +14,10 @@ const { hermesSpawnEnv, resolveHermesExe } = require('./hermes-runtime');
 
 const DEFAULT_PORT = Number.parseInt(process.env.KNOCKDESK_AGENTTOWN_PORT || process.env.STONIC_AGENTTOWN_PORT || '3010', 10);
 
+function isAgentTownHtml(contentType, html) {
+  return String(contentType).includes('text/html') && /<html[\\s>]/i.test(html) && html.includes('/_next/');
+}
+
 function probe(url, timeoutMs = 1200) {
   return new Promise((resolve, reject) => {
     const req = http.get(url, { timeout: timeoutMs, headers: { accept: 'text/html' } }, (res) => {
@@ -33,7 +37,7 @@ function probe(url, timeoutMs = 1200) {
         }
         const type = String(res.headers['content-type'] || '');
         const html = Buffer.concat(chunks).toString('utf8');
-        if (!type.includes('text/html') || !/<html[\\s>]/i.test(html) || !html.includes('/_next/')) {
+        if (!type.includes('text/html') || !isAgentTownHtml(type, html) || !html.includes('/_next/')) {
           reject(new Error('The listener is not an AgentTown Next.js page.'));
           return;
         }
@@ -235,4 +239,4 @@ class DesktopAgentTownRuntime {
   }
 }
 
-module.exports = { DesktopAgentTownRuntime };
+module.exports = { DesktopAgentTownRuntime, isAgentTownHtml };
