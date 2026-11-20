@@ -305,8 +305,12 @@ class DesktopHermesRuntime {
       };
       child.stdout?.on('data', collect);
       child.stderr?.on('data', collect);
-      child.once('error', (error) => finish({ ok: false, error: 'Hermes launch error: ' + error.message }));
+      child.once('error', (error) => {
+        this.memoryChildren.delete(child);
+        finish({ ok: false, error: 'Hermes launch error: ' + error.message });
+      });
       child.once('exit', (code) => {
+        this.memoryChildren.delete(child);
         const summary = output.trim().split(/\r?\n/).filter(Boolean).pop() || 'No response from Hermes.';
         finish(code === 0
           ? { ok: true, message: summary.slice(0, 500) }
