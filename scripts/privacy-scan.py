@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Scan first-party KnockDesk files for accidental contact/path leaks.
 
 Only file path, line number and category are printed, never the address or local
