@@ -12,6 +12,9 @@
     "dev:knockdesk": "node scripts/dev-knockdesk.mjs",
     "test": "node --test scripts/build-pipeline.test.mjs",
     "build:knockdesk": "node build-electron-main.mjs",
-    "check:knockdesk": "node --test scripts/build-pipeline.test.mjs && node build-electron-main.mjs"
+    "check:knockdesk": "node --test scripts/build-pipeline.test.mjs && node build-electron-main.mjs",
+    "list:asar": "node scripts/unpack-app-asar.mjs --list",
+    "unpack:asar": "node scripts/unpack-app-asar.mjs --extract",
+    "repack:asar": "node scripts/unpack-app-asar.mjs --pack"
   }
 }

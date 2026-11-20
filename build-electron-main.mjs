@@ -8,8 +8,8 @@
  * existing packaged app.asar, main.jsc, or KnockDesk.exe.
  */
 import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = dirname(fileURLToPath(import.meta.url));
@@ -101,8 +101,43 @@ function main() {
   mkdirSync(stagedDir, { recursive: true });
   cpSync(dist, join(stagedDir, 'dist'), { recursive: true });
 
-  // allowJs should emit these. Copying only absent files makes the staging
-  // operation resilient to future tsconfig changes without overwriting output.
+  writeFileSync(join(stagedDir, 'package.json'), JSON.stringify({
+    name: 'knockdesk-source-shell',
+    version: '1.0.0',
+    private: true,
+    type: 'commonjs',
+    main: 'dist/bootstrap.js',
+  }, null, 2) + '\n', 'utf8');
+
+  // Include the standalone AgentTown build because the desktop shell exposes it.
+  const agentTownSource = join(root, 'resources/agent-town-dist');
+  assertExists(agentTownSource, ['server.js', 'package.json']);
+  const stagedResources = join(stagedDir, 'resources');
+  mkdirSync(stagedResources, { recursive: true });
+  cpSync(agentTownSource, join(stagedResources, 'agent-town-dist'), {
+    recursive: true,
+    force: true,
+  });
+
+  // If a local Hermes venv is prepared, stage it and its source without workspace node_modules.
+  const hermesSource = join(root, 'resources/hermes-runtime');
+  const hermesVenv = join(hermesSource, 'venv');
+  let bundledHermesRuntime = false;
+  if (existsSync(hermesVenv)) {
+    const stagedHermes = join(stagedResources, 'hermes-runtime');
+    mkdirSync(stagedHermes, { recursive: true });
+    for (const folder of ['python', 'src', 'venv']) {
+      const source = join(hermesSource, folder);
+      if (!existsSync(source)) continue;
+      cpSync(source, join(stagedHermes, folder), {
+        recursive: true,
+        force: true,
+        filter: (sourcePath) => !sourcePath.split(sep).includes('node_modules'),
+      });
+    }
+    bundledHermesRuntime = existsSync(join(stagedHermes, 'venv', 'Scripts', 'hermes.exe'));
+  }
+
   for (const folder of ['main', 'services']) {
     copyMissingJs(join(electronDir, folder), join(stagedDir, 'dist', folder));
   }
@@ -117,17 +152,31 @@ function main() {
     'main/ipc/index.js',
     'main/ipc/system-handlers.js',
     'main/shared/paths.js',
-    'services/hermes-manager.js',
     'services/desktop-hermes-runtime.js',
     'services/desktop-agenttown-runtime.js',
-    'renderer/index.html',
+    'renderer/desktop.html',
     'pwa/icon-512.png',
   ]);
 
-  console.log('Staged Electron main, preloads, renderer and runtime modules:');
+  writeFileSync(join(stagedDir, 'BUILD-MANIFEST.json'), JSON.stringify({
+    schema: 1,
+    entry: 'dist/bootstrap.js',
+    renderer: 'dist/renderer/desktop.html',
+    agentTown: 'resources/agent-town-dist/server.js',
+    bundledHermesRuntime,
+    limitations: [
+      'This is source staging output, not a signed release installer.',
+      'The original packaged KnockDesk UI and V8 bytecode are not replaced.',
+      'A missing Hermes venv requires an installed Hermes CLI or separate runtime setup.',
+    ],
+  }, null, 2) + '\n', 'utf8');
+
+  console.log('Staged Electron application:');
   console.log(resolve(stagedDir));
+  console.log('AgentTown build included:', join(stagedResources, 'agent-town-dist'));
+  if (!bundledHermesRuntime) console.warn('Hermes venv was not staged; configure an installed Hermes CLI for agent features.');
   console.log('Existing KnockDesk.exe, resources/main.jsc and resources/app.asar were not modified.');
-  console.log('Staging is validated build output, not a signed release installer.');
+  console.log('Staging is launchable source output, not a signed release installer.');
 }
 
 main();

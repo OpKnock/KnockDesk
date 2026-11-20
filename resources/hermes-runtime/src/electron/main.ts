@@ -222,9 +222,15 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) void createWindow().catch(console.error);
 });
 
-app.on('before-quit', async () => {
-  await hermesManager?.stop?.();
-  await agentTownManager?.stop?.();
+let shutdownStarted = false;
+app.on('before-quit', (event) => {
+  if (shutdownStarted) return;
+  event.preventDefault();
+  shutdownStarted = true;
+  void Promise.allSettled([
+    Promise.resolve().then(() => hermesManager?.stop?.()),
+    Promise.resolve().then(() => agentTownManager?.stop?.()),
+  ]).finally(() => app.quit());
 });
 
 process.on('uncaughtException', (error) => {

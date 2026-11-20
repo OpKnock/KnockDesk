@@ -125,3 +125,39 @@ test('AgentTown rejects non-HTML or non-Next listeners and accepts real Next HTM
   assert.equal(isAgentTownHtml('application/json', '{"ok":true}'), false);
   assert.equal(isAgentTownHtml('text/html', '<html lang="en"><title>Not a Next app</title></html>'), false);
 });
+
+test('build assertions and Electron entrypoint agree on the Vite desktop HTML name', () => {
+  const build = readFileSync(script, 'utf8');
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  assert.ok(build.includes("'renderer/desktop.html'"));
+  assert.equal(build.includes("'renderer/index.html'"), false);
+  assert.ok(main.includes("path.join(__dirname, 'renderer', 'desktop.html')"));
+  assert.ok(build.includes("main: 'dist/bootstrap.js'"));
+  assert.ok(build.includes("join(stagedResources, 'agent-town-dist')"));
+});
+
+test('memory bridge payload matches the main-process string contract', () => {
+  const preload = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/desktop-preload.js'), 'utf8');
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  assert.ok(preload.includes("String(instruction ?? '').trim()"));
+  assert.ok(preload.includes("'knockdesk:memory:update',\n    String(instruction ?? '').trim()"));
+  assert.ok(main.includes("typeof instruction !== 'string'"));
+  assert.ok(!preload.includes("'knockdesk:memory:update', {\n    instruction:"));
+});
+
+test('ASAR helper documents safe list, extract and pack operations', () => {
+  const helper = resolve(root, 'scripts/unpack-app-asar.mjs');
+  const check = spawnSync(process.execPath, ['--check', helper], { encoding: 'utf8' });
+  assert.equal(check.status, 0, check.stderr);
+  const help = spawnSync(process.execPath, [helper, '--help'], { cwd: root, encoding: 'utf8' });
+  assert.equal(help.status, 0, help.stderr);
+  assert.match(help.stdout, /original resources\/app\.asar is never overwritten/i);
+});
+
+test('desktop shutdown waits for child runtime cleanup before quitting', () => {
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  assert.ok(main.includes('event.preventDefault()'));
+  assert.ok(main.includes('Promise.allSettled'));
+  assert.ok(main.includes('hermesManager?.stop?.()'));
+  assert.ok(main.includes('agentTownManager?.stop?.()'));
+});

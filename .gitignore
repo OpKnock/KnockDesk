@@ -35,3 +35,6 @@ asar-ui/
 asar-v2/
 asar-work/
 fix-asar*/
+
+# Repacked ASAR inspection artifact; never overwrite or commit it accidentally.
+resources/app.rebuilt.asar
