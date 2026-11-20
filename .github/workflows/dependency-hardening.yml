@@ -1,4 +1,4 @@
-name: One-time final dependency hardening
+name: One-time dependency hardening
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: knockdesk-final-dependency-hardening
+  group: knockdesk-dependency-hardening
   cancel-in-progress: false
 
 jobs:
@@ -41,36 +41,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          node <<'NODE'
-          const fs = require('fs');
+          npm install --package-lock-only --ignore-scripts --no-audit --workspace electron --save-exact electron@44.7.2
+          npm install --package-lock-only --ignore-scripts --no-audit --workspace web react-router-dom@^7.18.2
+          npm install --package-lock-only --ignore-scripts --no-audit --workspace web --save-dev vitest@4.1.11
+          npm install --package-lock-only --ignore-scripts --no-audit --workspace web sanitize-html@2.17.7
 
-          function update(path, fn) {
-            const data = JSON.parse(fs.readFileSync(path, 'utf8'));
-            fn(data);
-            fs.writeFileSync(path, JSON.stringify(data, null, 2) + '\n');
-          }
-
-          update('electron/package.json', (pkg) => {
-            pkg.dependencies.electron = '44.7.2';
-          });
-
-          update('web/package.json', (pkg) => {
-            pkg.dependencies['react-router-dom'] = '^7.18.2';
-            pkg.devDependencies.vitest = '^4.1.11';
-          });
-
-          update('package.json', (pkg) => {
-            pkg.overrides = {
-              ...(pkg.overrides || {}),
-              '@vitest/mocker': '4.1.11',
-              'sanitize-html': '2.17.7'
-            };
-          });
-          NODE
-
-          npm install --package-lock-only --ignore-scripts --no-audit --force
-
-          npm update --package-lock-only --ignore-scripts --no-audit             browserslist baseline-browser-mapping colord js-yaml postcss             sanitize-html source-map-js nanoid brace-expansion vitest @vitest/mocker
+          npm update --package-lock-only --ignore-scripts --no-audit             browserslist baseline-browser-mapping colord js-yaml postcss             source-map-js nanoid brace-expansion
 
       - name: Install validated workspaces
         working-directory: resources/hermes-runtime/src
@@ -108,7 +84,7 @@ jobs:
 
           git rm .github/workflows/dependency-hardening.yml
 
-          allowed='^(.github/workflows/dependency-hardening.yml|resources/hermes-runtime/src/package.json|resources/hermes-runtime/src/package-lock.json|resources/hermes-runtime/src/electron/package.json|resources/hermes-runtime/src/web/package.json)$'
+          allowed='^(.github/workflows/dependency-hardening.yml|resources/hermes-runtime/src/package-lock.json|resources/hermes-runtime/src/electron/package.json|resources/hermes-runtime/src/web/package.json)$'
           unexpected="$(git status --porcelain | sed -E 's/^.. //' | grep -Ev "$allowed" || true)"
           if [[ -n "$unexpected" ]]; then
             echo "::error::Unexpected modified files:"
@@ -120,6 +96,6 @@ jobs:
           git config user.name 'OpKnock'
           git config user.email "$gh_email"
 
-          git add resources/hermes-runtime/src/package.json resources/hermes-runtime/src/package-lock.json resources/hermes-runtime/src/electron/package.json resources/hermes-runtime/src/web/package.json
+          git add resources/hermes-runtime/src/package-lock.json resources/hermes-runtime/src/electron/package.json resources/hermes-runtime/src/web/package.json
           git commit -m 'chore: harden desktop dependencies'
           git push origin HEAD:main
