@@ -225,3 +225,13 @@ test('memory UI reports success only when IPC explicitly returns ok=true', () =>
   assert.ok(ui.includes('if (!result || result.ok !== true)'));
   assert.ok(ui.includes('The secure desktop bridge did not confirm a memory update.'));
 });
+
+test('shutdown waits for owned runtime and one-shot memory processes to exit', () => {
+  const hermes = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/services/desktop-hermes-runtime.js'), 'utf8');
+  const agentTown = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/services/desktop-agenttown-runtime.js'), 'utf8');
+  assert.ok(hermes.includes('const memoryChildren = [...this.memoryChildren]'));
+  assert.ok(hermes.includes('...memoryChildren.map((child) => stopOwnedChild(child))'));
+  assert.ok(hermes.includes('const pendingStart = this.startPromise'));
+  assert.ok(agentTown.includes('await Promise.allSettled(['));
+  assert.ok(agentTown.includes('stopOwnedChild(ownedChild)'));
+});
