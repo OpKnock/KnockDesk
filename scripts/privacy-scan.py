@@ -3,6 +3,7 @@
 Only file path, line number and category are printed, never the address or local
 username itself. Third-party and generated trees are excluded.
 """
+
 from __future__ import annotations
 
 import os
