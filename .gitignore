@@ -36,5 +36,11 @@ asar-v2/
 asar-work/
 fix-asar*/
 
+# Editor and tool backup files (do not commit stale source copies).
+*.backup
+*.bak
+*.orig
+*~
+
 # Repacked ASAR inspection artifact; never overwrite or commit it accidentally.
 resources/app.rebuilt.asar

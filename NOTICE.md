@@ -2,6 +2,8 @@
 
 KnockDesk combines first-party application code with third-party runtimes, libraries, bundled applications, native modules, and binary assets. This notice is an attribution and release-review aid, not legal advice or a release-specific software bill of materials (SBOM).
 
+**License scope:** The root Apache-2.0 license applies to KnockDesk-authored code identified as first-party. It does not override the MIT license retained by the Hermes-Agent source tree or the individual licenses and notices of other bundled components. A file's presence in this repository does not, by itself, make that file first-party or grant redistribution rights.
+
 First-party KnockDesk code is licensed under the Apache License 2.0; see [LICENSE](LICENSE). Third-party components retain their own terms. Keep applicable upstream copyright notices, license texts, and attribution files when modifying or redistributing those components.
 
 **Version note:** versions below are recorded in the current repository inventory or package metadata. They must be reconciled against the exact release payload before distribution.

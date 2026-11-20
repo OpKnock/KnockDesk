@@ -35,6 +35,22 @@ class MaintenanceToolTests(unittest.TestCase):
                 module["unpack_zip"](archive)
             self.assertFalse((temporary_path / "escaped.txt").exists())
 
+    def test_env_example_is_included_in_secret_scanning(self) -> None:
+        scanner = load_script("secret-scan.py")
+        self.assertNotIn(".env.example", scanner["SKIP_NAMES"])
+        self.assertIn(
+            "resources/hermes-runtime/src/.env.example",
+            scanner["DEFAULT_PATHS"],
+        )
+        findings = scanner["scan_file"](
+            ROOT / "resources" / "hermes-runtime" / "src" / ".env.example"
+        )
+        self.assertEqual(
+            findings,
+            [],
+            "Example configuration must contain placeholders, never live-looking credentials.",
+        )
+
     def test_privacy_scan_detects_windows_paths_with_forward_slashes(self) -> None:
         module = load_script("privacy-scan.py")
         synthetic_path = "C:" + "/" + "Users/" + "privacytest/" + "project"

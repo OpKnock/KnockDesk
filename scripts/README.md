@@ -28,10 +28,10 @@ npm run test:maintenance
 | Command | Output |
 |---|---|
 | `npm run check:privacy` | Reports likely email-address and absolute-home-path leaks in selected first-party text files |
-| `npm run check:secrets` | Reports redacted matches for known API-key patterns |
+| `npm run check:secrets` | Reports redacted matches for known API-key patterns, including the Hermes example environment file |
 | `npm run inventory` | Writes a file/size report to `staging/INVENTORY.md` |
 
-These are targeted scanners, not proof that binary metadata, generated bundles, Git history, upstream code, or every third-party payload is free of secrets or personal data.
+These are targeted scanners, not proof that binary metadata, generated bundles, Git history, upstream code, or every third-party payload is free of secrets or personal data. The checked-in `.env.example` must use placeholders only and is included in the secret scan.
 
 ## Archive inspection
 

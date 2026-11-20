@@ -29,7 +29,6 @@ SKIP_DIRS = {
     "agent-town-dist",
 }
 SKIP_NAMES = {
-    ".env.example",
     "package-lock.json",
     "pnpm-lock.yaml",
     "yarn.lock",
@@ -54,6 +53,7 @@ PLACEHOLDER = re.compile(
 DEFAULT_PATHS = (
     ".github",
     "scripts",
+    "resources/hermes-runtime/src/.env.example",
     "resources/hermes-runtime/src/electron",
     "resources/hermes-runtime/src/web/src",
     "resources/knockdesk-computer",
