@@ -13,6 +13,7 @@ import { pathToFileURL } from 'node:url';
 const { ensureKnockDeskDirectories } = require('./main/bootstrap/knockdesk-bootstrap.js');
 const {
   ensureKnockDeskPlugin,
+  ensureKnockDeskComputerPlugin,
   ensureKnockDeskMemoryPlugin,
 } = require('./services/knockdesk-plugin.js');
 const { DesktopHermesRuntime } = require('./services/desktop-hermes-runtime.js');
@@ -204,11 +205,22 @@ async function initializeServicesForIpc(): Promise<boolean> {
 
 async function initializeServicesOnce(window: BrowserWindow): Promise<void> {
   ensureKnockDeskDirectories(app);
-  await ensureKnockDeskPlugin();
-  await ensureKnockDeskMemoryPlugin();
 
   hermesManager = new DesktopHermesRuntime();
   hermesManager.mainWindow = window;
+  const hermesHome = hermesManager.getHermesHome();
+
+  // Install/update first-party plugins before launching the gateway. A missing
+  // optional plugin must be observable, but should not prevent the desktop UI
+  // from starting when a user's Hermes environment is unavailable.
+  const pluginResults = await Promise.all([
+    ensureKnockDeskPlugin(hermesHome),
+    ensureKnockDeskComputerPlugin(hermesHome),
+    ensureKnockDeskMemoryPlugin(hermesHome),
+  ]);
+  for (const result of pluginResults) {
+    if (!result.ok) console.warn('[KnockDesk] Plugin setup was incomplete:', result.error);
+  }
 
   agentTownManager = new DesktopAgentTownRuntime();
   agentTownManager.mainWindow = window;

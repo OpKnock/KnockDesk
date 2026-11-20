@@ -119,6 +119,19 @@ function main() {
     force: true,
   });
 
+  // First-party plugins must accompany a staged source shell. These are copied
+  // as source; they are installed into the user's Hermes home only at startup.
+  const pluginsSource = join(root, 'resources/hermes-plugins');
+  assertExists(pluginsSource, [
+    'knockdesk/plugin.yaml',
+    'knockdesk-computer/plugin.yaml',
+    'knockdesk-memory/plugin.yaml',
+  ]);
+  cpSync(pluginsSource, join(stagedResources, 'hermes-plugins'), {
+    recursive: true,
+    force: true,
+  });
+
   // If a local Hermes venv is prepared, stage it and its source without workspace node_modules.
   const hermesSource = join(root, 'resources/hermes-runtime');
   const hermesVenv = join(hermesSource, 'venv');

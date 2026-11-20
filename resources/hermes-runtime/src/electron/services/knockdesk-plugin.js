@@ -86,6 +86,11 @@ function pluginTargetDir(hermesHome, name = PLUGIN_NAME) {
 function pluginSourceDir(name = PLUGIN_NAME) {
   const candidates = [
     process.resourcesPath ? path.join(process.resourcesPath, 'hermes-plugins', name) : null,
+    // Source-staged app: dist/services -> app root -> resources/hermes-plugins.
+    path.resolve(__dirname, '..', '..', 'resources', 'hermes-plugins', name),
+    // Source checkout layout (raw services) and compiled Electron dist layout.
+    path.resolve(__dirname, '..', '..', '..', '..', 'hermes-plugins', name),
+    path.resolve(__dirname, '..', '..', '..', '..', '..', 'hermes-plugins', name),
     path.join(__dirname, '..', '..', 'hermes-plugins', name),
   ].filter(Boolean);
 

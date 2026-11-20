@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { dirname, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const script = resolve(root, 'build-electron-main.mjs');
@@ -175,4 +176,36 @@ test('manual ASAR extraction workflow exposes a downloadable artifact', () => {
   assert.ok(workflow.includes('workflow_dispatch:'));
   assert.ok(workflow.includes('npx --yes asar extract'));
   assert.ok(workflow.includes('actions/upload-artifact@v4'));
+});
+
+test('first-run setup installs every first-party plugin into the supplied Hermes home', () => {
+  const require = createRequire(import.meta.url);
+  const plugins = require(resolve(root, 'resources/hermes-runtime/src/electron/services/knockdesk-plugin.js'));
+  const home = mkdtempSync(join(tmpdir(), 'knockdesk-plugin-test-'));
+  try {
+    const results = [
+      plugins.ensureKnockDeskPlugin(home),
+      plugins.ensureKnockDeskComputerPlugin(home),
+      plugins.ensureKnockDeskMemoryPlugin(home),
+    ];
+    for (const result of results) assert.equal(result.ok, true, result.error);
+    for (const relativePath of [
+      'plugins/knockdesk/adapter.py',
+      'plugins/knockdesk/activity.py',
+      'plugins/knockdesk-computer/tool.py',
+      'plugins/knockdesk-memory/__init__.py',
+    ]) {
+      assert.ok(existsSync(join(home, relativePath)), 'missing installed plugin file: ' + relativePath);
+    }
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('staging bundles the plugin source used by its first-run installer', () => {
+  const build = readFileSync(script, 'utf8');
+  assert.ok(build.includes("join(stagedResources, 'hermes-plugins')"));
+  assert.ok(build.includes("'knockdesk/plugin.yaml'"));
+  assert.ok(build.includes("'knockdesk-computer/plugin.yaml'"));
+  assert.ok(build.includes("'knockdesk-memory/plugin.yaml'"));
 });
