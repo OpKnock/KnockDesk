@@ -158,7 +158,7 @@ async function createWindow(): Promise<BrowserWindow> {
     const rendererUrl = process.env.KNOCKDESK_RENDERER_URL || 'http://127.0.0.1:5174/desktop.html';
     await mainWindow.loadURL(rendererUrl);
   } else {
-    await mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+    await mainWindow.loadFile(path.join(__dirname, 'renderer', 'desktop.html'));
   }
 
   // CI smoke mode verifies Electron + the React renderer without installing or
