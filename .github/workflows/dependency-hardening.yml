@@ -1,0 +1,95 @@
+name: One-time dependency hardening
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/dependency-hardening.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: knockdesk-dependency-hardening
+  cancel-in-progress: false
+
+jobs:
+  harden:
+    if: github.repository == 'OpKnock/KnockDesk'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          lfs: false
+          persist-credentials: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: resources/hermes-runtime/src/package-lock.json
+
+      - name: Update vulnerable workspace dependencies
+        working-directory: resources/hermes-runtime/src
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --workspace electron electron@^44.7.2 --save-exact
+          npm install --workspace web react-router-dom@^7.18.2
+          npm audit fix --workspace electron --workspace web
+
+      - name: Prove high-severity audit gate is clean
+        working-directory: resources/hermes-runtime/src
+        run: npm audit --workspace electron --workspace web --audit-level=high
+
+      - name: Type-check and test web workspace
+        working-directory: resources/hermes-runtime/src
+        run: |
+          npm run typecheck --workspace web
+          npm test --workspace web
+          npm run build:desktop --workspace web
+
+      - name: Compile Electron workspace
+        working-directory: resources/hermes-runtime/src
+        run: npm run compile --workspace electron
+
+      - name: Test repository build wiring
+        run: node --test scripts/build-pipeline.test.mjs
+
+      - name: Remove temporary workflow and commit only validated dependency changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_tip="$(git rev-parse refs/remotes/origin/main)"
+          if [[ "$remote_tip" != "$GITHUB_SHA" ]]; then
+            echo "::error::main changed after this workflow started; refusing to overwrite newer work."
+            exit 1
+          fi
+
+          git rm .github/workflows/dependency-hardening.yml
+
+          allowed='^(.github/workflows/dependency-hardening.yml|resources/hermes-runtime/src/package-lock.json|resources/hermes-runtime/src/electron/package.json|resources/hermes-runtime/src/web/package.json)$'
+          unexpected="$(git status --porcelain | sed -E 's/^.. //' | grep -Ev "$allowed" || true)"
+          if [[ -n "$unexpected" ]]; then
+            echo "::error::Unexpected modified files:"
+            echo "$unexpected"
+            exit 1
+          fi
+
+          if git diff --quiet -- resources/hermes-runtime/src/package-lock.json resources/hermes-runtime/src/electron/package.json resources/hermes-runtime/src/web/package.json; then
+            echo "::error::No dependency update was produced."
+            exit 1
+          fi
+
+          gh_email="$(python -c 'print("287473583+OpKnock" + chr(64) + "users.noreply.github.com")')"
+          git config user.name 'OpKnock'
+          git config user.email "$gh_email"
+          git add resources/hermes-runtime/src/package-lock.json resources/hermes-runtime/src/electron/package.json resources/hermes-runtime/src/web/package.json
+          git commit -m 'chore: harden desktop dependency chain'
+          git push origin HEAD:main
