@@ -45,7 +45,7 @@ jobs:
           git checkout -B main "$GITHUB_SHA"
           echo "Original main tip: $(git rev-parse HEAD)"
 
-          if ! git log --all --format='%an <%ae>%n%cn <%ce>' | grep -Fq 'yoinkingfish@gmail.com'; then
+          if ! git log --all --format='%an <%ae>%n%cn <%ce>' | grep -F 'yoinkingfish@gmail.com' >/dev/null; then
             echo '::error::Expected personal email was not found; refusing to rewrite history.'
             exit 1
           fi
