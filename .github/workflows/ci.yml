@@ -122,7 +122,9 @@ jobs:
 
       - name: Install Electron and renderer workspaces
         working-directory: resources/hermes-runtime/src
-        run: npm ci --workspace electron --workspace web --include-workspace-root=false --no-audit
+        run: |
+          npm ci --workspace electron --workspace web --include-workspace-root=false --no-audit
+          npm exec --workspace electron -- install-electron --no
 
       - name: Compile Electron main and build the desktop renderer
         working-directory: resources/hermes-runtime/src
