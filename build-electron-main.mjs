@@ -92,7 +92,6 @@ function main() {
     'services/hermes-manager.js',
     'services/desktop-hermes-runtime.js',
     'services/desktop-agenttown-runtime.js',
-    'services/retryable-initializer.js',
     'renderer/desktop.html',
     'pwa/icon-512.png',
   ]);
@@ -168,6 +167,7 @@ function main() {
     'main/shared/paths.js',
     'services/desktop-hermes-runtime.js',
     'services/desktop-agenttown-runtime.js',
+    'services/retryable-initializer.js',
     'renderer/desktop.html',
     'pwa/icon-512.png',
   ]);
