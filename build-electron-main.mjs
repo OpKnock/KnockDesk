@@ -92,7 +92,7 @@ function main() {
     'services/hermes-manager.js',
     'services/desktop-hermes-runtime.js',
     'services/desktop-agenttown-runtime.js',
-    'renderer/index.html',
+    'renderer/desktop.html',
     'pwa/icon-512.png',
   ]);
 
