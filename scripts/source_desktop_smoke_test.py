@@ -112,7 +112,7 @@ def main() -> int:
                 page = None
                 while time.monotonic() < deadline:
                     for candidate in context.pages:
-                        if candidate.url.startswith("file://") and "renderer/index.html" in candidate.url:
+                        if candidate.url.startswith("file://") and "renderer/desktop.html" in candidate.url:
                             page = candidate
                             break
                     if page:
