@@ -66,7 +66,7 @@ def main() -> int:
         raise SystemExit("This source desktop smoke test is intended for the Windows CI runner.")
     if not ELECTRON_EXE.is_file():
         raise SystemExit(f"Electron binary is missing: {ELECTRON_EXE}")
-    renderer = ELECTRON_APP / "dist" / "renderer" / "index.html"
+    renderer = ELECTRON_APP / "dist" / "renderer" / "desktop.html"
     if not renderer.is_file():
         raise SystemExit(f"Desktop renderer has not been built: {renderer}")
 
