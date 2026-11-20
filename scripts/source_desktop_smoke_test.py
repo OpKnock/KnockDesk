@@ -6,6 +6,7 @@ import json
 import os
 import socket
 import subprocess
+import signal
 import tempfile
 import time
 import urllib.error
@@ -18,7 +19,13 @@ from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = ROOT / "resources" / "hermes-runtime" / "src"
 ELECTRON_APP = RUNTIME / "electron"
-ELECTRON_EXE = RUNTIME / "node_modules" / "electron" / "dist" / "electron.exe"
+ELECTRON_DIST = RUNTIME / "node_modules" / "electron" / "dist"
+if os.name == "nt":
+    ELECTRON_EXE = ELECTRON_DIST / "electron.exe"
+elif sys.platform == "darwin":
+    ELECTRON_EXE = ELECTRON_DIST / "Electron.app" / "Contents" / "MacOS" / "Electron"
+else:
+    ELECTRON_EXE = ELECTRON_DIST / "electron"
 VENDOR_MODULES = ROOT / "resources" / "app.asar.unpacked" / "node_modules"
 
 
@@ -50,20 +57,27 @@ def stop_process(process: subprocess.Popen[bytes] | None) -> None:
     if not process or process.poll() is not None:
         return
     try:
-        subprocess.run(
-            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
-            check=False,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=10,
-        )
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=10,
+            )
+        else:
+            # Electron is launched in its own session to permit safe tree cleanup.
+            os.killpg(process.pid, signal.SIGTERM)
+            try:
+                process.wait(timeout=8)
+            except subprocess.TimeoutExpired:
+                os.killpg(process.pid, signal.SIGKILL)
+                process.wait(timeout=2)
     except (OSError, subprocess.TimeoutExpired):
         process.kill()
 
 
 def main() -> int:
-    if os.name != "nt":
-        raise SystemExit("This source desktop smoke test is intended for the Windows CI runner.")
     if not ELECTRON_EXE.is_file():
         raise SystemExit(f"Electron binary is missing: {ELECTRON_EXE}")
     renderer = ELECTRON_APP / "dist" / "renderer" / "desktop.html"
@@ -96,7 +110,8 @@ def main() -> int:
             env=env,
             stdout=log_file,
             stderr=subprocess.STDOUT,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0,
+            start_new_session=os.name != "nt",
         )
         log_file.close()
         wait_for_cdp(port, process)
