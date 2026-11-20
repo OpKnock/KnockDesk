@@ -266,3 +266,9 @@ test('development and Windows smoke flows install the Electron 44 binary on dema
   assert.ok(dev.includes("'install-electron', '--no'"));
   assert.ok(ci.includes('npm exec --workspace electron -- install-electron --no'));
 });
+
+test('failed first-run initialization clears the cached promise so the user can retry', () => {
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  assert.match(main, /servicesPromise = initializeServicesOnce\(window\)\.catch\(/);
+  assert.match(main, /servicesPromise = null;\s*throw error;/);
+});
