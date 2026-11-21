@@ -29,8 +29,8 @@ const DEFAULT_PORT = parseInt(process.env.STONIC_HERMES_PORT || '9119', 10);
 // First boot can rebuild the dashboard web bundle (npm build inside Hermes),
 // which takes minutes on slow disks. Poll generously.
 const READY_TIMEOUT_MS = 4 * 60 * 1000;
-const READY_POLL_MS = 1500;
-const STATUS_REFRESH_MS = 15000;
+const READY_POLL_MS = 5000; // idle-throttled (was 1500): fewer probes during slow first boot
+const STATUS_REFRESH_MS = 60000; // idle-throttled (was 15000): 4x fewer probes + WMI scans when idle
 // Quit is not the place to wait out a slow gateway shutdown; main.js' sync sweep
 // kills whatever is still standing after this.
 const GATEWAY_STOP_TIMEOUT_MS = 4000;
@@ -1543,7 +1543,7 @@ class HermesManager {
           this.state = 'idle';
           this.external = false;
           this._broadcast();
-          setTimeout(() => this.start().catch(() => { /* reflected via state */ }), 2000);
+          setTimeout(() => this.start().catch(() => { /* reflected via state */ }), 8000); // idle backoff (was 2000)
         } else {
           this._setState('error', `Hermes dashboard exited unexpectedly (code ${code})`);
         }
@@ -1614,6 +1614,7 @@ class HermesManager {
         }
       }
     }, STATUS_REFRESH_MS);
+    if (this._statusTimer && this._statusTimer.unref) this._statusTimer.unref();
   }
 
   _stopStatusLoop() {
