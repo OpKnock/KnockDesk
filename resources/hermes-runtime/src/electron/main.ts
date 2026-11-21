@@ -19,6 +19,11 @@ const {
 const { DesktopHermesRuntime } = require('./services/desktop-hermes-runtime.js');
 const { DesktopAgentTownRuntime } = require('./services/desktop-agenttown-runtime.js');
 const { createRetryableInitializer } = require('./services/retryable-initializer.js');
+const {
+  isAllowedLoopbackUrl,
+  isAllowedWebviewPreload,
+  hardenWebviewPreferences,
+} = require('./services/webview-security.js');
 const initializeServicesOnceWithRetry = createRetryableInitializer(initializeServicesOnce);
 
 let mainWindow: BrowserWindow | null = null;
@@ -165,6 +170,50 @@ async function createWindow(): Promise<BrowserWindow> {
       webviewTag: true,
     },
     icon: path.join(__dirname, 'pwa', 'icon-512.png'),
+  });
+
+  const allowedGuestPreloads = [
+    path.join(__dirname, 'hermes-preload.js'),
+    path.join(__dirname, 'agenttown-preload.js'),
+  ];
+  mainWindow.webContents.on('will-attach-webview', (event, webPreferences, params) => {
+    const source = typeof params.src === 'string' ? params.src : '';
+    const sourceAllowed = isAllowedLoopbackUrl(source);
+    const preloadAllowed = isAllowedWebviewPreload(webPreferences.preload, allowedGuestPreloads);
+    if (!sourceAllowed || !preloadAllowed) {
+      console.warn('[KnockDesk] Blocked untrusted embedded webview.', { sourceAllowed, preloadAllowed });
+      event.preventDefault();
+      return;
+    }
+    hardenWebviewPreferences(webPreferences);
+  });
+
+  mainWindow.webContents.on('did-attach-webview', (_event, guestContents) => {
+    guestContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    const guardNavigation = (event: Electron.Event, target: string) => {
+      if (!isAllowedLoopbackUrl(target)) event.preventDefault();
+    };
+    guestContents.on('will-navigate', guardNavigation);
+    guestContents.on('will-redirect', guardNavigation);
+  });
+
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    // OAuth and ordinary external links use the system browser rather than
+    // opening an unsandboxed Electron child window.
+    try {
+      const target = new URL(url);
+      if (
+        ['https:', 'http:', 'mailto:'].includes(target.protocol) &&
+        !isAllowedLoopbackUrl(target.toString())
+      ) {
+        void shell.openExternal(target.toString()).catch((error: unknown) => {
+          console.warn('[KnockDesk] Could not open external link:', error);
+        });
+      }
+    } catch {
+      console.warn('[KnockDesk] Blocked invalid window.open URL.');
+    }
+    return { action: 'deny' };
   });
 
   mainWindow.once('ready-to-show', () => mainWindow?.show());

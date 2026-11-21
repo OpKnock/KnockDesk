@@ -97,7 +97,7 @@ function main() {
   ]);
 
   // Stage from a clean directory so deleted output cannot survive a rebuild.
-  rmSync(stagedDir, { recursive: true, force: true });
+  rmSync(stagedDir, { recursive: true, force: true, maxRetries: 8, retryDelay: 250 });
   mkdirSync(stagedDir, { recursive: true });
   cpSync(dist, join(stagedDir, 'dist'), { recursive: true });
 
@@ -169,6 +169,7 @@ function main() {
     'services/desktop-agenttown-runtime.js',
     'services/retryable-initializer.js',
     'services/child-process-tree.js',
+    'services/webview-security.js',
     'renderer/desktop.html',
     'pwa/icon-512.png',
   ]);
