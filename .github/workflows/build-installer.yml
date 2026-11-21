@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g. v3.1.12)'
+        description: 'Version tag (e.g. v3.1.13)'
         required: false
         default: ''
   push:
@@ -119,7 +119,7 @@ jobs:
           # staging, then compiles.
           $version = '${{ inputs.version }}'
           if (-not $version) { $version = '${{ github.ref_name }}' }
-          if (-not $version -or $version -eq 'refs/heads/main') { $version = '3.1.12' }
+          if (-not $version -or $version -eq 'refs/heads/main') { $version = '3.1.13' }
           $version = $version -replace '^v', ''
           Write-Output "Building KnockDesk-Setup-$version-x64.exe"
           powershell -ExecutionPolicy Bypass -File scripts/build-nsis-installer.ps1 -Version $version

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -9,6 +9,51 @@ import { dirname, join, resolve } from 'node:path';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const script = resolve(root, 'build-electron-main.mjs');
+
+function loadHermesManager(stubs = {}) {
+  const require = createRequire(import.meta.url);
+  // Staged legacy service: axios is not installed in the source workspace and
+  // the methods under test do no HTTP. Stub only the imports a test needs.
+  const { Module } = require('node:module');
+  const modulePath = resolve(root, 'resources/hermes-runtime/src/electron/services/hermes-manager.js');
+  delete require.cache[modulePath];
+  const originalLoad = Module._load;
+  Module._load = function loadWithStubs(request, parent, isMain) {
+    if (request === 'axios') return function axiosStub() {};
+    if (Object.prototype.hasOwnProperty.call(stubs, request)) return stubs[request];
+    return originalLoad.call(this, request, parent, isMain);
+  };
+  try {
+    return require(modulePath);
+  } finally {
+    Module._load = originalLoad;
+    delete require.cache[modulePath];
+  }
+}
+
+function loadMacUpdater() {
+  const require = createRequire(import.meta.url);
+  const { Module } = require('node:module');
+  const modulePath = resolve(root, 'resources/hermes-runtime/src/electron/services/macos-updater.js');
+  delete require.cache[modulePath];
+  const originalLoad = Module._load;
+  Module._load = function loadWithElectronStub(request, parent, isMain) {
+    if (request === 'electron') {
+      return {
+        app: {},
+        dialog: { showMessageBoxSync: () => 0 },
+        ipcMain: { handle: () => {} },
+      };
+    }
+    return originalLoad.call(this, request, parent, isMain);
+  };
+  try {
+    return require(modulePath);
+  } finally {
+    Module._load = originalLoad;
+    delete require.cache[modulePath];
+  }
+}
 
 test('Electron build script is valid Node JavaScript', () => {
   const check = spawnSync(process.execPath, ['--check', script], { encoding: 'utf8' });
@@ -107,6 +152,306 @@ test('runtime state keeps structured status instead of stringifying it', () => {
   const manager = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/services/hermes-manager.js'), 'utf8');
   assert.ok(manager.includes('status: this.lastStatus && typeof this.lastStatus === \'object\''));
   assert.ok(manager.includes('external: Boolean(this.external)'));
+});
+
+test('gateway supervisor revives only the gateway owned by KnockDesk setup', () => {
+  const require = createRequire(import.meta.url);
+  // hermes-manager.js is a staged legacy service whose axios dependency is not
+  // installed in the source workspace. Stub only that import; the supervisor
+  // branch under test does no HTTP.
+  const { Module } = require('node:module');
+  const originalLoad = Module._load;
+  Module._load = function loadWithAxiosStub(request, parent, isMain) {
+    if (request === 'axios') return function axiosStub() {};
+    return originalLoad.call(this, request, parent, isMain);
+  };
+  let hermesManagerModule;
+  try {
+    hermesManagerModule = require(resolve(root, 'resources/hermes-runtime/src/electron/services/hermes-manager.js'));
+  } finally {
+    Module._load = originalLoad;
+  }
+  const { HermesManager } = hermesManagerModule;
+
+  const makeManager = (knockdeskReady) => {
+    const manager = new HermesManager();
+    manager.state = 'ready';
+    manager._knockdeskReady = knockdeskReady;
+    manager._knockdeskPending = false;
+    manager._gatewayDownTicks = 0;
+    manager._gatewayUpSince = 0;
+    manager._gatewayRevivals = 0;
+    manager._gatewayLastReviveAt = 0;
+    manager._gatewayCommandAt = 0;
+    manager._gatewayHeldAt = 0;
+    manager.reviveCalls = 0;
+    manager._runKnockDeskSetupSoon = () => { manager.reviveCalls += 1; };
+    return manager;
+  };
+
+  const originalWarn = console.warn;
+  console.warn = () => {};
+  try {
+    const owned = makeManager(true);
+    const now = 1_000_000;
+    for (let tick = 0; tick < 5; tick += 1) {
+      owned._superviseGateway({ gateway_running: false }, now + tick * 1000);
+    }
+    assert.equal(owned.reviveCalls, 1, 'a dead owned gateway must be revived once');
+
+    const notOwned = makeManager(false);
+    for (let tick = 0; tick < 5; tick += 1) {
+      notOwned._superviseGateway({ gateway_running: false }, now + tick * 1000);
+    }
+    assert.equal(notOwned.reviveCalls, 0, 'a gateway not owned by KnockDesk setup must be left alone');
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+test('successful Mobile Remote setup stays ready for the gateway supervisor', async () => {
+  const pluginStubs = {
+    './knockdesk-plugin.js': {
+      ensureKnockDeskPlugin: () => ({ ok: true, changed: false, version: '1.2.0' }),
+      ensureKnockDeskComputerPlugin: () => ({ ok: true, changed: false }),
+      ensureKnockDeskMemoryPlugin: () => ({ ok: true, changed: false }),
+      MEMORY_PLUGIN_NAME: 'knockdesk-memory',
+    },
+  };
+  const { HermesManager } = loadHermesManager(pluginStubs);
+  const manager = new HermesManager();
+  const home = mkdtempSync(join(tmpdir(), 'kd-setup-ready-'));
+  manager.state = 'ready';
+  manager.getHermesHome = () => home;
+  manager.apiFetch = async (apiPath) => {
+    if (apiPath === '/api/status') return { ok: true, data: { gateway_running: true } };
+    if (apiPath === '/api/gateway/restart') return { ok: true };
+    throw new Error(`unexpected apiFetch ${apiPath}`);
+  };
+  manager._installMemoryPlugin = () => ({ ok: true, changed: false });
+  manager._removeLegacyPluginDirs = () => {};
+  manager._ensureKnockDeskPluginEnabled = async () => false;
+  manager._ensureKnockDeskEnv = async () => false;
+  manager._ensureMemoryProvider = async () => {};
+  manager.startGateway = async () => ({ ok: true });
+  manager.reviveCalls = 0;
+  manager._runKnockDeskSetupSoon = () => { manager.reviveCalls += 1; };
+  manager._gatewayDownTicks = 0;
+  manager._gatewayUpSince = 0;
+  manager._gatewayRevivals = 0;
+  manager._gatewayLastReviveAt = 0;
+  manager._gatewayCommandAt = 0;
+  manager._gatewayHeldAt = 0;
+
+  const res = await manager.ensureKnockDeskPlatform({
+    bridgeUrl: 'http://127.0.0.1:8749',
+    bridgeKey: 'k'.repeat(64),
+    chatId: 'chat-1',
+  });
+  assert.equal(res.ok, true);
+  assert.equal(Boolean(manager._knockdeskReady), true, 'a successful setup must leave the ready flag set');
+  manager._knockdeskPending = false;
+
+  const originalWarn = console.warn;
+  console.warn = () => {};
+  try {
+    const now = 2_000_000;
+    for (let tick = 0; tick < 5; tick += 1) {
+      manager._superviseGateway({ gateway_running: false }, now + tick * 1000);
+    }
+  } finally {
+    console.warn = originalWarn;
+    rmSync(home, { recursive: true, force: true });
+  }
+  assert.equal(manager.reviveCalls, 1, 'the gateway owned by a completed setup must be reviveable');
+});
+
+test('legacy env cache migration seeds the current cache without a gateway restart', async () => {
+  const { HermesManager } = loadHermesManager();
+  const home = mkdtempSync(join(tmpdir(), 'kd-legacy-env-cache-'));
+  try {
+    const args = { bridgeUrl: 'http://127.0.0.1:8749', bridgeKey: 'k'.repeat(64), chatId: 'chat-1' };
+    const cacheFile = join(home, 'knockdesk-bridge-env.json');
+    const legacyFile = join(home, 'stonic-bridge-env.json');
+
+    const seed = new HermesManager();
+    seed.getHermesHome = () => home;
+    seed.apiFetch = async () => ({ ok: true, data: { env: {} } });
+    seed._putEnv = async () => true;
+    assert.equal(await seed._ensureKnockDeskEnv(args), true);
+
+    const desired = JSON.parse(readFileSync(cacheFile, 'utf8'));
+    writeFileSync(legacyFile, JSON.stringify(desired, null, 2), 'utf8');
+    rmSync(cacheFile, { force: true });
+
+    const migrated = new HermesManager();
+    migrated.getHermesHome = () => home;
+    const rows = {};
+    for (const [key, value] of Object.entries(desired)) rows[key] = { is_set: true, value };
+    migrated.apiFetch = async (apiPath) => {
+      if (apiPath === '/api/env') return { ok: true, data: { env: rows } };
+      throw new Error(`unexpected apiFetch ${apiPath}`);
+    };
+    let writes = 0;
+    migrated._putEnv = async () => { writes += 1; return true; };
+
+    assert.equal(await migrated._ensureKnockDeskEnv(args), false, 'already-set legacy values must not bounce the gateway');
+    assert.equal(writes, 0);
+    assert.equal(existsSync(cacheFile), true, 'the current cache must be seeded from the legacy cache');
+    assert.equal(existsSync(legacyFile), false, 'the legacy cache must be retired after migration');
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('macOS updater resolves assets and exits only after the relaunch is spawned', () => {
+  const { resolveAssetUrl } = loadMacUpdater();
+  assert.equal(
+    resolveAssetUrl('https://example.test/feed', 'KnockDesk 3.1.13 arm64.zip'),
+    'https://example.test/feed/KnockDesk%203.1.13%20arm64.zip',
+  );
+  assert.equal(
+    resolveAssetUrl('https://example.test/feed', 'https://cdn.test/updates/app.zip'),
+    'https://cdn.test/updates/app.zip',
+  );
+
+  const source = readFileSync(
+    resolve(root, 'resources/hermes-runtime/src/electron/services/macos-updater.js'),
+    'utf8',
+  );
+  assert.equal((source.match(/app\.exit\(0\)/g) || []).length, 1, 'a delayed exit must be the only app.exit call');
+  assert.match(source, /setTimeout\(\(\) => app\.exit\(0\), 1000\)/);
+  assert.match(source, /ipcMain\.handle\('check-for-updates', \(\) => checkForUpdates\(\)\)/);
+});
+
+test('legacy plugin cleanup removes only pre-rebrand directories', () => {
+  const { HermesManager } = loadHermesManager();
+  const home = mkdtempSync(join(tmpdir(), 'kd-legacy-plugins-'));
+  try {
+    const manager = new HermesManager();
+    manager.getHermesHome = () => home;
+    const pairs = [
+      ['knockdesk', 'adapter.py', 'stonic'],
+      ['knockdesk-computer', 'tool.py', 'stonic-computer'],
+      ['knockdesk-memory', '__init__.py', 'stonic-memory'],
+    ];
+    for (const [fresh, marker, legacy] of pairs) {
+      const freshDir = join(home, 'plugins', fresh);
+      const legacyDir = join(home, 'plugins', legacy);
+      mkdirSync(freshDir, { recursive: true });
+      mkdirSync(legacyDir, { recursive: true });
+      writeFileSync(join(freshDir, marker), 'fresh\n', 'utf8');
+      writeFileSync(join(legacyDir, 'stale.txt'), 'legacy\n', 'utf8');
+    }
+
+    manager._removeLegacyPluginDirs();
+
+    for (const [fresh, marker, legacy] of pairs) {
+      assert.equal(existsSync(join(home, 'plugins', fresh, marker)), true, 'fresh plugin must survive cleanup');
+      assert.equal(existsSync(join(home, 'plugins', legacy)), false, 'pre-rebrand plugin must be removed');
+    }
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('plugins.enabled migration keeps KnockDesk names and user plugins', async () => {
+  const { HermesManager } = loadHermesManager();
+  const manager = new HermesManager();
+  const puts = [];
+  let yaml = [
+    'plugins:',
+    '  enabled:',
+    '    - stonic',
+    '    - stonic-computer',
+    '    - knockdesk',
+    '    - knockdesk-platform',
+    '    - knockdesk-computer',
+    '    - userplugin',
+    '',
+  ].join('\n');
+  manager.apiFetch = async (apiPath, { method = 'GET', body = null } = {}) => {
+    if (apiPath === '/api/config/raw') return { ok: true, data: { yaml } };
+    if (apiPath === '/api/config' && method === 'PUT') {
+      puts.push(body.config.plugins.enabled);
+      yaml = [
+        'plugins:',
+        '  enabled:',
+        ...body.config.plugins.enabled.map((name) => `    - ${name}`),
+        '',
+      ].join('\n');
+      return { ok: true };
+    }
+    throw new Error(`unexpected apiFetch ${apiPath}`);
+  };
+
+  assert.equal(await manager._ensureKnockDeskPluginEnabled(), true);
+  assert.deepEqual(puts[0], ['knockdesk', 'knockdesk-platform', 'knockdesk-computer', 'userplugin']);
+  const putCount = puts.length;
+  assert.equal(await manager._ensureKnockDeskPluginEnabled(), false, 'a second setup pass must be a no-op');
+  assert.equal(puts.length, putCount, 'a second setup pass must not write config again');
+});
+
+test('bridge env setup reuses its cache instead of deleting it', async () => {
+  const { HermesManager } = loadHermesManager();
+  const home = mkdtempSync(join(tmpdir(), 'kd-bridge-env-'));
+  try {
+    const manager = new HermesManager();
+    manager.getHermesHome = () => home;
+    const writes = [];
+    let firstWrites = [];
+    let fetchCount = 0;
+    manager.apiFetch = async (apiPath) => {
+      if (apiPath !== '/api/env') throw new Error(`unexpected apiFetch ${apiPath}`);
+      fetchCount += 1;
+      const rows = {};
+      // First pass: nothing set. Later passes: every key written on pass one is set.
+      if (fetchCount > 1) {
+        for (const [key, value] of firstWrites) rows[key] = { is_set: true, value };
+      }
+      return { ok: true, data: { env: rows } };
+    };
+    manager._putEnv = async (key, value) => {
+      writes.push([key, value]);
+      return true;
+    };
+
+    const args = { bridgeUrl: 'http://127.0.0.1:8749', bridgeKey: 'k'.repeat(64), chatId: 'chat-1' };
+    assert.equal(await manager._ensureKnockDeskEnv(args), true);
+    assert.equal(writes.length, 10, 'both KNOCKDESK_* and STONIC_* env names must be written');
+    const cacheFile = join(home, 'knockdesk-bridge-env.json');
+    assert.equal(existsSync(cacheFile), true, 'the live cache must be kept');
+
+    firstWrites = [...writes];
+    writes.length = 0;
+    assert.equal(await manager._ensureKnockDeskEnv(args), false, 'a second pass must make no env writes');
+    assert.equal(writes.length, 0);
+    assert.equal(existsSync(cacheFile), true, 'the cache must survive every setup pass');
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('memory provider migration only replaces the pre-rebrand provider', async () => {
+  const { HermesManager } = loadHermesManager();
+  for (const [current, expectedWrites] of [['stonic-memory', 1], ['honcho', 0]]) {
+    const manager = new HermesManager();
+    const puts = [];
+    manager.apiFetch = async (apiPath, { method = 'GET', body = null } = {}) => {
+      if (apiPath === '/api/config' && method === 'PUT') {
+        puts.push(body.config.memory.provider);
+        return { ok: true };
+      }
+      if (apiPath === '/api/config' && method === 'GET') {
+        return { ok: true, data: { memory: { provider: current } } };
+      }
+      throw new Error(`unexpected apiFetch ${apiPath}`);
+    };
+
+    await manager._ensureMemoryProvider();
+    assert.equal(puts.length, expectedWrites);
+    if (expectedWrites) assert.equal(puts[0], 'knockdesk-memory');
+  }
 });
 
 test('Hermes command approval is on by default; unattended mode requires explicit opt-in', () => {
@@ -258,9 +603,60 @@ test('first-run setup installs every first-party plugin into the supplied Hermes
     ]) {
       assert.ok(existsSync(join(home, relativePath)), 'missing installed plugin file: ' + relativePath);
     }
+
+    // Same version, stale code: the installer must still detect the content
+    // drift and repair the installed copy. Otherwise a source fix never
+    // reaches machines that already have the plugin installed.
+    const installedTool = join(home, 'plugins/knockdesk-computer/tool.py');
+    const bundledTool = resolve(root, 'resources/hermes-plugins/knockdesk-computer/tool.py');
+    writeFileSync(installedTool, '# stale installed plugin\n', 'utf8');
+    const repaired = plugins.ensureKnockDeskComputerPlugin(home);
+    assert.equal(repaired.ok, true, repaired.error);
+    assert.equal(repaired.changed, true, 'stale plugin code must be reinstalled even when the version matches');
+    assert.equal(readFileSync(installedTool, 'utf8'), readFileSync(bundledTool, 'utf8'));
   } finally {
     rmSync(home, { recursive: true, force: true });
   }
+});
+
+test('bridge key is stable across restarts and replaces invalid files', () => {
+  const require = createRequire(import.meta.url);
+  const { KnockDeskBridge } = require(resolve(root, 'resources/hermes-runtime/src/electron/services/knockdesk-bridge.js'));
+  const dir = mkdtempSync(join(tmpdir(), 'kd-bridge-key-'));
+  try {
+    const bridge = new KnockDeskBridge({ userDataDir: dir });
+    const first = bridge._loadOrCreateKey();
+    assert.match(first, /^[0-9a-f]{64}$/);
+    assert.equal(bridge._loadOrCreateKey(), first, 'an existing bridge key must be reused');
+    assert.equal(readFileSync(join(dir, 'knockdesk-bridge-key'), 'utf8'), first);
+
+    writeFileSync(join(dir, 'knockdesk-bridge-key'), 'not-a-key', 'utf8');
+    const second = bridge._loadOrCreateKey();
+    assert.notEqual(second, 'not-a-key');
+    assert.match(second, /^[0-9a-f]{64}$/, 'an invalid key file must be replaced');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('computer_task cleanup regression tests run against the real plugin handler', () => {
+  const testFile = resolve(root, 'scripts/test_computer_task.py');
+  const candidates = process.platform === 'win32'
+    ? [['py', ['-3']], ['python', []]]
+    : [['python3', []], ['python', []]];
+  let executed = false;
+  for (const [command, prefix] of candidates) {
+    const run = spawnSync(command, [...prefix, testFile], { cwd: root, encoding: 'utf8' });
+    if (run.error && run.error.code === 'ENOENT') continue;
+    assert.equal(
+      run.status,
+      0,
+      `${command} ${prefix.join(' ')} ${testFile} failed:\n${run.stdout || ''}\n${run.stderr || ''}`,
+    );
+    executed = true;
+    break;
+  }
+  assert.ok(executed, 'No Python interpreter found to run computer_task regression tests.');
 });
 
 test('staging bundles the plugin source used by its first-run installer', () => {

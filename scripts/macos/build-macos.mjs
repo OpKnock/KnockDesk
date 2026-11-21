@@ -39,7 +39,7 @@ const VENV_PY_WIN = join(KNOCKDESK, 'resources', 'hermes-runtime', 'venv', 'Scri
 const WIN_SITE = join(KNOCKDESK, 'resources', 'hermes-runtime', 'venv', 'Lib', 'site-packages');
 const ICON_SRC = join(KNOCKDESK, 'resources', 'hermes-runtime', 'src', 'electron', 'pwa', 'icon-512.png');
 
-const APP_VERSION = '3.1.12';
+const APP_VERSION = '3.1.13';
 const ELECTRON_VERSION = '44.7.2';
 const NODE_VERSION = '22.11.0';
 const SQLITE_VERSION = '12.11.1';
