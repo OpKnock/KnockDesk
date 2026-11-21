@@ -71,6 +71,34 @@ function registerSystemHandlers() {
 
   ipcMain.handle('system-fs-op', async (_event, { operation, path: targetPath, content, dest }) => {
     try {
+      // Sender check (BE-01): only the app's own windows may use this
+      // channel — never webview guests or stray frames. Without this, any
+      // compromised renderer/webview content could reach privileged fs ops.
+      const { BrowserWindow } = require('electron');
+      const senderOk = BrowserWindow.getAllWindows().some((w) => {
+        try { return w.webContents === _event.sender; } catch { return false; }
+      });
+      if (!senderOk) {
+        throw new Error('system-fs-op denied: unknown sender');
+      }
+      // Directory restriction (BE-01): absolute paths used to be honored
+      // verbatim (delete with recursive:true on ANY path) and relative
+      // paths could escape via '..'. Everything is now contained to the
+      // app's data roots; legit flows already live there.
+      const KD_DATA_ROOTS = () => [
+        path.join(app.getPath('documents'), 'KnockDesk Data'),
+        app.getPath('documents'),
+      ];
+      const assertAllowed = (p) => {
+        const resolved = path.resolve(p);
+        const ok = KD_DATA_ROOTS().some(
+          (root) => resolved === root || resolved.startsWith(root + path.sep)
+        );
+        if (!ok) {
+          throw new Error('system-fs-op denied: path outside permitted roots');
+        }
+        return resolved;
+      };
       let resolvedPath = targetPath;
 
       if (targetPath && (targetPath.includes('${resolvedNotesPath}') || targetPath.includes('$resolvedNotesPath'))) {
@@ -113,6 +141,12 @@ function registerSystemHandlers() {
             resolvedDest = path.join(app.getPath('documents'), 'KnockDesk Data', dest);
           }
         }
+      }
+
+      // Enforce containment on the final resolved paths (all branches above).
+      resolvedPath = assertAllowed(resolvedPath);
+      if (resolvedDest) {
+        resolvedDest = assertAllowed(resolvedDest);
       }
 
       switch (operation) {
