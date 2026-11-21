@@ -75,6 +75,22 @@ test('build script never writes directly to production ASAR or bytecode', () => 
   assert.match(source, /staging\/electron-main/);
 });
 
+test('packaged core rebuild overlays the maintained services for 3.1.13', () => {
+  const rebuild = resolve(root, 'scripts/rebuild-packaged-core.mjs');
+  const run = spawnSync(process.execPath, [rebuild, '--dry-run'], { cwd: root, encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.stdout, /3\.1\.13/);
+  for (const target of [
+    'electron/services/hermes-manager.js',
+    'electron/services/knockdesk-plugin.js',
+    'electron/services/knockdesk-bridge.js',
+    'electron/services/macos-updater.js',
+  ]) {
+    assert.ok(run.stdout.includes(target), `missing overlay target: ${target}`);
+  }
+  assert.match(run.stdout, /integrity-manifest\.json/);
+});
+
 test('Electron loads the source-built KnockDesk shell and does not block on Hermes boot', () => {
   const paths = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main/shared/paths.ts'), 'utf8');
   const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
