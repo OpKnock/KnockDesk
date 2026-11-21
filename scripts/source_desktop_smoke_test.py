@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Launch and exercise the maintained Electron + React desktop shell on Windows."""
+"""Launch and exercise the maintained Electron + React desktop shell on Windows or macOS."""
 from __future__ import annotations
 
 import json
 import os
 import socket
 import subprocess
+import signal
+import sys
 import tempfile
 import time
 import urllib.error
@@ -18,7 +20,13 @@ from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = ROOT / "resources" / "hermes-runtime" / "src"
 ELECTRON_APP = RUNTIME / "electron"
-ELECTRON_EXE = RUNTIME / "node_modules" / "electron" / "dist" / "electron.exe"
+ELECTRON_DIST = RUNTIME / "node_modules" / "electron" / "dist"
+if os.name == "nt":
+    ELECTRON_EXE = ELECTRON_DIST / "electron.exe"
+elif sys.platform == "darwin":
+    ELECTRON_EXE = ELECTRON_DIST / "Electron.app" / "Contents" / "MacOS" / "Electron"
+else:
+    ELECTRON_EXE = ELECTRON_DIST / "electron"
 VENDOR_MODULES = ROOT / "resources" / "app.asar.unpacked" / "node_modules"
 
 
@@ -47,23 +55,68 @@ def wait_for_cdp(port: int, process: subprocess.Popen[bytes], timeout: float = 3
 
 
 def stop_process(process: subprocess.Popen[bytes] | None) -> None:
-    if not process or process.poll() is not None:
+    if not process:
         return
+    if os.name == "nt":
+        if process.poll() is None:
+            try:
+                subprocess.run(
+                    ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                    check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=10,
+                )
+            except (OSError, subprocess.TimeoutExpired):
+                process.kill()
+        return
+
+    # The smoke runner starts Electron in a fresh session; its PID is also the
+    # process-group ID. Signal the group even if Electron's parent already exited.
+    group_id = process.pid
     try:
-        subprocess.run(
-            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
-            check=False,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=10,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        process.kill()
+        os.killpg(group_id, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    except PermissionError:
+        return
+
+    deadline = time.monotonic() + 8
+    while time.monotonic() < deadline:
+        try:
+            os.killpg(group_id, 0)
+        except ProcessLookupError:
+            break
+        except PermissionError:
+            # The group exists, but cannot be inspected. Keep the bounded grace period.
+            pass
+        if process.poll() is None:
+            try:
+                process.wait(timeout=0.1)
+            except subprocess.TimeoutExpired:
+                pass
+        else:
+            time.sleep(0.1)
+
+    # A parent can exit while Chromium/Electron helper processes remain alive.
+    try:
+        os.killpg(group_id, 0)
+    except ProcessLookupError:
+        return
+    except PermissionError:
+        pass
+    try:
+        os.killpg(group_id, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    if process.poll() is None:
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill()
 
 
 def main() -> int:
-    if os.name != "nt":
-        raise SystemExit("This source desktop smoke test is intended for the Windows CI runner.")
     if not ELECTRON_EXE.is_file():
         raise SystemExit(f"Electron binary is missing: {ELECTRON_EXE}")
     renderer = ELECTRON_APP / "dist" / "renderer" / "desktop.html"
@@ -96,7 +149,8 @@ def main() -> int:
             env=env,
             stdout=log_file,
             stderr=subprocess.STDOUT,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0,
+            start_new_session=os.name != "nt",
         )
         log_file.close()
         wait_for_cdp(port, process)

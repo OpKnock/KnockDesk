@@ -148,8 +148,17 @@ class DesktopHermesRuntime {
     this.stopping = false;
     this.childError = null;
     this._setState('starting');
-    this.startPromise = this._startBackground();
-    // Don't block the desktop window while a first-run Python environment starts.
+    // Keep startup non-blocking, but turn unexpected background failures into
+    // an observable error state. Otherwise a rejected task can leave the UI
+    // stuck at "starting" and future retries short-circuit forever.
+    const pendingStart = this._startBackground().catch((error) => {
+      if (!this.stopping) {
+        const message = error instanceof Error ? error.message : String(error);
+        this._setState('error', 'Hermes startup failed: ' + message);
+      }
+      if (this.startPromise === pendingStart) this.startPromise = null;
+    });
+    this.startPromise = pendingStart;
     return Promise.resolve(this.getState());
   }
 

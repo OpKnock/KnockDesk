@@ -10,7 +10,7 @@ KnockDesk has a maintained source-owned Electron/React desktop shell and a separ
 |---|---|---|
 | Electron source | TypeScript compile, output assertions, source wiring tests | Signed installer and feature parity with compiled legacy main process |
 | Desktop React renderer | Type-check, unit tests, ESLint and production bundle | Every route against a live Hermes installation |
-| Windows smoke test | Launches Electron and exercises source-owned renderer with smoke mode | Hermes and AgentTown sidecars intentionally disabled in smoke mode |
+| Windows/macOS source smoke test | CI launches Electron and exercises the source-owned renderer on both operating systems with smoke mode | Hermes and AgentTown sidecars are intentionally disabled; live runtime testing is still required |
 | Packaged archive | ASAR listing, brand invariant, real LFS payload checks | Every packaged UI screen and integration is not exhaustively tested |
 | Git LFS | Pointer and binary-attribute checks | LFS availability on another machine/account |
 | Python and secrets | Python syntax, Ruff and first-party secret scan | Secrets hidden in binaries, Git history or unscanned generated/upstream bundles |
@@ -46,7 +46,7 @@ The reachable `main` history has been rewritten to use the `OpKnock` account ide
 
 ## Release checklist
 
-- [x] Latest GitHub Actions run is green, including blocking dependency audits, source build/tests, first-party security tooling, Git LFS integrity, packaged artifact integrity, and the Windows renderer smoke test.
+- [x] Latest GitHub Actions run is green, including blocking dependency audits, source build/tests, first-party security tooling, Git LFS integrity, packaged artifact integrity, and Windows/macOS source-renderer smoke tests.
 - [ ] Configure protection for `main` with required CI checks, no force-pushes, and no branch deletion where the repository plan supports it. An unprotected branch is a governance gap, not itself a GitHub Terms of Service violation.
 - [ ] Start the app on a clean Windows machine using the intended Hermes CLI/virtual environment.
 - [ ] Verify runtime status, chat/session pages, memory read/update and shutdown/restart behavior.
@@ -65,4 +65,4 @@ The maintained desktop dependency set now passes a blocking npm audit at all sev
 
 ## Current limitations
 
-The source build produces a staging application, not a signed installer. The Windows CI smoke mode intentionally skips live sidecars. The original ASAR and compiled main bytecode are preserved, and parity with the packaged application is not claimed. Until the release checklist is complete, classify KnockDesk as **in active stabilization**, not fully product-ready.
+The source build produces a staging application, not a signed installer. Windows/macOS CI smoke mode intentionally skips live sidecars. The legacy packaged executable remains Windows-specific; macOS packaging, signing, notarization, and end-to-end runtime parity are not release-ready. The original ASAR and compiled main bytecode are preserved, and parity with the packaged application is not claimed. Until the release checklist is complete, classify KnockDesk as **in active stabilization**, not fully product-ready.

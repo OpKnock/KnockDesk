@@ -84,7 +84,7 @@ Large binary paths use Git LFS. A pointer is a small text file describing a bina
 
 ## Validation coverage and release gate
 
-CI exercises source/build-contract tests, web type checks and tests, desktop renderer lint/build, Python syntax/security tooling, dependency audit, LFS pointer integrity, packed archive integrity, and a Windows renderer smoke test. Optional sidecars, credentials, voice devices, remote messaging, all model providers and every packaged legacy screen require separate integration tests.
+CI exercises source/build-contract tests, web type checks and tests, desktop renderer lint/build, Python syntax/security tooling, dependency audit, LFS pointer integrity, packed archive integrity, and source-renderer smoke tests on Windows and macOS. Smoke mode intentionally disables Hermes and AgentTown, so it does not verify their end-to-end behavior. The preserved packaged executable and its legacy runtime are Windows-specific; macOS requires a native Hermes installation and has no signed/notarized distributable yet. Optional sidecars, credentials, voice devices, remote messaging, all model providers and every packaged legacy screen require separate integration tests.
 
 Before calling a build a release, require all of the following:
 
