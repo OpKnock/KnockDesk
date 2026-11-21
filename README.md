@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.knockdesk.work.gd">Website</a>
+  <a href="https://knockdesk.app">Website</a>
   · <a href="https://github.com/OpKnock/KnockDesk">Source</a>
   · <a href="CONTRIBUTING.md">Contributing</a>
   · <a href="SECURITY.md">Security</a>
