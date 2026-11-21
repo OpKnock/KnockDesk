@@ -203,8 +203,16 @@ async function initializeServicesForIpc(): Promise<boolean> {
     ? mainWindow
     : BrowserWindow.getAllWindows()[0] ?? null;
   if (!window) return false;
-  await initializeServices(window);
-  return true;
+  try {
+    await initializeServices(window);
+    return true;
+  } catch (error: unknown) {
+    // The individual IPC handlers translate false into their documented
+    // fallback payloads. Do not catch the manager.start() call in those
+    // handlers: genuine runtime-start errors should still be observable.
+    console.error('[KnockDesk] IPC service initialization failed:', error);
+    return false;
+  }
 }
 
 async function initializeServicesOnce(window: BrowserWindow): Promise<void> {

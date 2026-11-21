@@ -163,12 +163,17 @@ test('desktop shutdown waits for child runtime cleanup before quitting', () => {
   assert.ok(main.includes('agentTownManager?.stop?.()'));
 });
 
-test('runtime and AgentTown start requests wait for first-run service initialization', () => {
+test('IPC initialization failures return channel-specific fallback payloads without masking runtime start errors', () => {
   const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
   assert.equal((main.match(/await initializeServicesForIpc\(\)/g) || []).length, 3);
-  assert.ok(main.includes('async function initializeServicesForIpc(): Promise<boolean>'));
+  assert.match(main, /async function initializeServicesForIpc\(\): Promise<boolean> \{[\s\S]*?try \{\s*await initializeServices\(window\);\s*return true;\s*\} catch \(error: unknown\) \{[\s\S]*?return false;/);
   assert.ok(main.includes("stateFallback('error', 'AgentTown could not be initialized.')"));
   assert.ok(main.includes("stateFallback('error', 'The Hermes runtime could not be initialized.')"));
+  assert.ok(main.includes("return { available: false, memory: '', user: '' }"));
+  // Manager start errors must continue to propagate rather than being converted
+  // into a misleading "initialization failed" state.
+  assert.ok(main.includes('return hermesManager.start();'));
+  assert.ok(main.includes('return agentTownManager.start();'));
 });
 
 test('manual ASAR extraction workflow exposes a downloadable artifact', () => {
@@ -392,4 +397,8 @@ test('Windows required CI status-check name remains stable with a separate macOS
   assert.match(workflow, /name:\s*\$\{\{\s*matrix\.name\s*\}\}/);
   assert.match(workflow, /os:\s*windows-latest[\s\S]*?name:\s*Windows desktop renderer smoke test/);
   assert.match(workflow, /os:\s*macos-latest[\s\S]*?name:\s*macOS desktop renderer smoke test/);
+});
+test('CodeQL workflow does not persist its checkout token', () => {
+  const workflow = readFileSync(resolve(root, '.github/workflows/codeql.yml'), 'utf8');
+  assert.match(workflow, /uses: actions\/checkout@v4\s+with:\s+lfs: false\s+persist-credentials: false/);
 });
