@@ -337,3 +337,28 @@ test('native title-bar overlay is configured only on platforms that need custom 
   assert.match(main, /\.\.\.\(process\.platform !== 'darwin' \? \{/);
   assert.match(main, /titleBarOverlay:\s*\{/);
 });
+
+test('AgentTown background startup errors clear the pending promise and can be retried', async () => {
+  const { DesktopAgentTownRuntime } = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/desktop-agenttown-runtime.js'
+  ));
+  const runtime = new DesktopAgentTownRuntime();
+  let attempts = 0;
+  runtime._startBackground = async () => {
+    attempts += 1;
+    if (attempts === 1) throw new Error('transient AgentTown startup failure');
+    runtime._setState('ready');
+  };
+
+  const firstStart = runtime.start();
+  const firstAttempt = runtime.startPromise;
+  await Promise.resolve(firstAttempt).catch(() => undefined);
+  await firstStart;
+  assert.equal(runtime.getState().state, 'error', 'a rejected background start must surface an error state');
+  assert.equal(runtime.startPromise, null, 'a failed background start must release the retry lock');
+
+  await runtime.start();
+  await runtime.startPromise;
+  assert.equal(attempts, 2, 'the next start request must attempt launch again');
+  assert.equal(runtime.getState().state, 'ready');
+});
