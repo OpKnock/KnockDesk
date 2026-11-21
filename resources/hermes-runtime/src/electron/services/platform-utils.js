@@ -16,6 +16,7 @@
  */
 
 const { exec } = require('child_process');
+const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -113,10 +114,20 @@ function getDefaultUserAgent() {
     return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 }
 
-// Promisified exec helper
+// Promisified exec helper (shell — only for static commands, never user input)
 function execPromise(command, options = {}) {
     return new Promise((resolve, reject) => {
         exec(command, { timeout: 15000, ...options }, (error, stdout, stderr) => {
+            if (error) reject(error);
+            else resolve(stdout.toString().trim());
+        });
+    });
+}
+
+// Promisified execFile helper (no shell — for anything carrying variables)
+function execFilePromise(file, args, options = {}) {
+    return new Promise((resolve, reject) => {
+        execFile(file, args, { timeout: 15000, ...options }, (error, stdout, stderr) => {
             if (error) reject(error);
             else resolve(stdout.toString().trim());
         });
@@ -193,14 +204,15 @@ async function macOpenApplication(appName) {
 
     if (MAC_SCHEME_MAP[name]) {
         const cmd = `open "${MAC_SCHEME_MAP[name]}"`;
-        await execPromise(cmd, { timeout: 10000 });
+        await execFilePromise('open', [MAC_SCHEME_MAP[name]], { timeout: 10000 });
         return cmd;
     }
 
     const macApp = MAC_APP_MAP[name] || appName;
-    // `open -a "App"` resolves by app display name; falls back gracefully.
+    // `open -a` with an argv array: no shell, so display names can never
+    // break out (CodeQL js/incomplete-sanitization).
     const cmd = `open -a "${macApp.replace(/"/g, '\\"')}"`;
-    await execPromise(cmd, { timeout: 10000 });
+    await execFilePromise('open', ['-a', macApp], { timeout: 10000 });
     return cmd;
 }
 

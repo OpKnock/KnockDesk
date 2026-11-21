@@ -304,13 +304,18 @@ async function quitAndInstall() {
     fs.rmSync(backupPath, { recursive: true, force: true });
     fs.rmSync(pending.workDir, { recursive: true, force: true });
 
-    // 4. Full quit, then reopen the NEW bundle (full close → reliable swap)
+    // 4. Full quit, then reopen the NEW bundle (full close → reliable swap).
+    // No shell: spawn open(1) directly so a hostile app path can never be
+    // reinterpreted by sh (CodeQL js/incomplete-sanitization).
     log.info('Swap complete — restarting into the new version.');
-    const reopen = spawn('/bin/sh', ['-c', `sleep 2; /usr/bin/open -n "${currentApp.replace(/"/g, '\\"')}"`], {
-      detached: true,
-      stdio: 'ignore',
-    });
-    reopen.unref();
+    const reopenTimer = setTimeout(() => {
+      const reopen = spawn('/usr/bin/open', ['-n', currentApp], {
+        detached: true,
+        stdio: 'ignore',
+      });
+      reopen.unref();
+    }, 2000);
+    reopenTimer.unref?.();
     state.pending = null;
     app.exit(0);
   } catch (err) {

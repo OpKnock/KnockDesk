@@ -26,7 +26,7 @@ import path from 'path';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { randomBytes, createHash } from 'crypto';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { tmpdir } from 'os';
 import qrcode from 'qrcode-terminal';
 import {
@@ -694,7 +694,29 @@ function inferMediaType(ext) {
 }
 
 // Send media (image, video, document) natively
+// Fixed-window guard: the bridge is loopback-only, but expensive ffmpeg
+// conversions must not be callable in an unbounded burst (CodeQL
+// js/missing-rate-limiting).
+const sendMediaHits = new Map();
+setInterval(() => {
+  const cutoff = Date.now() - 60000;
+  for (const [ip, stamps] of sendMediaHits) {
+    const kept = stamps.filter((t) => t > cutoff);
+    if (kept.length) sendMediaHits.set(ip, kept);
+    else sendMediaHits.delete(ip);
+  }
+}, 60000).unref?.();
+function sendMediaRateOk(ip) {
+  const now = Date.now();
+  const stamps = (sendMediaHits.get(ip) || []).filter((t) => now - t < 60000);
+  stamps.push(now);
+  sendMediaHits.set(ip, stamps);
+  return stamps.length <= 30;
+}
 app.post('/send-media', async (req, res) => {
+  if (!sendMediaRateOk(req.ip || 'loopback')) {
+    return res.status(429).json({ error: 'Rate limit exceeded: max 30 media sends per minute' });
+  }
   if (!sock || connectionState !== 'connected') {
     return res.status(503).json({ error: 'Not connected to WhatsApp' });
   }
@@ -732,8 +754,11 @@ app.post('/send-media', async (req, res) => {
         if (needsConversion) {
           tmpPath = path.join(tmpdir(), `hermes_voice_${randomBytes(6).toString('hex')}.ogg`);
           try {
-            execSync(
-              `ffmpeg -y -i ${JSON.stringify(filePath)} -ar 48000 -ac 1 -c:a libopus ${JSON.stringify(tmpPath)}`,
+            // No shell: argv array cannot be reinterpreted by sh even if the
+            // path contains $(), backticks, or quotes (CodeQL js/command-line-injection).
+            execFileSync(
+              'ffmpeg',
+              ['-y', '-i', filePath, '-ar', '48000', '-ac', '1', '-c:a', 'libopus', tmpPath],
               { timeout: 30000, stdio: 'pipe' }
             );
             audioBuffer = readFileSync(tmpPath);

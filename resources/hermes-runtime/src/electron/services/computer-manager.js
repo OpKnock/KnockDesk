@@ -565,7 +565,9 @@ class ComputerManager {
   // ── Sidecar ka process ───────────────────────────────────────────────────
 
   _fingerprint(cfg) {
-    return crypto.createHash('sha1').update(JSON.stringify(cfg)).digest('hex');
+    // Non-security change detector (not a password store); sha256 keeps
+    // CodeQL js/insufficient-password-hash quiet with identical behavior.
+    return crypto.createHash('sha256').update(JSON.stringify(cfg)).digest('hex');
   }
 
   _spawn(cfg, fp) {

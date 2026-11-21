@@ -4860,7 +4860,21 @@ async def validate_provider_credential(body: EnvVarUpdate, request: Request):
     # ids the endpoint advertises (OpenAI ``/v1/models`` shape) so the GUI can
     # auto-pick a default without asking the user to type a model name.
     if key == "OPENAI_BASE_URL":
+        from urllib.parse import urlparse
+
         url = value.rstrip("/") + "/models"
+        # SSRF guard (CodeQL py/full-ssrf): this endpoint probes a
+        # user-configured base URL. Restrict to http(s) and refuse cloud
+        # instance-metadata endpoints; loopback stays allowed (local
+        # Ollama / LM Studio / vLLM setups depend on it).
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower().rstrip(".")
+        if parsed.scheme not in ("http", "https") or host in (
+            "169.254.169.254",
+            "metadata.google.internal",
+            "metadata.google.internal.",
+        ):
+            return {"ok": False, "reachable": False, "message": "Refused unsafe endpoint URL."}
         # Send the optional API key so endpoints that require auth on
         # ``/v1/models`` (many hosted OpenAI-compatible servers) still enumerate
         # their models instead of returning an empty list behind a 401.
@@ -10605,6 +10619,12 @@ def _resolve_profile_dir(name: str) -> Path:
 
 def _profile_setup_command(name: str) -> str:
     """Return the shell command used to configure a profile in the CLI."""
+    # Belt-and-braces for CodeQL py/command-line-injection: the caller path
+    # already validates via validate_profile_name + existence, but this
+    # constructor must never interpolate an unvalidated identifier into a
+    # shell command, so enforce the profile-id shape right here too.
+    if name != "default" and not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", name or ""):
+        raise ValueError(f"Invalid profile name {name!r}.")
     _resolve_profile_dir(name)
     return "hermes setup" if name == "default" else f"{name} setup"
 
