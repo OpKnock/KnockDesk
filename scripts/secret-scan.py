@@ -59,7 +59,6 @@ DEFAULT_PATHS = (
     "resources/knockdesk-computer",
     "resources/hermes-plugins",
     "README.md",
-    "index.html",
     "build-electron-main.mjs",
 )
 
