@@ -10,40 +10,10 @@ const fs = require('node:fs');
 const http = require('node:http');
 const net = require('node:net');
 const path = require('node:path');
+const { stopOwnedChild } = require('./child-process-tree');
 const { hermesSpawnEnv, resolveHermesExe } = require('./hermes-runtime');
 
 const DEFAULT_PORT = Number.parseInt(process.env.KNOCKDESK_AGENTTOWN_PORT || process.env.STONIC_AGENTTOWN_PORT || '3010', 10);
-
-function stopOwnedChild(child, timeoutMs = 2500) {
-  if (!child || child.exitCode !== null) return Promise.resolve();
-  return new Promise((resolve) => {
-    let settled = false;
-    let timer;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      if (timer) clearTimeout(timer);
-      child.removeListener('exit', finish);
-      resolve();
-    };
-    child.once('exit', finish);
-    timer = setTimeout(() => {
-      try {
-        if (child.exitCode === null) child.kill();
-      } catch {
-        // The OS may already have removed the process.
-      }
-      finish();
-    }, timeoutMs);
-    try {
-      const sent = child.kill();
-      if (!sent && child.exitCode !== null) finish();
-    } catch {
-      finish();
-    }
-  });
-}
-
 
 function isAgentTownHtml(contentType, html) {
   return String(contentType).includes('text/html') && /<html[\s>]/i.test(html) && html.includes('/_next/');
@@ -153,7 +123,17 @@ class DesktopAgentTownRuntime {
     if (this.state === 'ready' || this.state === 'starting') return Promise.resolve(this.getState());
     this.stopping = false;
     this._setState('starting');
-    this.startPromise = this._startBackground();
+    // A detached background failure must not leave the runtime stuck at
+    // "starting" with a permanently rejected promise. Keep launch non-blocking,
+    // report unexpected failures, and allow a later call to retry.
+    const pendingStart = this._startBackground().catch((error) => {
+      if (!this.stopping) {
+        const message = error instanceof Error ? error.message : String(error);
+        this._setState('error', 'AgentTown startup failed: ' + message);
+      }
+      if (this.startPromise === pendingStart) this.startPromise = null;
+    });
+    this.startPromise = pendingStart;
     return Promise.resolve(this.getState());
   }
 
@@ -227,6 +207,7 @@ class DesktopAgentTownRuntime {
       this.child = spawn(process.execPath, [path.join(this.dir, 'server.js')], {
         cwd: this.dir,
         windowsHide: true,
+        detached: process.platform !== 'win32',
         stdio: ['ignore', 'pipe', 'pipe'],
         env: { ...env, ELECTRON_RUN_AS_NODE: '1', NODE_ENV: 'production' },
       });
@@ -284,7 +265,7 @@ class DesktopAgentTownRuntime {
     const ownedChild = this.child && !this.external ? this.child : null;
     const pendingStart = this.startPromise;
     await Promise.allSettled([
-      stopOwnedChild(ownedChild),
+      stopOwnedChild(ownedChild, 2500, { detachedGroup: process.platform !== 'win32' }),
       pendingStart,
     ].filter(Boolean));
     this.child = null;

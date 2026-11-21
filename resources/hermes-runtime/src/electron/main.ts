@@ -18,12 +18,18 @@ const {
 } = require('./services/knockdesk-plugin.js');
 const { DesktopHermesRuntime } = require('./services/desktop-hermes-runtime.js');
 const { DesktopAgentTownRuntime } = require('./services/desktop-agenttown-runtime.js');
+const { createRetryableInitializer } = require('./services/retryable-initializer.js');
+const {
+  isAllowedLoopbackUrl,
+  isAllowedWebviewPreload,
+  hardenWebviewPreferences,
+} = require('./services/webview-security.js');
+const initializeServicesOnceWithRetry = createRetryableInitializer(initializeServicesOnce);
 
 let mainWindow: BrowserWindow | null = null;
 let hermesManager: any = null;
 let agentTownManager: any = null;
 let ipcHandlersRegistered = false;
-let servicesPromise: Promise<void> | null = null;
 
 app.disableHardwareAcceleration();
 app.setAppUserModelId('com.knockdesk.app');
@@ -99,12 +105,15 @@ function registerDesktopIpc(): void {
   });
 
   ipcMain.handle('knockdesk:memory:update', async (_event, instruction: unknown) => {
-    if (!hermesManager) return { ok: false, error: 'Hermes is not ready yet.' };
     if (typeof instruction !== 'string' || !instruction.trim()) {
       return { ok: false, error: 'Enter a memory instruction first.' };
     }
-    if (instruction.length > 4000) {
-      return { ok: false, error: 'Memory instructions must be 4,000 characters or fewer.' };
+    if (instruction.length > 1500) {
+      return { ok: false, error: 'Memory instructions must be 1,500 characters or fewer.' };
+    }
+    const initialized = await initializeServicesForIpc();
+    if (!initialized || !hermesManager) {
+      return { ok: false, error: 'Hermes could not be initialized.' };
     }
     return hermesManager.memoryRequest(instruction.trim());
   });
@@ -141,11 +150,15 @@ async function createWindow(): Promise<BrowserWindow> {
     backgroundColor: '#090c12',
     title: 'KnockDesk',
     titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#0a0c10',
-      symbolColor: '#66d9f4',
-      height: 36,
-    },
+    // macOS keeps its native traffic-light controls with a hidden title bar.
+    // Windows and Linux need Electron's title-bar overlay for native controls.
+    ...(process.platform !== 'darwin' ? {
+      titleBarOverlay: {
+        color: '#0a0c10',
+        symbolColor: '#66d9f4',
+        height: 36,
+      },
+    } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'desktop-preload.js'),
       contextIsolation: true,
@@ -157,6 +170,50 @@ async function createWindow(): Promise<BrowserWindow> {
       webviewTag: true,
     },
     icon: path.join(__dirname, 'pwa', 'icon-512.png'),
+  });
+
+  const allowedGuestPreloads = [
+    path.join(__dirname, 'hermes-preload.js'),
+    path.join(__dirname, 'agenttown-preload.js'),
+  ];
+  mainWindow.webContents.on('will-attach-webview', (event, webPreferences, params) => {
+    const source = typeof params.src === 'string' ? params.src : '';
+    const sourceAllowed = isAllowedLoopbackUrl(source);
+    const preloadAllowed = isAllowedWebviewPreload(webPreferences.preload, allowedGuestPreloads);
+    if (!sourceAllowed || !preloadAllowed) {
+      console.warn('[KnockDesk] Blocked untrusted embedded webview.', { sourceAllowed, preloadAllowed });
+      event.preventDefault();
+      return;
+    }
+    hardenWebviewPreferences(webPreferences);
+  });
+
+  mainWindow.webContents.on('did-attach-webview', (_event, guestContents) => {
+    guestContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    const guardNavigation = (event: Electron.Event, target: string) => {
+      if (!isAllowedLoopbackUrl(target)) event.preventDefault();
+    };
+    guestContents.on('will-navigate', guardNavigation);
+    guestContents.on('will-redirect', guardNavigation);
+  });
+
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    // OAuth and ordinary external links use the system browser rather than
+    // opening an unsandboxed Electron child window.
+    try {
+      const target = new URL(url);
+      if (
+        ['https:', 'http:', 'mailto:'].includes(target.protocol) &&
+        !isAllowedLoopbackUrl(target.toString())
+      ) {
+        void shell.openExternal(target.toString()).catch((error: unknown) => {
+          console.warn('[KnockDesk] Could not open external link:', error);
+        });
+      }
+    } catch {
+      console.warn('[KnockDesk] Blocked invalid window.open URL.');
+    }
+    return { action: 'deny' };
   });
 
   mainWindow.once('ready-to-show', () => mainWindow?.show());
@@ -188,8 +245,7 @@ async function createWindow(): Promise<BrowserWindow> {
 }
 
 async function initializeServices(window: BrowserWindow): Promise<void> {
-  if (!servicesPromise) servicesPromise = initializeServicesOnce(window);
-  await servicesPromise;
+  await initializeServicesOnceWithRetry(window);
   if (hermesManager) hermesManager.mainWindow = window;
   if (agentTownManager) agentTownManager.mainWindow = window;
 }
@@ -199,12 +255,26 @@ async function initializeServicesForIpc(): Promise<boolean> {
     ? mainWindow
     : BrowserWindow.getAllWindows()[0] ?? null;
   if (!window) return false;
-  await initializeServices(window);
-  return true;
+  try {
+    await initializeServices(window);
+    return true;
+  } catch (error: unknown) {
+    // The individual IPC handlers translate false into their documented
+    // fallback payloads. Do not catch the manager.start() call in those
+    // handlers: genuine runtime-start errors should still be observable.
+    console.error('[KnockDesk] IPC service initialization failed:', error);
+    return false;
+  }
 }
 
 async function initializeServicesOnce(window: BrowserWindow): Promise<void> {
-  ensureKnockDeskDirectories(app);
+  const dataDirectory = ensureKnockDeskDirectories(app);
+  if (!dataDirectory) {
+    throw new Error(
+      'KnockDesk could not initialize its Documents/KnockDesk Data folder. ' +
+      'Check that your Documents folder is writable, then retry.'
+    );
+  }
 
   hermesManager = new DesktopHermesRuntime();
   hermesManager.mainWindow = window;

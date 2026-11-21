@@ -47,6 +47,44 @@ test('staging script includes CommonJS services', () => {
   assert.ok(source.includes('services/hermes-manager.js'));
 });
 
+test('Hermes runtime detection recognizes Windows and macOS virtual-environment entrypoints', () => {
+  const source = readFileSync(script, 'utf8');
+  assert.match(source, /process\.platform\s*===\s*['\"]win32['\"]/);
+  assert.match(source, /venv['\"],\s*['\"]Scripts['\"],\s*['\"]hermes\.exe['\"]/);
+  assert.match(source, /venv['\"],\s*['\"]bin['\"],\s*['\"]hermes['\"]/);
+});
+
+test('Hermes dashboard route pages are lazy-loaded behind a Suspense boundary', () => {
+  const app = readFileSync(resolve(root, 'resources/hermes-runtime/src/web/src/App.tsx'), 'utf8');
+  for (const page of [
+    'ConfigPage', 'DocsPage', 'EnvPage', 'FilesPage', 'SessionsPage', 'LogsPage',
+    'AnalyticsPage', 'ModelsPage', 'CronPage', 'ProfilesPage', 'ProfileBuilderPage',
+    'SkillsPage', 'PluginsPage', 'McpPage', 'PairingPage', 'ChannelsPage',
+    'WebhooksPage', 'SystemPage',
+  ]) {
+    assert.match(app, new RegExp(`const ${page} = lazy\\(\\(\\) => import\\([\\"']@/pages/${page}[\\"']\\)\\)`));
+    assert.doesNotMatch(app, new RegExp(`import ${page} from [\\"']@/pages/${page}[\\"']`));
+  }
+  const routesPosition = app.lastIndexOf('<Routes>');
+  const suspenseStart = app.lastIndexOf('<Suspense', routesPosition);
+  const suspenseEnd = app.indexOf('</Suspense>', routesPosition);
+  assert.ok(routesPosition >= 0 && suspenseStart >= 0 && suspenseEnd > routesPosition,
+    'all routes must render inside a Suspense boundary');
+  // Chat owns a persistent terminal and must remain mounted when switching routes.
+  assert.match(app, /import ChatPage from [\"']@\/pages\/ChatPage[\"']/);
+});
+
+test('Hermes update dialog resets stale update details before opening without effect-driven state writes', () => {
+  const app = readFileSync(resolve(root, 'resources/hermes-runtime/src/web/src/App.tsx'), 'utf8');
+  assert.match(app, /if \(action === "update"\) \{\s*setUpdateConfirmInfo\(null\);\s*setUpdateConfirmChecking\(true\);\s*setUpdateConfirmOpen\(true\);/);
+  const effectStart = app.indexOf('useEffect(() => {\n    if (!updateConfirmOpen)');
+  const apiRequestStart = app.indexOf('    api\n', effectStart);
+  const effectEnd = app.indexOf('}, [updateConfirmOpen]);', effectStart);
+  assert.ok(effectStart >= 0 && apiRequestStart > effectStart && effectEnd > apiRequestStart,
+    'update check effect should be identifiable');
+  assert.doesNotMatch(app.slice(effectStart, apiRequestStart), /setUpdateConfirm(?:Info|Checking)\(/);
+});
+
 test('desktop renderer has its own stable output path', () => {
   const html = readFileSync(resolve(root, 'resources/hermes-runtime/src/web/desktop.html'), 'utf8');
   const vite = readFileSync(resolve(root, 'resources/hermes-runtime/src/web/vite.desktop.config.ts'), 'utf8');
@@ -141,9 +179,27 @@ test('memory bridge payload matches the main-process string contract', () => {
   const preload = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/desktop-preload.js'), 'utf8');
   const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
   assert.ok(preload.includes("String(instruction ?? '').trim()"));
-  assert.ok(preload.includes("'knockdesk:memory:update',\n    String(instruction ?? '').trim()"));
+  assert.match(preload, /'knockdesk:memory:update',\s*String\(instruction \?\? ''\)\.trim\(\)/);
   assert.ok(main.includes("typeof instruction !== 'string'"));
   assert.ok(!preload.includes("'knockdesk:memory:update', {\n    instruction:"));
+});
+
+test('memory update re-attempts service initialization and returns a typed fallback on failure', () => {
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  const start = main.indexOf("ipcMain.handle('knockdesk:memory:update'");
+  const end = main.indexOf("ipcMain.handle('knockdesk:system:info'", start);
+  assert.ok(start >= 0 && end > start, 'memory update IPC handler must exist');
+  const handler = main.slice(start, end);
+  assert.match(handler, /const initialized = await initializeServicesForIpc\(\)/);
+  assert.match(handler, /if \(!initialized \|\| !hermesManager\) \{\s*return \{ ok: false, error: 'Hermes could not be initialized\.' \};\s*\}/);
+});
+
+test('memory IPC length validation matches the runtime limit and never silently truncates accepted input', () => {
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  const runtime = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/services/desktop-hermes-runtime.js'), 'utf8');
+  assert.match(main, /if \(instruction\.length > 1500\)/);
+  assert.ok(main.includes('Memory instructions must be 1,500 characters or fewer.'));
+  assert.match(runtime, /String\(instruction \|\| ''\)\.trim\(\)\.slice\(0, 1500\)/);
 });
 
 test('ASAR helper documents safe list, extract and pack operations', () => {
@@ -163,12 +219,17 @@ test('desktop shutdown waits for child runtime cleanup before quitting', () => {
   assert.ok(main.includes('agentTownManager?.stop?.()'));
 });
 
-test('runtime and AgentTown start requests wait for first-run service initialization', () => {
+test('IPC initialization failures return channel-specific fallback payloads without masking runtime start errors', () => {
   const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
-  assert.equal((main.match(/await initializeServicesForIpc\(\)/g) || []).length, 3);
-  assert.ok(main.includes('async function initializeServicesForIpc(): Promise<boolean>'));
+  assert.equal((main.match(/await initializeServicesForIpc\(\)/g) || []).length, 4);
+  assert.match(main, /async function initializeServicesForIpc\(\): Promise<boolean> \{[\s\S]*?try \{\s*await initializeServices\(window\);\s*return true;\s*\} catch \(error: unknown\) \{[\s\S]*?return false;/);
   assert.ok(main.includes("stateFallback('error', 'AgentTown could not be initialized.')"));
   assert.ok(main.includes("stateFallback('error', 'The Hermes runtime could not be initialized.')"));
+  assert.ok(main.includes("return { available: false, memory: '', user: '' }"));
+  // Manager start errors must continue to propagate rather than being converted
+  // into a misleading "initialization failed" state.
+  assert.ok(main.includes('return hermesManager.start();'));
+  assert.ok(main.includes('return agentTownManager.start();'));
 });
 
 test('manual ASAR extraction workflow exposes a downloadable artifact', () => {
@@ -208,16 +269,20 @@ test('staging bundles the plugin source used by its first-run installer', () => 
   assert.ok(build.includes("'knockdesk/plugin.yaml'"));
   assert.ok(build.includes("'knockdesk-computer/plugin.yaml'"));
   assert.ok(build.includes("'knockdesk-memory/plugin.yaml'"));
+  assert.ok(build.includes("'services/retryable-initializer.js'"));
+  assert.ok(build.includes("'services/child-process-tree.js'"));
+  assert.ok(build.includes("'services/webview-security.js'"));
+  assert.ok(build.includes("'services/cdp-port-resolver.js'"));
 });
 
 test('runtime startup cannot spawn or mark ready after shutdown begins', () => {
   const hermes = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/services/desktop-hermes-runtime.js'), 'utf8');
   const agentTown = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/services/desktop-agenttown-runtime.js'), 'utf8');
-  assert.ok(hermes.includes('const firstProbe = await this._probe().catch(() => null);\n    if (this.stopping)'));
-  assert.ok(hermes.includes('const status = await this._probe().catch(() => null);\n      if (this.stopping)'));
-  assert.ok(agentTown.includes('const adopted = await probe(this.baseUrl).catch(() => null);\n    if (this.stopping)'));
-  assert.ok(agentTown.includes('const available = await isPortAvailable(candidate);\n      if (this.stopping)'));
-  assert.ok(agentTown.includes('const ready = await probe(this.baseUrl).catch(() => null);\n      if (this.stopping)'));
+  assert.match(hermes, /const firstProbe = await this\._probe\(\)\.catch\(\(\) => null\);\s*if \(this\.stopping\)/);
+  assert.match(hermes, /const status = await this\._probe\(\)\.catch\(\(\) => null\);\s*if \(this\.stopping\)/);
+  assert.match(agentTown, /const adopted = await probe\(this\.baseUrl\)\.catch\(\(\) => null\);\s*if \(this\.stopping\)/);
+  assert.match(agentTown, /const available = await isPortAvailable\(candidate\);\s*if \(this\.stopping\)/);
+  assert.match(agentTown, /const ready = await probe\(this\.baseUrl\)\.catch\(\(\) => null\);\s*if \(this\.stopping\)/);
 });
 
 test('memory UI reports success only when IPC explicitly returns ok=true', () => {
@@ -230,16 +295,20 @@ test('shutdown waits for owned runtime and one-shot memory processes to exit', (
   const hermes = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/services/desktop-hermes-runtime.js'), 'utf8');
   const agentTown = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/services/desktop-agenttown-runtime.js'), 'utf8');
   assert.ok(hermes.includes('const memoryChildren = [...this.memoryChildren]'));
-  assert.ok(hermes.includes('...memoryChildren.map((child) => stopOwnedChild(child))'));
+  assert.ok(hermes.includes('...memoryChildren.map((child) => stopOwnedChild(child, 2500, {'));
   assert.ok(hermes.includes('const pendingStart = this.startPromise'));
   assert.ok(agentTown.includes('await Promise.allSettled(['));
-  assert.ok(agentTown.includes('stopOwnedChild(ownedChild)'));
+  assert.ok(agentTown.includes("stopOwnedChild(ownedChild, 2500, { detachedGroup: process.platform !== 'win32' })"));
 });
 
-test('Windows source smoke test waits for the built desktop.html renderer', () => {
+test('Windows and macOS source smoke paths wait for the built desktop.html renderer', () => {
   const smoke = readFileSync(resolve(root, 'scripts/source_desktop_smoke_test.py'), 'utf8');
   assert.ok(smoke.includes('ELECTRON_APP / "dist" / "renderer" / "desktop.html"'));
+  assert.ok(smoke.includes('elif sys.platform == "darwin"'));
   assert.ok(smoke.includes('"renderer/desktop.html" in candidate.url'));
+  assert.ok(smoke.includes('start_new_session=os.name != "nt"'));
+  assert.ok(smoke.includes('os.killpg(group_id, signal.SIGTERM)'));
+  assert.ok(smoke.includes('os.killpg(group_id, signal.SIGKILL)'));
   assert.equal(smoke.includes('"renderer/index.html" in candidate.url'), false);
 });
 
@@ -265,4 +334,358 @@ test('development and Windows smoke flows install the Electron 44 binary on dema
   const ci = readFileSync(resolve(root, '.github/workflows/ci.yml'), 'utf8');
   assert.ok(dev.includes("'install-electron', '--no'"));
   assert.ok(ci.includes('npm exec --workspace electron -- install-electron --no'));
+});
+
+test('failed first-run initialization clears the cached promise so the user can retry', () => {
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  assert.match(main, /createRetryableInitializer/);
+  assert.match(main, /initializeServicesOnceWithRetry\(window\)/);
+});
+
+test('retryable initializer deduplicates concurrent startup requests', async () => {
+  const { createRetryableInitializer } = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/retryable-initializer.js'
+  ));
+  let release;
+  let calls = 0;
+  const initializer = createRetryableInitializer(() => {
+    calls += 1;
+    return new Promise((resolve) => { release = resolve; });
+  });
+
+  const first = initializer();
+  const second = initializer();
+  assert.equal(first, second, 'concurrent callers should share the same promise');
+  await Promise.resolve();
+  assert.equal(calls, 1, 'only one initialization attempt should start');
+  release('ready');
+  assert.equal(await first, 'ready');
+  assert.equal(await initializer(), 'ready', 'successful initialization remains cached');
+  assert.equal(calls, 1, 'successful initialization must not run twice');
+});
+
+test('retryable initializer permits a new attempt after rejection', async () => {
+  const { createRetryableInitializer } = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/retryable-initializer.js'
+  ));
+  let calls = 0;
+  const initializer = createRetryableInitializer(async () => {
+    calls += 1;
+    if (calls === 1) throw new Error('transient setup failure');
+    return 'ready';
+  });
+
+  await assert.rejects(initializer(), /transient setup failure/);
+  assert.equal(await initializer(), 'ready');
+  assert.equal(calls, 2, 'second call should rerun the failed initialization');
+});
+
+test('retryable initializer rejects a missing callback clearly', () => {
+  const { createRetryableInitializer } = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/retryable-initializer.js'
+  ));
+  assert.throws(() => createRetryableInitializer(null), /initialize must be a function/);
+});
+
+test('startup stops with a clear error when the KnockDesk data directory cannot be initialized', () => {
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  assert.match(main, /const dataDirectory = ensureKnockDeskDirectories\(app\);/);
+  assert.match(main, /if \(!dataDirectory\)/);
+  assert.match(main, /Check that your Documents folder is writable, then retry/);
+});
+
+test('Hermes background startup errors clear the pending promise and can be retried', async () => {
+  const { DesktopHermesRuntime } = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/desktop-hermes-runtime.js'
+  ));
+  const runtime = new DesktopHermesRuntime();
+  let attempts = 0;
+  runtime._startBackground = async () => {
+    attempts += 1;
+    if (attempts === 1) throw new Error('transient Hermes startup failure');
+    runtime._setState('ready');
+  };
+
+  const firstStart = runtime.start();
+  const firstAttempt = runtime.startPromise;
+  await Promise.resolve(firstAttempt).catch(() => undefined);
+  await firstStart;
+  assert.equal(runtime.getState().state, 'error', 'a rejected background start must surface an error state');
+  assert.match(runtime.getState().error, /Hermes startup failed: transient Hermes startup failure/);
+  assert.equal(runtime.startPromise, null, 'a failed background start must release the retry lock');
+
+  await runtime.start();
+  await runtime.startPromise;
+  assert.equal(attempts, 2, 'the next start request must attempt launch again');
+  assert.equal(runtime.getState().state, 'ready');
+});
+
+test('native title-bar overlay is configured only on platforms that need custom window controls', () => {
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  assert.match(main, /\.\.\.\(process\.platform !== 'darwin' \? \{/);
+  assert.match(main, /titleBarOverlay:\s*\{/);
+});
+
+test('AgentTown background startup errors clear the pending promise and can be retried', async () => {
+  const { DesktopAgentTownRuntime } = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/desktop-agenttown-runtime.js'
+  ));
+  const runtime = new DesktopAgentTownRuntime();
+  let attempts = 0;
+  runtime._startBackground = async () => {
+    attempts += 1;
+    if (attempts === 1) throw new Error('transient AgentTown startup failure');
+    runtime._setState('ready');
+  };
+
+  const firstStart = runtime.start();
+  const firstAttempt = runtime.startPromise;
+  await Promise.resolve(firstAttempt).catch(() => undefined);
+  await firstStart;
+  assert.equal(runtime.getState().state, 'error', 'a rejected background start must surface an error state');
+  assert.equal(runtime.startPromise, null, 'a failed background start must release the retry lock');
+
+  await runtime.start();
+  await runtime.startPromise;
+  assert.equal(attempts, 2, 'the next start request must attempt launch again');
+  assert.equal(runtime.getState().state, 'ready');
+});
+
+test('Windows required CI status-check name remains stable with a separate macOS smoke job', () => {
+  const workflow = readFileSync(resolve(root, '.github/workflows/ci.yml'), 'utf8');
+  assert.match(workflow, /name:\s*\$\{\{\s*matrix\.name\s*\}\}/);
+  assert.match(workflow, /os:\s*windows-latest[\s\S]*?name:\s*Windows desktop renderer smoke test/);
+  assert.match(workflow, /os:\s*macos-latest[\s\S]*?name:\s*macOS desktop renderer smoke test/);
+});
+
+test('CodeQL workflow does not persist its checkout token', () => {
+  const workflow = readFileSync(resolve(root, '.github/workflows/codeql.yml'), 'utf8');
+  assert.match(workflow, /uses: actions\/checkout@v4\s+with:\s+lfs: false\s+persist-credentials: false/);
+});
+
+test('Hermes shutdown terminates the owned process tree instead of leaving a Python child behind', () => {
+  const { terminateOwnedProcessTree } = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/child-process-tree.js'
+  ));
+  assert.equal(typeof terminateOwnedProcessTree, 'function');
+
+  const windowsCalls = [];
+  let windowsChildKilled = false;
+  const windowsChild = { pid: 1234, exitCode: null, kill: () => { windowsChildKilled = true; } };
+  const spawnedKiller = { once() { return this; } };
+  assert.equal(terminateOwnedProcessTree(windowsChild, {
+    platform: 'win32',
+    spawnProcess: (...args) => { windowsCalls.push(args); return spawnedKiller; },
+  }), true);
+  assert.deepEqual(windowsCalls[0].slice(0, 2), ['taskkill.exe', ['/PID', '1234', '/T', '/F']]);
+  assert.equal(windowsCalls[0][2].windowsHide, true);
+  assert.equal(windowsChildKilled, false, 'use taskkill /T so the launcher does not orphan its interpreter');
+
+  const posixCalls = [];
+  let posixChildKilled = false;
+  const posixChild = { pid: 5678, exitCode: null, kill: () => { posixChildKilled = true; } };
+  assert.equal(terminateOwnedProcessTree(posixChild, {
+    platform: 'darwin',
+    detachedGroup: true,
+    killProcess: (pid, signal) => posixCalls.push([pid, signal]),
+  }), true);
+  assert.deepEqual(posixCalls, [[-5678, 'SIGKILL']], 'terminate the isolated process group on POSIX');
+  assert.equal(posixChildKilled, false);
+});
+
+test('detached process groups are cleaned even if their parent has already exited', async () => {
+  const { stopOwnedChild } = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/child-process-tree.js'
+  ));
+  const calls = [];
+  const exitedChild = {
+    pid: 6789,
+    exitCode: null,
+    signalCode: 'SIGTERM',
+    once() { return this; },
+    removeListener() { return this; },
+    kill() { throw new Error('direct child should already be exited'); },
+  };
+
+  await stopOwnedChild(exitedChild, 2500, {
+    platform: 'darwin',
+    detachedGroup: true,
+    killProcess: (pid, signal) => calls.push([pid, signal]),
+  });
+
+  assert.deepEqual(calls, [[-6789, 'SIGKILL']]);
+});
+
+
+test('embedded webviews reject untrusted origins and preloads and enforce isolated preferences', () => {
+  const security = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/webview-security.js'
+  ));
+  const { pathToFileURL } = createRequire(import.meta.url)('node:url');
+  const { join } = createRequire(import.meta.url)('node:path');
+  const allowedHermes = join(root, 'resources/hermes-runtime/src/electron/hermes-preload.js');
+  const allowedAgentTown = join(root, 'resources/hermes-runtime/src/electron/agenttown-preload.js');
+
+  assert.equal(security.isAllowedLoopbackUrl('http://127.0.0.1:9119'), true);
+  assert.equal(security.isAllowedLoopbackUrl('http://localhost:3010/path'), true);
+  assert.equal(security.isAllowedLoopbackUrl('http://[::1]:3010'), true);
+  assert.equal(security.isAllowedLoopbackUrl('https://127.0.0.1:9119'), false);
+  assert.equal(security.isAllowedLoopbackUrl('http://127.0.0.1.attacker.example:9119'), false);
+  assert.equal(security.isAllowedLoopbackUrl('http://user:pass@127.0.0.1:9119'), false);
+  assert.equal(security.isAllowedLoopbackUrl('file:///C:/Windows/win.ini'), false);
+
+  assert.equal(security.isAllowedWebviewPreload(undefined, [allowedHermes, allowedAgentTown]), true);
+  assert.equal(security.isAllowedWebviewPreload(pathToFileURL(allowedHermes).toString(), [allowedHermes, allowedAgentTown]), true);
+  assert.equal(security.isAllowedWebviewPreload(allowedAgentTown, [allowedHermes, allowedAgentTown]), true);
+  assert.equal(security.isAllowedWebviewPreload('file:///C:/Temp/attacker.js', [allowedHermes, allowedAgentTown]), false);
+  assert.equal(security.isAllowedWebviewPreload('javascript:alert(1)', [allowedHermes, allowedAgentTown]), false);
+
+  const preferences = {
+    nodeIntegration: true,
+    contextIsolation: false,
+    sandbox: false,
+    webSecurity: false,
+    allowRunningInsecureContent: true,
+    webviewTag: true,
+    experimentalFeatures: true,
+  };
+  security.hardenWebviewPreferences(preferences);
+  assert.equal(preferences.nodeIntegration, false);
+  assert.equal(preferences.contextIsolation, true);
+  assert.equal(preferences.sandbox, true);
+  assert.equal(preferences.webSecurity, true);
+  assert.equal(preferences.allowRunningInsecureContent, false);
+  assert.equal(preferences.webviewTag, false);
+  assert.equal(preferences.experimentalFeatures, false);
+});
+
+
+test('Electron enforces the embedded webview policy in the main process', () => {
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  assert.match(main, /webContents\.on\('will-attach-webview'/);
+  assert.match(main, /isAllowedLoopbackUrl\(source\)/);
+  assert.match(main, /isAllowedWebviewPreload\(webPreferences\.preload, allowedGuestPreloads\)/);
+  assert.match(main, /hardenWebviewPreferences\(webPreferences\)/);
+  assert.match(main, /webContents\.on\('did-attach-webview'/);
+  assert.match(main, /guestContents\.setWindowOpenHandler\(\(\) => \(\{ action: 'deny' \}\)\)/);
+  assert.match(main, /guestContents\.on\('will-navigate', guardNavigation\)/);
+  assert.match(main, /guestContents\.on\('will-redirect', guardNavigation\)/);
+});
+test('main-window OAuth popups are safely forwarded to the system browser', () => {
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  assert.match(main, /mainWindow\.webContents\.setWindowOpenHandler\(\(\{ url \}\) => \{/);
+  assert.match(main, /\['https:', 'http:', 'mailto:'\]\.includes\(target\.protocol\)/);
+  assert.match(main, /shell\.openExternal\(target\.toString\(\)\)/);
+  assert.match(main, /return \{ action: 'deny' \};/);
+});
+test('staging cleanup retries transient Windows directory removal races', () => {
+  const build = readFileSync(script, 'utf8');
+  assert.match(build, /rmSync\(stagedDir, \{\s*recursive: true,\s*force: true,\s*maxRetries: 8,\s*retryDelay: 250\s*\}\)/);
+});
+
+test('CDP resolver skips occupied ports and reserves the next available port', async () => {
+  const resolver = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/cdp-port-resolver.js'
+  ));
+  const reserved = { close() {} };
+  const result = await resolver.findUsableCdpPort({
+    startPort: 9222,
+    endPort: 9224,
+    tryReservePort: async (port) => port === 9223 ? reserved : null,
+    probeCdpEndpoint: async () => ({ reachable: true, chromeFamily: false, browser: 'Adobe UXP' }),
+    logger: { warn() {}, log() {}, error() {} },
+  });
+  assert.equal(result.port, 9223);
+  assert.equal(result.reservation, reserved);
+  assert.equal(result.reusedExisting, false);
+});
+
+test('CDP resolver reuses an existing Chrome-family endpoint but never another service', async () => {
+  const resolver = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/cdp-port-resolver.js'
+  ));
+  const result = await resolver.findUsableCdpPort({
+    startPort: 9222,
+    endPort: 9223,
+    tryReservePort: async () => null,
+    probeCdpEndpoint: async (port) => port === 9222
+      ? { reachable: true, chromeFamily: false, browser: 'Adobe UXP' }
+      : { reachable: true, chromeFamily: true, browser: 'Chrome/142.0' },
+    logger: { warn() {}, log() {}, error() {} },
+  });
+  assert.equal(result.port, 9223);
+  assert.equal(result.reservation, null);
+  assert.equal(result.reusedExisting, true);
+});
+
+test('CDP resolver fails clearly instead of reusing an occupied non-Chrome port as fallback', async () => {
+  const resolver = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/cdp-port-resolver.js'
+  ));
+  await assert.rejects(
+    resolver.findUsableCdpPort({
+      startPort: 9222,
+      endPort: 9223,
+      tryReservePort: async () => null,
+      probeCdpEndpoint: async () => ({ reachable: true, chromeFamily: false, browser: 'Adobe UXP' }),
+      logger: { warn() {}, log() {}, error() {} },
+    }),
+    /No usable Chrome DevTools Protocol port in 9222-9223/
+  );
+});
+
+test('CDP launch retry classification only matches likely port contention', () => {
+  const resolver = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/cdp-port-resolver.js'
+  ));
+  assert.equal(resolver.isCdpPortConflictError(new Error('listen EADDRINUSE: address already in use')), true);
+  assert.equal(resolver.isCdpPortConflictError(new Error('DevToolsActivePort file does not exist')), true);
+  assert.equal(resolver.isCdpPortConflictError(new Error('missing chrome_elf.dll')), false);
+});
+
+
+test('CDP replacement-port selection never reuses a second existing browser endpoint', async () => {
+  const resolver = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/cdp-port-resolver.js'
+  ));
+  const result = await resolver.findUsableCdpPort({
+    startPort: 9222,
+    endPort: 9224,
+    excludedPorts: [9222],
+    allowReuseExisting: false,
+    tryReservePort: async (port) => port === 9224 ? { close() {} } : null,
+    probeCdpEndpoint: async (port) => ({
+      reachable: true,
+      chromeFamily: port === 9223,
+      browser: port === 9223 ? 'Chrome/142.0' : 'Adobe UXP',
+    }),
+    logger: { warn() {}, log() {}, error() {} },
+  });
+  assert.equal(result.port, 9224);
+  assert.equal(result.reusedExisting, false);
+});
+
+
+test('browser service retries CDP port collisions without quarantining the user profile', () => {
+  const browserManager = readFileSync(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/browser-manager.js'
+  ), 'utf8');
+  assert.match(browserManager, /findUsableCdpPort\(\{/);
+  assert.match(browserManager, /let cdpPort = await resolveCdpPort\(\)/);
+  assert.match(browserManager, /isCdpPortConflictError\(firstErr\)[\s\S]*resolveCdpPort\(\[cdpPort\], false\)/);
+  assert.match(browserManager, /if \(isCdpPortConflictError\(err\)\)/);
+  assert.match(browserManager, /LAUNCH FAILED due to CDP port conflict/);
+});
+
+
+test('CDP no-port-available error is classified as a port failure, not a profile corruption', () => {
+  const resolver = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/cdp-port-resolver.js'
+  ));
+  assert.equal(
+    resolver.isCdpPortConflictError(
+      new Error('No usable Chrome DevTools Protocol port in 9222-9252; every candidate is occupied or excluded.')
+    ),
+    true
+  );
 });

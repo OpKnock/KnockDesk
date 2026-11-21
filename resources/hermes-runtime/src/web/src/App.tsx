@@ -4,6 +4,8 @@ import {
   useMemo,
   useRef,
   useState,
+  lazy,
+  Suspense,
   type ComponentType,
   type FocusEvent,
   type MouseEvent,
@@ -72,24 +74,6 @@ import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 import { ProfileScopeBanner } from "@/components/ProfileScopeBanner";
 import { useSystemActions } from "@/contexts/useSystemActions";
 import type { SystemAction } from "@/contexts/system-actions-context";
-import ConfigPage from "@/pages/ConfigPage";
-import DocsPage from "@/pages/DocsPage";
-import EnvPage from "@/pages/EnvPage";
-import FilesPage from "@/pages/FilesPage";
-import SessionsPage from "@/pages/SessionsPage";
-import LogsPage from "@/pages/LogsPage";
-import AnalyticsPage from "@/pages/AnalyticsPage";
-import ModelsPage from "@/pages/ModelsPage";
-import CronPage from "@/pages/CronPage";
-import ProfilesPage from "@/pages/ProfilesPage";
-import ProfileBuilderPage from "@/pages/ProfileBuilderPage";
-import SkillsPage from "@/pages/SkillsPage";
-import PluginsPage from "@/pages/PluginsPage";
-import McpPage from "@/pages/McpPage";
-import PairingPage from "@/pages/PairingPage";
-import ChannelsPage from "@/pages/ChannelsPage";
-import WebhooksPage from "@/pages/WebhooksPage";
-import SystemPage from "@/pages/SystemPage";
 import ChatPage from "@/pages/ChatPage";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
@@ -101,6 +85,26 @@ import { useTheme } from "@/themes";
 import { isDashboardEmbeddedChatEnabled } from "@/lib/dashboard-flags";
 import { api } from "@/lib/api";
 import type { StatusResponse, UpdateCheckResponse } from "@/lib/api";
+
+// Load routed pages on demand to keep the first dashboard bundle small.
+const ConfigPage = lazy(() => import("@/pages/ConfigPage"));
+const DocsPage = lazy(() => import("@/pages/DocsPage"));
+const EnvPage = lazy(() => import("@/pages/EnvPage"));
+const FilesPage = lazy(() => import("@/pages/FilesPage"));
+const SessionsPage = lazy(() => import("@/pages/SessionsPage"));
+const LogsPage = lazy(() => import("@/pages/LogsPage"));
+const AnalyticsPage = lazy(() => import("@/pages/AnalyticsPage"));
+const ModelsPage = lazy(() => import("@/pages/ModelsPage"));
+const CronPage = lazy(() => import("@/pages/CronPage"));
+const ProfilesPage = lazy(() => import("@/pages/ProfilesPage"));
+const ProfileBuilderPage = lazy(() => import("@/pages/ProfileBuilderPage"));
+const SkillsPage = lazy(() => import("@/pages/SkillsPage"));
+const PluginsPage = lazy(() => import("@/pages/PluginsPage"));
+const McpPage = lazy(() => import("@/pages/McpPage"));
+const PairingPage = lazy(() => import("@/pages/PairingPage"));
+const ChannelsPage = lazy(() => import("@/pages/ChannelsPage"));
+const WebhooksPage = lazy(() => import("@/pages/WebhooksPage"));
+const SystemPage = lazy(() => import("@/pages/SystemPage"));
 
 function RootRedirect() {
   return <Navigate to="/sessions" replace />;
@@ -737,17 +741,23 @@ export default function App() {
                 )}
               >
                 <ProfileKeyedRoutes>
-                  <Routes>
-                    {routes.map(({ key, path, element }) => (
-                      <Route key={key} path={path} element={element} />
-                    ))}
-                    <Route
-                      path="*"
-                      element={
-                        <UnknownRouteFallback pluginsLoading={pluginsLoading} />
-                      }
-                    />
-                  </Routes>
+                  <Suspense fallback={(
+                    <div className="flex min-h-48 items-center justify-center" aria-busy="true" aria-live="polite">
+                      <Spinner />
+                    </div>
+                  )}>
+                    <Routes>
+                      {routes.map(({ key, path, element }) => (
+                        <Route key={key} path={path} element={element} />
+                      ))}
+                      <Route
+                        path="*"
+                        element={
+                          <UnknownRouteFallback pluginsLoading={pluginsLoading} />
+                        }
+                      />
+                    </Routes>
+                  </Suspense>
                 </ProfileKeyedRoutes>
 
                 {embeddedChat &&
@@ -909,12 +919,8 @@ function SidebarSystemActions({
   const [updateConfirmChecking, setUpdateConfirmChecking] = useState(false);
 
   useEffect(() => {
-    if (!updateConfirmOpen) {
-      setUpdateConfirmInfo(null);
-      return;
-    }
+    if (!updateConfirmOpen) return;
     let cancelled = false;
-    setUpdateConfirmChecking(true);
     api
       .checkHermesUpdate(false)
       .then((info) => {
@@ -970,6 +976,8 @@ function SidebarSystemActions({
       return;
     }
     if (action === "update") {
+      setUpdateConfirmInfo(null);
+      setUpdateConfirmChecking(true);
       setUpdateConfirmOpen(true);
       return;
     }
