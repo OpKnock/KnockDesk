@@ -135,7 +135,6 @@ class HermesManager {
     this._runApiVerifiedAt = 0;
     this._runApiFailedAt = 0;
     // Mobile Remote (KnockDesk platform plugin) ka setup — ek waqt mein ek koshish.
-    this._knockdeskReady = null;
     this._knockdeskReady = false;
     // Jo setup HONA chahiye — `{ bridgeUrl, bridgeKey, chatId }`.
     //
@@ -1669,7 +1668,10 @@ class HermesManager {
     if (this._stopping || this.state !== 'ready') return false;
 
     // Sirf wo gateway jise hum ne khud Mobile Remote ke liye khara kiya tha.
-    if (!this._knockdeskReady || this._knockdeskPending || this._knockdeskReady) {
+    // Setup abhi chal raha ho (`_knockdeskPending`) ya kabhi complete hi na hua
+    // ho (`_knockdeskReady` false) to yahan se kuch nahi karna — warna setup
+    // khud usay start kar raha hota aur do haath ek gateway par aa jate.
+    if (!this._knockdeskReady || this._knockdeskPending) {
       this._gatewayDownTicks = 0;
       return false;
     }
