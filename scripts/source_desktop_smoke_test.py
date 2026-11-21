@@ -55,27 +55,65 @@ def wait_for_cdp(port: int, process: subprocess.Popen[bytes], timeout: float = 3
 
 
 def stop_process(process: subprocess.Popen[bytes] | None) -> None:
-    if not process or process.poll() is not None:
+    if not process:
         return
-    try:
-        if os.name == "nt":
-            subprocess.run(
-                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
-                check=False,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                timeout=10,
-            )
-        else:
-            # Electron is launched in its own session to permit safe tree cleanup.
-            os.killpg(process.pid, signal.SIGTERM)
+    if os.name == "nt":
+        if process.poll() is None:
             try:
-                process.wait(timeout=8)
+                subprocess.run(
+                    ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                    check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=10,
+                )
+            except (OSError, subprocess.TimeoutExpired):
+                process.kill()
+        return
+
+    # The smoke runner starts Electron in a fresh session; its PID is also the
+    # process-group ID. Signal the group even if Electron's parent already exited.
+    group_id = process.pid
+    try:
+        os.killpg(group_id, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    except PermissionError:
+        return
+
+    deadline = time.monotonic() + 8
+    while time.monotonic() < deadline:
+        try:
+            os.killpg(group_id, 0)
+        except ProcessLookupError:
+            break
+        except PermissionError:
+            # The group exists, but cannot be inspected. Keep the bounded grace period.
+            pass
+        if process.poll() is None:
+            try:
+                process.wait(timeout=0.1)
             except subprocess.TimeoutExpired:
-                os.killpg(process.pid, signal.SIGKILL)
-                process.wait(timeout=2)
-    except (OSError, subprocess.TimeoutExpired):
-        process.kill()
+                pass
+        else:
+            time.sleep(0.1)
+
+    # A parent can exit while Chromium/Electron helper processes remain alive.
+    try:
+        os.killpg(group_id, 0)
+    except ProcessLookupError:
+        return
+    except PermissionError:
+        pass
+    try:
+        os.killpg(group_id, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    if process.poll() is None:
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill()
 
 
 def main() -> int:
