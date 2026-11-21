@@ -234,6 +234,7 @@ test('staging bundles the plugin source used by its first-run installer', () => 
   assert.ok(build.includes("'services/retryable-initializer.js'"));
   assert.ok(build.includes("'services/child-process-tree.js'"));
   assert.ok(build.includes("'services/webview-security.js'"));
+  assert.ok(build.includes("'services/cdp-port-resolver.js'"));
 });
 
 test('runtime startup cannot spawn or mark ready after shutdown begins', () => {
@@ -542,4 +543,111 @@ test('main-window OAuth popups are safely forwarded to the system browser', () =
 test('staging cleanup retries transient Windows directory removal races', () => {
   const build = readFileSync(script, 'utf8');
   assert.match(build, /rmSync\(stagedDir, \{\s*recursive: true,\s*force: true,\s*maxRetries: 8,\s*retryDelay: 250\s*\}\)/);
+});
+
+test('CDP resolver skips occupied ports and reserves the next available port', async () => {
+  const resolver = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/cdp-port-resolver.js'
+  ));
+  const reserved = { close() {} };
+  const result = await resolver.findUsableCdpPort({
+    startPort: 9222,
+    endPort: 9224,
+    tryReservePort: async (port) => port === 9223 ? reserved : null,
+    probeCdpEndpoint: async () => ({ reachable: true, chromeFamily: false, browser: 'Adobe UXP' }),
+    logger: { warn() {}, log() {}, error() {} },
+  });
+  assert.equal(result.port, 9223);
+  assert.equal(result.reservation, reserved);
+  assert.equal(result.reusedExisting, false);
+});
+
+test('CDP resolver reuses an existing Chrome-family endpoint but never another service', async () => {
+  const resolver = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/cdp-port-resolver.js'
+  ));
+  const result = await resolver.findUsableCdpPort({
+    startPort: 9222,
+    endPort: 9223,
+    tryReservePort: async () => null,
+    probeCdpEndpoint: async (port) => port === 9222
+      ? { reachable: true, chromeFamily: false, browser: 'Adobe UXP' }
+      : { reachable: true, chromeFamily: true, browser: 'Chrome/142.0' },
+    logger: { warn() {}, log() {}, error() {} },
+  });
+  assert.equal(result.port, 9223);
+  assert.equal(result.reservation, null);
+  assert.equal(result.reusedExisting, true);
+});
+
+test('CDP resolver fails clearly instead of reusing an occupied non-Chrome port as fallback', async () => {
+  const resolver = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/cdp-port-resolver.js'
+  ));
+  await assert.rejects(
+    resolver.findUsableCdpPort({
+      startPort: 9222,
+      endPort: 9223,
+      tryReservePort: async () => null,
+      probeCdpEndpoint: async () => ({ reachable: true, chromeFamily: false, browser: 'Adobe UXP' }),
+      logger: { warn() {}, log() {}, error() {} },
+    }),
+    /No usable Chrome DevTools Protocol port in 9222-9223/
+  );
+});
+
+test('CDP launch retry classification only matches likely port contention', () => {
+  const resolver = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/cdp-port-resolver.js'
+  ));
+  assert.equal(resolver.isCdpPortConflictError(new Error('listen EADDRINUSE: address already in use')), true);
+  assert.equal(resolver.isCdpPortConflictError(new Error('DevToolsActivePort file does not exist')), true);
+  assert.equal(resolver.isCdpPortConflictError(new Error('missing chrome_elf.dll')), false);
+});
+
+
+test('CDP replacement-port selection never reuses a second existing browser endpoint', async () => {
+  const resolver = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/cdp-port-resolver.js'
+  ));
+  const result = await resolver.findUsableCdpPort({
+    startPort: 9222,
+    endPort: 9224,
+    excludedPorts: [9222],
+    allowReuseExisting: false,
+    tryReservePort: async (port) => port === 9224 ? { close() {} } : null,
+    probeCdpEndpoint: async (port) => ({
+      reachable: true,
+      chromeFamily: port === 9223,
+      browser: port === 9223 ? 'Chrome/142.0' : 'Adobe UXP',
+    }),
+    logger: { warn() {}, log() {}, error() {} },
+  });
+  assert.equal(result.port, 9224);
+  assert.equal(result.reusedExisting, false);
+});
+
+
+test('browser service retries CDP port collisions without quarantining the user profile', () => {
+  const browserManager = readFileSync(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/browser-manager.js'
+  ), 'utf8');
+  assert.match(browserManager, /findUsableCdpPort\(\{/);
+  assert.match(browserManager, /let cdpPort = await resolveCdpPort\(\)/);
+  assert.match(browserManager, /isCdpPortConflictError\(firstErr\)[\s\S]*resolveCdpPort\(\[cdpPort\], false\)/);
+  assert.match(browserManager, /if \(isCdpPortConflictError\(err\)\)/);
+  assert.match(browserManager, /LAUNCH FAILED due to CDP port conflict/);
+});
+
+
+test('CDP no-port-available error is classified as a port failure, not a profile corruption', () => {
+  const resolver = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/cdp-port-resolver.js'
+  ));
+  assert.equal(
+    resolver.isCdpPortConflictError(
+      new Error('No usable Chrome DevTools Protocol port in 9222-9252; every candidate is occupied or excluded.')
+    ),
+    true
+  );
 });
