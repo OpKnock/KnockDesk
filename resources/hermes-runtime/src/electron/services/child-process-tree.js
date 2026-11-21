@@ -2,6 +2,11 @@
 
 const { spawn } = require('node:child_process');
 
+function hasExited(child) {
+  return (child.exitCode !== null && child.exitCode !== undefined) ||
+    (child.signalCode !== null && child.signalCode !== undefined);
+}
+
 /**
  * Terminate a child process and the processes it owns.
  *
@@ -22,7 +27,7 @@ function terminateOwnedProcessTree(child, options = {}) {
   // A detached POSIX child's descendants can outlive the group leader. The
   // exit code only describes the direct child; still sweep its dedicated group.
   // Do not attempt this on Windows, where a dead PID may already be reused.
-  if (child.exitCode !== null) {
+  if (hasExited(child)) {
     if (platform !== 'win32' && options.detachedGroup && validPid) {
       try {
         killProcess(-pid, 'SIGKILL');
@@ -52,7 +57,7 @@ function terminateOwnedProcessTree(child, options = {}) {
       );
       killer?.once?.('error', () => {
         try {
-          if (child.exitCode === null) child.kill();
+          if (!hasExited(child)) child.kill();
         } catch {
           // The process or its tree may already have exited.
         }
@@ -91,7 +96,7 @@ function terminateOwnedProcessTree(child, options = {}) {
  */
 function stopOwnedChild(child, timeoutMs = 2500, options = {}) {
   if (!child) return Promise.resolve();
-  if (child.exitCode !== null) {
+  if (hasExited(child)) {
     terminateOwnedProcessTree(child, options);
     return Promise.resolve();
   }
@@ -109,12 +114,12 @@ function stopOwnedChild(child, timeoutMs = 2500, options = {}) {
 
     child.once('exit', finish);
     timer = setTimeout(() => {
-      if (child.exitCode === null) terminateOwnedProcessTree(child, options);
+      if (!hasExited(child)) terminateOwnedProcessTree(child, options);
       finish();
     }, timeoutMs);
 
     terminateOwnedProcessTree(child, options);
-    if (child.exitCode !== null) finish();
+    if (hasExited(child)) finish();
   });
 }
 
