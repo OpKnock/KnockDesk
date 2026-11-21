@@ -141,7 +141,7 @@ test('memory bridge payload matches the main-process string contract', () => {
   const preload = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/desktop-preload.js'), 'utf8');
   const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
   assert.ok(preload.includes("String(instruction ?? '').trim()"));
-  assert.ok(preload.includes("'knockdesk:memory:update',\n    String(instruction ?? '').trim()"));
+  assert.match(preload, /'knockdesk:memory:update',\s*String\(instruction \?\? ''\)\.trim\(\)/);
   assert.ok(main.includes("typeof instruction !== 'string'"));
   assert.ok(!preload.includes("'knockdesk:memory:update', {\n    instruction:"));
 });
@@ -214,11 +214,11 @@ test('staging bundles the plugin source used by its first-run installer', () => 
 test('runtime startup cannot spawn or mark ready after shutdown begins', () => {
   const hermes = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/services/desktop-hermes-runtime.js'), 'utf8');
   const agentTown = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/services/desktop-agenttown-runtime.js'), 'utf8');
-  assert.ok(hermes.includes('const firstProbe = await this._probe().catch(() => null);\n    if (this.stopping)'));
-  assert.ok(hermes.includes('const status = await this._probe().catch(() => null);\n      if (this.stopping)'));
-  assert.ok(agentTown.includes('const adopted = await probe(this.baseUrl).catch(() => null);\n    if (this.stopping)'));
-  assert.ok(agentTown.includes('const available = await isPortAvailable(candidate);\n      if (this.stopping)'));
-  assert.ok(agentTown.includes('const ready = await probe(this.baseUrl).catch(() => null);\n      if (this.stopping)'));
+  assert.match(hermes, /const firstProbe = await this\._probe\(\)\.catch\(\(\) => null\);\s*if \(this\.stopping\)/);
+  assert.match(hermes, /const status = await this\._probe\(\)\.catch\(\(\) => null\);\s*if \(this\.stopping\)/);
+  assert.match(agentTown, /const adopted = await probe\(this\.baseUrl\)\.catch\(\(\) => null\);\s*if \(this\.stopping\)/);
+  assert.match(agentTown, /const available = await isPortAvailable\(candidate\);\s*if \(this\.stopping\)/);
+  assert.match(agentTown, /const ready = await probe\(this\.baseUrl\)\.catch\(\(\) => null\);\s*if \(this\.stopping\)/);
 });
 
 test('memory UI reports success only when IPC explicitly returns ok=true', () => {
