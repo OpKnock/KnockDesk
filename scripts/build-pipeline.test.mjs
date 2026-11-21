@@ -331,3 +331,9 @@ test('Hermes background startup errors remain retryable', () => {
   assert.match(source, /Hermes startup failed:/);
   assert.match(source, /this.startPromise === pendingStart/);
 });
+
+test('native title-bar overlay is configured only on platforms that need custom window controls', () => {
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  assert.match(main, /\.\.\.\(process\.platform !== 'darwin' \? \{/);
+  assert.match(main, /titleBarOverlay:\s*\{/);
+});
