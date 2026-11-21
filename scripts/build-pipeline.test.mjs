@@ -237,10 +237,14 @@ test('shutdown waits for owned runtime and one-shot memory processes to exit', (
   assert.ok(agentTown.includes('stopOwnedChild(ownedChild)'));
 });
 
-test('Windows source smoke test waits for the built desktop.html renderer', () => {
+test('Windows and macOS source smoke paths wait for the built desktop.html renderer', () => {
   const smoke = readFileSync(resolve(root, 'scripts/source_desktop_smoke_test.py'), 'utf8');
   assert.ok(smoke.includes('ELECTRON_APP / "dist" / "renderer" / "desktop.html"'));
+  assert.ok(smoke.includes('elif sys.platform == "darwin"'));
   assert.ok(smoke.includes('"renderer/desktop.html" in candidate.url'));
+  assert.ok(smoke.includes('start_new_session=os.name != "nt"'));
+  assert.ok(smoke.includes('os.killpg(group_id, signal.SIGTERM)'));
+  assert.ok(smoke.includes('os.killpg(group_id, signal.SIGKILL)'));
   assert.equal(smoke.includes('"renderer/index.html" in candidate.url'), false);
 });
 
@@ -326,10 +330,30 @@ test('startup stops with a clear error when the KnockDesk data directory cannot 
   assert.match(main, /Check that your Documents folder is writable, then retry/);
 });
 
-test('Hermes background startup errors remain retryable', () => {
-  const source = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/services/desktop-hermes-runtime.js'), 'utf8');
-  assert.match(source, /Hermes startup failed:/);
-  assert.match(source, /this.startPromise === pendingStart/);
+test('Hermes background startup errors clear the pending promise and can be retried', async () => {
+  const { DesktopHermesRuntime } = createRequire(import.meta.url)(resolve(
+    root, 'resources/hermes-runtime/src/electron/services/desktop-hermes-runtime.js'
+  ));
+  const runtime = new DesktopHermesRuntime();
+  let attempts = 0;
+  runtime._startBackground = async () => {
+    attempts += 1;
+    if (attempts === 1) throw new Error('transient Hermes startup failure');
+    runtime._setState('ready');
+  };
+
+  const firstStart = runtime.start();
+  const firstAttempt = runtime.startPromise;
+  await Promise.resolve(firstAttempt).catch(() => undefined);
+  await firstStart;
+  assert.equal(runtime.getState().state, 'error', 'a rejected background start must surface an error state');
+  assert.match(runtime.getState().error, /Hermes startup failed: transient Hermes startup failure/);
+  assert.equal(runtime.startPromise, null, 'a failed background start must release the retry lock');
+
+  await runtime.start();
+  await runtime.startPromise;
+  assert.equal(attempts, 2, 'the next start request must attempt launch again');
+  assert.equal(runtime.getState().state, 'ready');
 });
 
 test('native title-bar overlay is configured only on platforms that need custom window controls', () => {
