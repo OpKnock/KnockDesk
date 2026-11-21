@@ -146,6 +146,24 @@ test('memory bridge payload matches the main-process string contract', () => {
   assert.ok(!preload.includes("'knockdesk:memory:update', {\n    instruction:"));
 });
 
+test('memory update re-attempts service initialization and returns a typed fallback on failure', () => {
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  const start = main.indexOf("ipcMain.handle('knockdesk:memory:update'");
+  const end = main.indexOf("ipcMain.handle('knockdesk:system:info'", start);
+  assert.ok(start >= 0 && end > start, 'memory update IPC handler must exist');
+  const handler = main.slice(start, end);
+  assert.match(handler, /const initialized = await initializeServicesForIpc\(\)/);
+  assert.match(handler, /if \(!initialized \|\| !hermesManager\) \{\s*return \{ ok: false, error: 'Hermes could not be initialized\.' \};\s*\}/);
+});
+
+test('memory IPC length validation matches the runtime limit and never silently truncates accepted input', () => {
+  const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
+  const runtime = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/services/desktop-hermes-runtime.js'), 'utf8');
+  assert.match(main, /if \(instruction\.length > 1500\)/);
+  assert.ok(main.includes('Memory instructions must be 1,500 characters or fewer.'));
+  assert.match(runtime, /String\(instruction \|\| ''\)\.trim\(\)\.slice\(0, 1500\)/);
+});
+
 test('ASAR helper documents safe list, extract and pack operations', () => {
   const helper = resolve(root, 'scripts/unpack-app-asar.mjs');
   const check = spawnSync(process.execPath, ['--check', helper], { encoding: 'utf8' });
@@ -165,7 +183,7 @@ test('desktop shutdown waits for child runtime cleanup before quitting', () => {
 
 test('IPC initialization failures return channel-specific fallback payloads without masking runtime start errors', () => {
   const main = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/main.ts'), 'utf8');
-  assert.equal((main.match(/await initializeServicesForIpc\(\)/g) || []).length, 3);
+  assert.equal((main.match(/await initializeServicesForIpc\(\)/g) || []).length, 4);
   assert.match(main, /async function initializeServicesForIpc\(\): Promise<boolean> \{[\s\S]*?try \{\s*await initializeServices\(window\);\s*return true;\s*\} catch \(error: unknown\) \{[\s\S]*?return false;/);
   assert.ok(main.includes("stateFallback('error', 'AgentTown could not be initialized.')"));
   assert.ok(main.includes("stateFallback('error', 'The Hermes runtime could not be initialized.')"));
