@@ -27,7 +27,7 @@ const DEFAULT_PORT = parseInt(process.env.STONIC_AGENTTOWN_PORT || '3010', 10);
 const DEFAULT_GATEWAY = process.env.STONIC_AGENTTOWN_GATEWAY || 'ws://127.0.0.1:18789/';
 // Next.js dev first-compile can be slow; poll generously.
 const READY_TIMEOUT_MS = 3 * 60 * 1000;
-const READY_POLL_MS = 1500;
+const READY_POLL_MS = 5000; // idle-throttled (was 1500)
 // Agent Town used to hard-code 3010. Hermes' WhatsApp bridge (a SEPARATE
 // process) also defaults to 127.0.0.1:3010, and having bound IPv4 first it
 // shadows our dual-stack (`::`) Next.js server for every 127.0.0.1 request:
@@ -110,9 +110,9 @@ class AgentTownManager {
       // Keep checking after success too, but rarely: the gateway can be
       // restarted from Hermes' own UI, which rotates nothing but is worth
       // re-confirming so a stale file never strands us on the fallback.
-      this._runApiPoller = setTimeout(tick, done ? 5 * 60_000 : 15_000);
+      this._runApiPoller = setTimeout(tick, done ? 15 * 60_000 : 60_000); // idle-throttled (was 5min/15s)
     };
-    this._runApiPoller = setTimeout(tick, 5_000);
+    this._runApiPoller = setTimeout(tick, 15_000); // idle-throttled (was 5s)
   }
 
   _stopRunApiWatch() {
@@ -424,9 +424,11 @@ class AgentTownManager {
           return;
         }
       }
-      this._healthPoller = setTimeout(tick, 10_000);
+      this._healthPoller = setTimeout(tick, 60_000);
+      if (this._healthPoller && this._healthPoller.unref) this._healthPoller.unref();
     };
-    this._healthPoller = setTimeout(tick, 10_000);
+    this._healthPoller = setTimeout(tick, 60_000); // idle-throttled (was 10s)
+    if (this._healthPoller && this._healthPoller.unref) this._healthPoller.unref();
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────
@@ -568,7 +570,7 @@ class AgentTownManager {
           this.state = 'idle';
           this.external = false;
           this._broadcast();
-          setTimeout(() => this.start().catch(() => { /* reflected via state */ }), 2000);
+          setTimeout(() => this.start().catch(() => { /* reflected via state */ }), 8000); // idle backoff (was 2000)
         } else {
           this._setState('error', `Agent Town server exited unexpectedly (code ${code})`);
         }
