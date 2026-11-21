@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -9,6 +9,23 @@ import { dirname, join, resolve } from 'node:path';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const script = resolve(root, 'build-electron-main.mjs');
+
+function loadHermesManager() {
+  const require = createRequire(import.meta.url);
+  // Staged legacy service: axios is not installed in the source workspace and
+  // the methods under test do no HTTP. Stub only that import.
+  const { Module } = require('node:module');
+  const originalLoad = Module._load;
+  Module._load = function loadWithAxiosStub(request, parent, isMain) {
+    if (request === 'axios') return function axiosStub() {};
+    return originalLoad.call(this, request, parent, isMain);
+  };
+  try {
+    return require(resolve(root, 'resources/hermes-runtime/src/electron/services/hermes-manager.js'));
+  } finally {
+    Module._load = originalLoad;
+  }
+}
 
 test('Electron build script is valid Node JavaScript', () => {
   const check = spawnSync(process.execPath, ['--check', script], { encoding: 'utf8' });
@@ -161,6 +178,136 @@ test('gateway supervisor revives only the gateway owned by KnockDesk setup', () 
     assert.equal(notOwned.reviveCalls, 0, 'a gateway not owned by KnockDesk setup must be left alone');
   } finally {
     console.warn = originalWarn;
+  }
+});
+
+test('legacy plugin cleanup removes only pre-rebrand directories', () => {
+  const { HermesManager } = loadHermesManager();
+  const home = mkdtempSync(join(tmpdir(), 'kd-legacy-plugins-'));
+  try {
+    const manager = new HermesManager();
+    manager.getHermesHome = () => home;
+    const pairs = [
+      ['knockdesk', 'adapter.py', 'stonic'],
+      ['knockdesk-computer', 'tool.py', 'stonic-computer'],
+      ['knockdesk-memory', '__init__.py', 'stonic-memory'],
+    ];
+    for (const [fresh, marker, legacy] of pairs) {
+      const freshDir = join(home, 'plugins', fresh);
+      const legacyDir = join(home, 'plugins', legacy);
+      mkdirSync(freshDir, { recursive: true });
+      mkdirSync(legacyDir, { recursive: true });
+      writeFileSync(join(freshDir, marker), 'fresh\n', 'utf8');
+      writeFileSync(join(legacyDir, 'stale.txt'), 'legacy\n', 'utf8');
+    }
+
+    manager._removeLegacyPluginDirs();
+
+    for (const [fresh, marker, legacy] of pairs) {
+      assert.equal(existsSync(join(home, 'plugins', fresh, marker)), true, 'fresh plugin must survive cleanup');
+      assert.equal(existsSync(join(home, 'plugins', legacy)), false, 'pre-rebrand plugin must be removed');
+    }
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('plugins.enabled migration keeps KnockDesk names and user plugins', async () => {
+  const { HermesManager } = loadHermesManager();
+  const manager = new HermesManager();
+  const puts = [];
+  let yaml = [
+    'plugins:',
+    '  enabled:',
+    '    - stonic',
+    '    - stonic-computer',
+    '    - knockdesk',
+    '    - knockdesk-platform',
+    '    - knockdesk-computer',
+    '    - userplugin',
+    '',
+  ].join('\n');
+  manager.apiFetch = async (apiPath, { method = 'GET', body = null } = {}) => {
+    if (apiPath === '/api/config/raw') return { ok: true, data: { yaml } };
+    if (apiPath === '/api/config' && method === 'PUT') {
+      puts.push(body.config.plugins.enabled);
+      yaml = [
+        'plugins:',
+        '  enabled:',
+        ...body.config.plugins.enabled.map((name) => `    - ${name}`),
+        '',
+      ].join('\n');
+      return { ok: true };
+    }
+    throw new Error(`unexpected apiFetch ${apiPath}`);
+  };
+
+  assert.equal(await manager._ensureKnockDeskPluginEnabled(), true);
+  assert.deepEqual(puts[0], ['knockdesk', 'knockdesk-platform', 'knockdesk-computer', 'userplugin']);
+  const putCount = puts.length;
+  assert.equal(await manager._ensureKnockDeskPluginEnabled(), false, 'a second setup pass must be a no-op');
+  assert.equal(puts.length, putCount, 'a second setup pass must not write config again');
+});
+
+test('bridge env setup reuses its cache instead of deleting it', async () => {
+  const { HermesManager } = loadHermesManager();
+  const home = mkdtempSync(join(tmpdir(), 'kd-bridge-env-'));
+  try {
+    const manager = new HermesManager();
+    manager.getHermesHome = () => home;
+    const writes = [];
+    let firstWrites = [];
+    let fetchCount = 0;
+    manager.apiFetch = async (apiPath) => {
+      if (apiPath !== '/api/env') throw new Error(`unexpected apiFetch ${apiPath}`);
+      fetchCount += 1;
+      const rows = {};
+      // First pass: nothing set. Later passes: every key written on pass one is set.
+      if (fetchCount > 1) {
+        for (const [key, value] of firstWrites) rows[key] = { is_set: true, value };
+      }
+      return { ok: true, data: { env: rows } };
+    };
+    manager._putEnv = async (key, value) => {
+      writes.push([key, value]);
+      return true;
+    };
+
+    const args = { bridgeUrl: 'http://127.0.0.1:8749', bridgeKey: 'k'.repeat(64), chatId: 'chat-1' };
+    assert.equal(await manager._ensureKnockDeskEnv(args), true);
+    assert.equal(writes.length, 10, 'both KNOCKDESK_* and STONIC_* env names must be written');
+    const cacheFile = join(home, 'knockdesk-bridge-env.json');
+    assert.equal(existsSync(cacheFile), true, 'the live cache must be kept');
+
+    firstWrites = [...writes];
+    writes.length = 0;
+    assert.equal(await manager._ensureKnockDeskEnv(args), false, 'a second pass must make no env writes');
+    assert.equal(writes.length, 0);
+    assert.equal(existsSync(cacheFile), true, 'the cache must survive every setup pass');
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('memory provider migration only replaces the pre-rebrand provider', async () => {
+  const { HermesManager } = loadHermesManager();
+  for (const [current, expectedWrites] of [['stonic-memory', 1], ['honcho', 0]]) {
+    const manager = new HermesManager();
+    const puts = [];
+    manager.apiFetch = async (apiPath, { method = 'GET', body = null } = {}) => {
+      if (apiPath === '/api/config' && method === 'PUT') {
+        puts.push(body.config.memory.provider);
+        return { ok: true };
+      }
+      if (apiPath === '/api/config' && method === 'GET') {
+        return { ok: true, data: { memory: { provider: current } } };
+      }
+      throw new Error(`unexpected apiFetch ${apiPath}`);
+    };
+
+    await manager._ensureMemoryProvider();
+    assert.equal(puts.length, expectedWrites);
+    if (expectedWrites) assert.equal(puts[0], 'knockdesk-memory');
   }
 });
 
@@ -326,6 +473,26 @@ test('first-run setup installs every first-party plugin into the supplied Hermes
     assert.equal(readFileSync(installedTool, 'utf8'), readFileSync(bundledTool, 'utf8'));
   } finally {
     rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('bridge key is stable across restarts and replaces invalid files', () => {
+  const require = createRequire(import.meta.url);
+  const { KnockDeskBridge } = require(resolve(root, 'resources/hermes-runtime/src/electron/services/knockdesk-bridge.js'));
+  const dir = mkdtempSync(join(tmpdir(), 'kd-bridge-key-'));
+  try {
+    const bridge = new KnockDeskBridge({ userDataDir: dir });
+    const first = bridge._loadOrCreateKey();
+    assert.match(first, /^[0-9a-f]{64}$/);
+    assert.equal(bridge._loadOrCreateKey(), first, 'an existing bridge key must be reused');
+    assert.equal(readFileSync(join(dir, 'knockdesk-bridge-key'), 'utf8'), first);
+
+    writeFileSync(join(dir, 'knockdesk-bridge-key'), 'not-a-key', 'utf8');
+    const second = bridge._loadOrCreateKey();
+    assert.notEqual(second, 'not-a-key');
+    assert.match(second, /^[0-9a-f]{64}$/, 'an invalid key file must be replaced');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

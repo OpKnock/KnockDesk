@@ -927,11 +927,15 @@ class HermesManager {
   _removeLegacyPluginDirs() {
     try {
       const pairs = [
-        ['knockdesk', 'adapter.py', 'knockdesk'],
-        ['knockdesk-computer', 'tool.py', 'knockdesk-computer'],
-        ['knockdesk-memory', '__init__.py', 'knockdesk-memory'],
+        ['knockdesk', 'adapter.py', 'stonic'],
+        ['knockdesk-computer', 'tool.py', 'stonic-computer'],
+        ['knockdesk-memory', '__init__.py', 'stonic-memory'],
       ];
       for (const [fresh, marker, legacy] of pairs) {
+        // Rebrand find/replace ne do naam ek kar diye the — aise row par
+        // freshDir === legacyDir hota aur rmSync newly installed plugin ko
+        // hi mita deta tha. Kabhi bhi ek hi path ko target na banao.
+        if (fresh === legacy) continue;
         const freshDir = path.join(this.getHermesHome(), 'plugins', fresh);
         const legacyDir = path.join(this.getHermesHome(), 'plugins', legacy);
         if (!fs.existsSync(path.join(freshDir, marker))) continue;
@@ -952,7 +956,7 @@ class HermesManager {
     // Read-before-write LAZMI hai: PUT /api/config list ko poora badal deta
     // hai (deep-merge lists ko jorta nahi). Bina parhe likhne se user ke apne
     // enable kiye hue plugins chup-chaap gayab ho jate.
-    const LEGACY_NAMES = ['knockdesk', 'knockdesk-platform', 'knockdesk-computer'];
+    const LEGACY_NAMES = ['stonic', 'stonic-platform', 'stonic-computer'];
     const existing = this._parseConfigListKey(current.data.yaml, 'plugins', 'enabled');
     const wanted = ['knockdesk', 'knockdesk-platform', 'knockdesk-computer'];
     const missing = wanted.filter((name) => !existing.includes(name));
@@ -1018,12 +1022,17 @@ class HermesManager {
     };
 
     const cachePath = path.join(this.getHermesHome(), 'knockdesk-bridge-env.json');
-    const legacyCachePath = path.join(this.getHermesHome(), 'knockdesk-bridge-env.json');
+    const legacyCachePath = path.join(this.getHermesHome(), 'stonic-bridge-env.json');
     let cached = {};
     try {
       cached = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
     } catch {
-      cached = {};
+      try {
+        // Purane rebrand cache se Values le lo taake ek dafa hi PUT ho.
+        cached = JSON.parse(fs.readFileSync(legacyCachePath, 'utf8'));
+      } catch {
+        cached = {};
+      }
     }
 
     let changed = false;
@@ -1050,7 +1059,9 @@ class HermesManager {
       }
     } catch { /* agli dafa sahi — gateway purani keys nazar-andaaz karta hai */ }
     try {
-      if (fs.existsSync(legacyCachePath)) fs.rmSync(legacyCachePath, { force: true });
+      if (cachePath !== legacyCachePath && fs.existsSync(legacyCachePath)) {
+        fs.rmSync(legacyCachePath, { force: true });
+      }
     } catch { /* purani cache reh gayi to koi harj nahi */ }
 
     if (changed) {
@@ -1155,10 +1166,10 @@ class HermesManager {
         this._memoryProviderApplied = true;
         return;
       }
-      // One-time rebrand migration: beech ke (`knockdesk-memory`) ya purane
-      // naam ko canonical naam par le aao — neeche wala likhne ka raasta
-      // waise hi chalta hai. Khaali jagah par bhi wahi raasta hai.
-      if (current && current !== 'knockdesk-memory' && current !== 'knockdesk-memory') {
+      // One-time rebrand migration: purana `stonic-memory` canonical naam par
+      // le aao — neeche wala likhne ka raasta waise hi chalta hai. Kisi aur
+      // provider (Honcho, Mem0, ...) ka apna choice haath nahi lagate.
+      if (current && current !== 'stonic-memory') {
         this._memoryProviderApplied = true;
         console.log(`[Hermes] Memory provider "${current}" pehle se chuna hua hai; KnockDesk Memory usay nahi badalta.`);
         return;
