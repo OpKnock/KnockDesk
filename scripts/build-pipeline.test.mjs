@@ -54,6 +54,37 @@ test('Hermes runtime detection recognizes Windows and macOS virtual-environment 
   assert.match(source, /venv['\"],\s*['\"]bin['\"],\s*['\"]hermes['\"]/);
 });
 
+test('Hermes dashboard route pages are lazy-loaded behind a Suspense boundary', () => {
+  const app = readFileSync(resolve(root, 'resources/hermes-runtime/src/web/src/App.tsx'), 'utf8');
+  for (const page of [
+    'ConfigPage', 'DocsPage', 'EnvPage', 'FilesPage', 'SessionsPage', 'LogsPage',
+    'AnalyticsPage', 'ModelsPage', 'CronPage', 'ProfilesPage', 'ProfileBuilderPage',
+    'SkillsPage', 'PluginsPage', 'McpPage', 'PairingPage', 'ChannelsPage',
+    'WebhooksPage', 'SystemPage',
+  ]) {
+    assert.match(app, new RegExp(`const ${page} = lazy\\(\\(\\) => import\\([\\"']@/pages/${page}[\\"']\\)\\)`));
+    assert.doesNotMatch(app, new RegExp(`import ${page} from [\\"']@/pages/${page}[\\"']`));
+  }
+  const routesPosition = app.lastIndexOf('<Routes>');
+  const suspenseStart = app.lastIndexOf('<Suspense', routesPosition);
+  const suspenseEnd = app.indexOf('</Suspense>', routesPosition);
+  assert.ok(routesPosition >= 0 && suspenseStart >= 0 && suspenseEnd > routesPosition,
+    'all routes must render inside a Suspense boundary');
+  // Chat owns a persistent terminal and must remain mounted when switching routes.
+  assert.match(app, /import ChatPage from [\"']@\/pages\/ChatPage[\"']/);
+});
+
+test('Hermes update dialog resets stale update details before opening without effect-driven state writes', () => {
+  const app = readFileSync(resolve(root, 'resources/hermes-runtime/src/web/src/App.tsx'), 'utf8');
+  assert.match(app, /if \(action === "update"\) \{\s*setUpdateConfirmInfo\(null\);\s*setUpdateConfirmChecking\(true\);\s*setUpdateConfirmOpen\(true\);/);
+  const effectStart = app.indexOf('useEffect(() => {\n    if (!updateConfirmOpen)');
+  const apiRequestStart = app.indexOf('    api\n', effectStart);
+  const effectEnd = app.indexOf('}, [updateConfirmOpen]);', effectStart);
+  assert.ok(effectStart >= 0 && apiRequestStart > effectStart && effectEnd > apiRequestStart,
+    'update check effect should be identifiable');
+  assert.doesNotMatch(app.slice(effectStart, apiRequestStart), /setUpdateConfirm(?:Info|Checking)\(/);
+});
+
 test('desktop renderer has its own stable output path', () => {
   const html = readFileSync(resolve(root, 'resources/hermes-runtime/src/web/desktop.html'), 'utf8');
   const vite = readFileSync(resolve(root, 'resources/hermes-runtime/src/web/vite.desktop.config.ts'), 'utf8');
