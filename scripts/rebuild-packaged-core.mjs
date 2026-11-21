@@ -26,13 +26,13 @@ const WORK = path.join(ROOT, 'staging', 'app-asar-rebuild');
 const OUTPUT = path.join(ROOT, 'resources', 'app.rebuilt.asar');
 const SERVICES = path.join(ROOT, 'resources', 'hermes-runtime', 'src', 'electron', 'services');
 
-const VERSION = '3.1.13';
+const VERSION = '3.1.14';
 const OLD_VERSION = '3.1.12';
 const VERSION_FILE = 'package.json';
 const VERSION_BUNDLE = 'dist/assets/index-u5ljrpMR-kd90.js';
 
 // Maintained source -> path inside app.asar. These are the service modules
-// changed by the 3.1.13 fixes that the legacy bytecode still loads.
+// changed by the 3.1.14 fixes that the legacy bytecode still loads.
 const OVERLAYS = [
   ['hermes-manager.js', 'electron/services/hermes-manager.js'],
   ['knockdesk-plugin.js', 'electron/services/knockdesk-plugin.js'],

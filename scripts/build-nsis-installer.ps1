@@ -7,7 +7,7 @@
 # Unsigned builds install with a SmartScreen warning; signing happens only
 # via scripts/sign-release.ps1 with a production certificate (never embedded).
 param(
-  [string]$Version = '3.1.13',
+  [string]$Version = '3.1.14',
   [string]$VersionDisplay = '',
   [string]$Makensis = 'C:\Program Files (x86)\NSIS\makensis.exe'
 )
