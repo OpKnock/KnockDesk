@@ -11,14 +11,30 @@ const { spawn } = require('node:child_process');
  * without signalling the Electron process itself.
  */
 function terminateOwnedProcessTree(child, options = {}) {
-  if (!child || child.exitCode !== null) return false;
+  if (!child) return false;
 
   const platform = options.platform || process.platform;
   const spawnProcess = options.spawnProcess || spawn;
   const killProcess = options.killProcess || process.kill;
   const pid = Number(child.pid);
+  const validPid = Number.isInteger(pid) && pid > 0;
 
-  if (!Number.isInteger(pid) || pid <= 0) {
+  // A detached POSIX child's descendants can outlive the group leader. The
+  // exit code only describes the direct child; still sweep its dedicated group.
+  // Do not attempt this on Windows, where a dead PID may already be reused.
+  if (child.exitCode !== null) {
+    if (platform !== 'win32' && options.detachedGroup && validPid) {
+      try {
+        killProcess(-pid, 'SIGKILL');
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  if (!validPid) {
     try {
       child.kill();
       return true;
@@ -74,7 +90,11 @@ function terminateOwnedProcessTree(child, options = {}) {
  * The timeout repeats tree termination as a guard against a delayed taskkill.
  */
 function stopOwnedChild(child, timeoutMs = 2500, options = {}) {
-  if (!child || child.exitCode !== null) return Promise.resolve();
+  if (!child) return Promise.resolve();
+  if (child.exitCode !== null) {
+    terminateOwnedProcessTree(child, options);
+    return Promise.resolve();
+  }
 
   return new Promise((resolve) => {
     let settled = false;
