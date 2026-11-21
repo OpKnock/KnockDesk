@@ -10,7 +10,7 @@ Launches the app with remote debugging, connects via CDP, and verifies:
 - No console errors/warnings
 
 Usage:
-    python scripts/smoke_test.py [--timeout 60] [--headless]
+    python scripts/smoke_test.py [--timeout 60] [--idle-seconds 180] [--headless]
     python scripts/smoke_test.py --help
 
 Exit codes:
@@ -21,6 +21,8 @@ Exit codes:
     4 = sidecar check failed
     5 = memory bridge check failed
     6 = console errors detected
+    7 = idle hang detected (renderer unresponsive after idle soak)
+    8 = orphaned processes after shutdown
 """
 
 from __future__ import annotations
@@ -32,9 +34,13 @@ import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Optional
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 # Try to import playwright; if missing, give clear install hint
 try:
@@ -114,6 +120,19 @@ async def run_checks(args: argparse.Namespace) -> int:
         stderr=subprocess.PIPE,
         creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
     )
+
+    # Drain stdout/stderr continuously: the app logs verbosely, and a full
+    # OS pipe buffer would block the child process mid-run.
+    def _drain(pipe) -> None:
+        try:
+            for _ in pipe:
+                pass
+        except Exception:
+            pass
+
+    for _pipe in (proc.stdout, proc.stderr):
+        _t = threading.Thread(target=_drain, args=(_pipe,), daemon=True)
+        _t.start()
 
     try:
         # 1. Wait for CDP
@@ -282,7 +301,49 @@ async def run_checks(args: argparse.Namespace) -> int:
                 for w in console_warnings[:5]:
                     log(f"  - {w}", "WARN")
 
-            # 10. Clean shutdown
+            # 10. Idle soak + post-idle responsiveness (regression cover for
+            # reported 1-2 minute idle hangs)
+            idle_seconds = getattr(args, "idle_seconds", 180)
+            if idle_seconds > 0:
+                log(f"Idle soak: {idle_seconds}s with periodic sampling...", "STEP")
+                try:
+                    import psutil as _psutil
+                except ImportError:
+                    _psutil = None
+                samples = []
+                waited = 0
+                step = 30
+                while waited < idle_seconds:
+                    await asyncio.sleep(min(step, idle_seconds - waited))
+                    waited += step
+                    try:
+                        t0 = time.monotonic()
+                        await page.evaluate("() => Date.now()")
+                        rtt = (time.monotonic() - t0) * 1000.0
+                    except Exception as e:
+                        log(f"Renderer unresponsive during idle ({e})", "ERROR")
+                        return 7
+                    rss = None
+                    if _psutil is not None:
+                        try:
+                            rss = sum(
+                                p.memory_info().rss
+                                for p in _psutil.process_iter(["name", "memory_info"])
+                                if (p.info["name"] or "") == "KnockDesk.exe"
+                            ) / 1e6
+                        except Exception:
+                            pass
+                    samples.append((min(waited, idle_seconds), round(rtt, 1), rss and round(rss, 1)))
+                    log(f"idle t+{min(waited, idle_seconds)}s rtt={rtt:.0f}ms" + (f" rss={rss:.0f}MB" if rss else ""))
+                rtts = [s[1] for s in samples]
+                if max(rtts) > 3000:
+                    log(f"Post-idle responsiveness FAILED (worst rtt {max(rtts):.0f}ms)", "ERROR")
+                    return 7
+                log(f"Idle soak passed ({len(samples)} samples, worst rtt {max(rtts):.0f}ms)")
+            else:
+                log("Idle soak skipped (--idle-seconds 0)")
+
+            # 11. Clean shutdown
             log("Closing browser connection...", "STEP")
             await browser.close()
 
@@ -303,11 +364,25 @@ async def run_checks(args: argparse.Namespace) -> int:
             proc.wait()
         except Exception:
             pass
+        # 12. Orphan check: no KnockDesk.exe may survive (excludes our own
+        # drained/zombie handles — count live PIDs only).
+        try:
+            import psutil as _psutil2
+            leftovers = [
+                p.pid for p in _psutil2.process_iter(["name"])
+                if (p.info["name"] or "") == "KnockDesk.exe"
+            ]
+        except Exception:
+            leftovers = []
+        if leftovers:
+            log(f"Orphaned KnockDesk.exe processes after shutdown: {leftovers}", "ERROR")
+            return 8
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="KnockDesk smoke test")
     parser.add_argument("--timeout", type=int, default=60, help="Max seconds to wait for CDP/app")
+    parser.add_argument("--idle-seconds", type=int, default=180, help="Idle soak duration; 0 to skip")
     parser.add_argument("--headless", action="store_true", help="(ignored; CDP requires visible)")
     args = parser.parse_args()
 
