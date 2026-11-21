@@ -304,18 +304,24 @@ async function quitAndInstall() {
     fs.rmSync(backupPath, { recursive: true, force: true });
     fs.rmSync(pending.workDir, { recursive: true, force: true });
 
-    // 4. Full quit, then reopen the NEW bundle (full close → reliable swap).
-    // No shell: spawn open(1) directly so a hostile app path can never be
-    // reinterpreted by sh (CodeQL js/incomplete-sanitization).
+    // 4. Reopen the NEW bundle, then quit this process. Order matters (A1):
+    // the replacement must be spawned (detached, surviving our exit)
+    // BEFORE app.exit runs — a timer callback can never fire after exit.
+    // No shell: open(1) argv cannot be reinterpreted (CodeQL
+    // js/incomplete-sanitization). A short delay before quitting lets the
+    // new instance start while OS file handles are still valid.
     log.info('Swap complete — restarting into the new version.');
-    const reopenTimer = setTimeout(() => {
+    try {
       const reopen = spawn('/usr/bin/open', ['-n', currentApp], {
         detached: true,
         stdio: 'ignore',
       });
       reopen.unref();
-    }, 2000);
-    reopenTimer.unref?.();
+    } catch (err) {
+      log.error('Relaunch spawn failed:', err.message);
+    }
+    state.pending = null;
+    setTimeout(() => app.exit(0), 1000);
     state.pending = null;
     app.exit(0);
   } catch (err) {

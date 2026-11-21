@@ -154,6 +154,18 @@ function main() {
     bundledHermesRuntime = existsSync(hermesEntrypoint);
   }
 
+  // A4/O-03: opt-in release validation. Default builds keep the old
+  // warn-and-continue behavior for development; --strict-runtime makes a
+  // release claiming to bundle Hermes fail loudly instead of shipping
+  // a shell with no runtime behind it.
+  if (process.argv.includes('--strict-runtime') && !bundledHermesRuntime) {
+    throw new Error(
+      'Release validation failed: --strict-runtime requires a staged Hermes ' +
+      'venv with a working hermes entrypoint (venv/Scripts/hermes.exe on ' +
+      'Windows, venv/bin/hermes elsewhere). Prepare the venv or drop the flag.'
+    );
+  }
+
   for (const folder of ['main', 'services']) {
     copyMissingJs(join(electronDir, folder), join(stagedDir, 'dist', folder));
   }

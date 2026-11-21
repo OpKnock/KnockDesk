@@ -4861,12 +4861,16 @@ async def validate_provider_credential(body: EnvVarUpdate, request: Request):
     # auto-pick a default without asking the user to type a model name.
     if key == "OPENAI_BASE_URL":
         from urllib.parse import urlparse
+        import ipaddress
 
         url = value.rstrip("/") + "/models"
         # SSRF guard (CodeQL py/full-ssrf): this endpoint probes a
         # user-configured base URL. Restrict to http(s) and refuse cloud
         # instance-metadata endpoints; loopback stays allowed (local
-        # Ollama / LM Studio / vLLM setups depend on it).
+        # Ollama / LM Studio / vLLM setups depend on it). Host is
+        # normalized through the ipaddress module so decimal/octal/hex
+        # and IPv6 alternative representations of link-local ranges
+        # cannot slip past a string comparison.
         parsed = urlparse(url)
         host = (parsed.hostname or "").lower().rstrip(".")
         if parsed.scheme not in ("http", "https") or host in (
@@ -4875,6 +4879,12 @@ async def validate_provider_credential(body: EnvVarUpdate, request: Request):
             "metadata.google.internal.",
         ):
             return {"ok": False, "reachable": False, "message": "Refused unsafe endpoint URL."}
+        try:
+            ip = ipaddress.ip_address(host)
+            if ip.is_link_local or ip.is_reserved or ip.is_multicast:
+                return {"ok": False, "reachable": False, "message": "Refused unsafe endpoint URL."}
+        except ValueError:
+            pass
         # Send the optional API key so endpoints that require auth on
         # ``/v1/models`` (many hosted OpenAI-compatible servers) still enumerate
         # their models instead of returning an empty list behind a 401.
