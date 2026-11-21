@@ -47,6 +47,13 @@ test('staging script includes CommonJS services', () => {
   assert.ok(source.includes('services/hermes-manager.js'));
 });
 
+test('Hermes runtime detection recognizes Windows and macOS virtual-environment entrypoints', () => {
+  const source = readFileSync(script, 'utf8');
+  assert.match(source, /process\.platform\s*===\s*['\"]win32['\"]/);
+  assert.match(source, /venv['\"],\s*['\"]Scripts['\"],\s*['\"]hermes\.exe['\"]/);
+  assert.match(source, /venv['\"],\s*['\"]bin['\"],\s*['\"]hermes['\"]/);
+});
+
 test('desktop renderer has its own stable output path', () => {
   const html = readFileSync(resolve(root, 'resources/hermes-runtime/src/web/desktop.html'), 'utf8');
   const vite = readFileSync(resolve(root, 'resources/hermes-runtime/src/web/vite.desktop.config.ts'), 'utf8');

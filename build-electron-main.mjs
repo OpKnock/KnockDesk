@@ -148,7 +148,10 @@ function main() {
         filter: (sourcePath) => !sourcePath.split(sep).includes('node_modules'),
       });
     }
-    bundledHermesRuntime = existsSync(join(stagedHermes, 'venv', 'Scripts', 'hermes.exe'));
+    const hermesEntrypoint = process.platform === 'win32'
+      ? join(stagedHermes, 'venv', 'Scripts', 'hermes.exe')
+      : join(stagedHermes, 'venv', 'bin', 'hermes');
+    bundledHermesRuntime = existsSync(hermesEntrypoint);
   }
 
   for (const folder of ['main', 'services']) {
