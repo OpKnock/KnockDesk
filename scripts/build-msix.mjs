@@ -37,7 +37,7 @@ const MASTER = path.join(ROOT, 'resources', 'public', 'knockdesk-logo-1024.png')
 
 // The release version. The NSIS installer script keeps the same value in
 // its own $Version parameter, so the two packages always match.
-const VERSION = process.env.KNOCKDESK_VERSION || '3.1.13';
+const VERSION = process.env.KNOCKDESK_VERSION || '3.1.14';
 
 const args = process.argv.slice(2);
 const ASSETS_ONLY = args.includes('--assets-only');

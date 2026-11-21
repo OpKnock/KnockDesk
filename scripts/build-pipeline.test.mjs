@@ -75,11 +75,11 @@ test('build script never writes directly to production ASAR or bytecode', () => 
   assert.match(source, /staging\/electron-main/);
 });
 
-test('packaged core rebuild overlays the maintained services for 3.1.13', () => {
+test('packaged core rebuild overlays the maintained services for 3.1.14', () => {
   const rebuild = resolve(root, 'scripts/rebuild-packaged-core.mjs');
   const run = spawnSync(process.execPath, [rebuild, '--dry-run'], { cwd: root, encoding: 'utf8' });
   assert.equal(run.status, 0, run.stderr);
-  assert.match(run.stdout, /3\.1\.13/);
+  assert.match(run.stdout, /3\.1\.14/);
   for (const target of [
     'electron/services/hermes-manager.js',
     'electron/services/knockdesk-plugin.js',
@@ -323,8 +323,8 @@ test('legacy env cache migration seeds the current cache without a gateway resta
 test('macOS updater resolves assets and exits only after the relaunch is spawned', () => {
   const { resolveAssetUrl } = loadMacUpdater();
   assert.equal(
-    resolveAssetUrl('https://example.test/feed', 'KnockDesk 3.1.13 arm64.zip'),
-    'https://example.test/feed/KnockDesk%203.1.13%20arm64.zip',
+    resolveAssetUrl('https://example.test/feed', 'KnockDesk 3.1.14 arm64.zip'),
+    'https://example.test/feed/KnockDesk%203.1.14%20arm64.zip',
   );
   assert.equal(
     resolveAssetUrl('https://example.test/feed', 'https://cdn.test/updates/app.zip'),
