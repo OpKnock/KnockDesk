@@ -75,7 +75,7 @@ test('Hermes dashboard route pages are lazy-loaded behind a Suspense boundary', 
 });
 
 test('Hermes update dialog resets stale update details before opening without effect-driven state writes', () => {
-  const app = readFileSync(resolve(root, 'resources/hermes-runtime/src/web/src/App.tsx'), 'utf8');
+  const app = readFileSync(resolve(root, 'resources/hermes-runtime/src/web/src/App.tsx'), 'utf8').replace(/\r\n/g, '\n');
   assert.match(app, /if \(action === "update"\) \{\s*setUpdateConfirmInfo\(null\);\s*setUpdateConfirmChecking\(true\);\s*setUpdateConfirmOpen\(true\);/);
   const effectStart = app.indexOf('useEffect(() => {\n    if (!updateConfirmOpen)');
   const apiRequestStart = app.indexOf('    api\n', effectStart);
