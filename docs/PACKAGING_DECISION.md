@@ -48,9 +48,11 @@ verifies the UNSIGNED installer; a separate gated job signs only when
 ## Payload note (why the release installer is host-built)
 The Hermes venv, the computer-use venv, the hermes `src/node_modules` tree,
 and the dashboard dists are git-ignored build-host trees (hundreds of MB,
-never committed). A checkout-only CI runner stages only tracked files, so
-the CI job now fails loudly at a payload-verification step rather than
-packaging an installer without the agent runtimes. The shipped release
-installer is built on the host that holds those trees; to make CI produce
-the release itself, commit the payloads via LFS or rebuild them from
-`requirements-darwin.txt`-style pins in the workflow.
+never committed). The CI workflow can rebuild all of them from committed
+sources (`scripts/requirements-windows-hermes.txt` and
+`requirements-windows-computer.txt` are exact freezes of the shipped venvs;
+the dashboard bundles come from the npm workspace builds), so a tag build
+now produces a complete installer; the build script verifies the payloads
+after staging and refuses to package without them. The v3.1.12 release
+installer is the host-built one that was additionally smoke-tested by a real
+install and uninstall cycle.
