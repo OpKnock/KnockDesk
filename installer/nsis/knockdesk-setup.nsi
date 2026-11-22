@@ -5,11 +5,11 @@
 
 !define APP_NAME "KnockDesk"
 !define APP_PUBLISHER "OpKnock"
-!define APP_VERSION "3.1.12"
-!define APP_VERSION_DISPLAY "3.1.12-local"
+!define APP_VERSION "3.1.13"
+!define APP_VERSION_DISPLAY "3.1.13-local"
 !define APP_EXE "KnockDesk.exe"
 !define APP_ICON_FILE "KnockDesk.ico"
-!define INSTALLER_OUT "..\..\dist\KnockDesk-Setup-3.1.12-x64.exe"
+!define INSTALLER_OUT "..\..\dist\KnockDesk-Setup-3.1.13-x64.exe"
 ; Staging path is passed via /D from build-nsis-installer.ps1 (short TEMP path
 ; to avoid Windows MAX_PATH on deeply nested Python venv files).
 !ifndef STAGE_DIR
