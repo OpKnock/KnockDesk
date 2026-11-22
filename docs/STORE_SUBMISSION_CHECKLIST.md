@@ -9,6 +9,7 @@ Date: 2026-10-21 (revised; originally 2026-10-17). Version: 3.1.12. Status per i
 | Version scheme (semver) | VERIFIED | 3.1.12 in exe metadata + package.json + NSIS VIAddVersionKey |
 | Architecture declared | VERIFIED | x64 (NSIS installer targets 64-bit) |
 | Package identity (Publisher/Name) | VERIFIED | `OpKnock.KnockDesk` / `CN=13E3D3C2-988F-4109-AD0E-42DE8604237C` â€” the values Partner Center assigned. `scripts/build-msix.mjs` declares them. |
+| Publisher display name | VERIFIED | `Mehul Wagde` — the Partner Center account display name. The GitHub organisation name `OpKnock` is not valid here and is rejected by Package acceptance validation. |
 | Package family name | VERIFIED | Derived by Windows from the identity name and publisher (`OpKnock.KnockDesk_f3e3af4par97c`). It is never written by hand. |
 | MSIX version number | VERIFIED | `3.1.12.0` â€” the four-part form Partner Center expects. Partner Center must not already hold an equal or higher version. |
 | Version sync across exe/installer/about | VERIFIED | FileVersionInfo: 3.1.12; NSIS: 3.1.12; app displays 3.1.12-local |
