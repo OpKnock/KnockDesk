@@ -34,15 +34,20 @@ except ImportError:
     psutil = None
 
 ROOT = Path(__file__).resolve().parents[1]
-# Typical install locations (adjust if needed)
+# Actual install location comes from installer/nsis/knockdesk-setup.nsi
+# (InstallDir "$LOCALAPPDATA\KnockDesk"). Legacy guesses are kept for older builds.
 INSTALL_DIRS = [
+    Path(os.environ.get("LOCALAPPDATA", "")) / "KnockDesk",
     Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "KnockDesk",
     Path(os.environ.get("PROGRAMFILES", "")) / "KnockDesk",
     Path(os.environ.get("PROGRAMFILES(X86)", "")) / "KnockDesk",
 ]
+# App profile: %APPDATA%\knockdesk (Electron userData). The capitalized legacy
+# path is kept so older profiles are still reported. Note: the INSTALL
+# directory (%LOCALAPPDATA%\KnockDesk) is tracked in INSTALL_DIRS only.
 USER_DATA_DIRS = [
+    Path(os.environ.get("APPDATA", "")) / "knockdesk",
     Path(os.environ.get("APPDATA", "")) / "KnockDesk",
-    Path(os.environ.get("LOCALAPPDATA", "")) / "KnockDesk",
 ]
 REGISTRY_KEYS = [
     r"HKCU\Software\KnockDesk",
@@ -53,8 +58,13 @@ REGISTRY_KEYS = [
 SHORTCUT_DIRS = [
     Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "KnockDesk",
     Path(os.environ.get("USERPROFILE", "")) / "Desktop",
+    Path(os.environ.get("USERPROFILE", "")) / "OneDrive" / "Desktop",
     Path(os.environ.get("PUBLIC", "")) / "Desktop",
 ]
+# Patterns safe to match against a full command line. Everything else in the
+# process sweep matches process NAMES only (a repo path in a shell's command
+# line is not a running app).
+CMDLINE_ONLY_PATTERNS = {"runner.py", "knockdesk_overlay", "knockdesk-computer"}
 
 results: dict[str, Any] = {
     "timestamp": time.time(),
@@ -77,6 +87,7 @@ def find_uninstaller() -> Path | None:
     """Find the uninstaller executable."""
     # Try common locations
     candidates = [
+        Path(os.environ.get("LOCALAPPDATA", "")) / "KnockDesk" / "Uninstall KnockDesk.exe",
         Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "KnockDesk" / "Uninstall KnockDesk.exe",
         Path(os.environ.get("PROGRAMFILES", "")) / "KnockDesk" / "Uninstall KnockDesk.exe",
         Path(os.environ.get("PROGRAMFILES(X86)", "")) / "KnockDesk" / "Uninstall KnockDesk.exe",
@@ -113,18 +124,47 @@ def find_uninstaller() -> Path | None:
     return None
 
 
+def _protected_pids() -> set[int]:
+    """This process plus its ancestors: the kill sweep must never touch them
+    (their command lines contain the repo path, which the patterns match)."""
+    protected = {os.getpid()}
+    if psutil:
+        try:
+            proc = psutil.Process()
+            while True:
+                protected.add(proc.pid)
+                parent = proc.parent()
+                if parent is None or parent.pid in protected:
+                    break
+                proc = parent
+        except Exception:
+            pass
+    return protected
+
+
 def kill_processes(name_patterns: list[str]) -> list[int]:
     """Kill processes matching patterns. Return list of PIDs killed."""
     killed = []
     if not psutil:
         return killed
+    protected = _protected_pids()
+    # Command-line matching is limited to the app's own helper scripts: a bare
+    # "KnockDesk"/"hermes" cmdline match also hits shells, editors, and CI
+    # agents working inside the repo path.
+    cmdline_patterns = [p for p in name_patterns if p in CMDLINE_ONLY_PATTERNS]
+    name_only_patterns = [p for p in name_patterns if p not in CMDLINE_ONLY_PATTERNS]
     for proc in psutil.process_iter(["pid", "name", "cmdline"]):
         try:
             info = proc.info
+            pid = info["pid"]
+            if pid in protected:
+                continue
             cmd = " ".join(info.get("cmdline") or [])
-            if any(p.lower() in (info.get("name") or "").lower() or p.lower() in cmd.lower()
-                   for p in name_patterns):
-                pid = info["pid"]
+            name = (info.get("name") or "").lower()
+            hit = any(p.lower() in name for p in name_only_patterns) or any(
+                p.lower() in cmd.lower() for p in cmdline_patterns
+            )
+            if hit:
                 proc.kill()
                 killed.append(pid)
         except (psutil.NoSuchProcess, psutil.AccessDenied):
@@ -170,8 +210,14 @@ def run_checks(args: argparse.Namespace) -> int:
             results["overall"] = "unhealthy"
             return 1
     else:
-        add_check("uninstaller_found", bool(uninstaller),
-                 str(uninstaller) if uninstaller else "Not found")
+        if args.run_uninstaller and not uninstaller:
+            add_check("uninstaller_found", False, "Requested to run the uninstaller but it was not found")
+        elif uninstaller:
+            add_check("uninstaller_found", True, str(uninstaller))
+        else:
+            # Nothing to run and nothing found: the uninstaller is already gone,
+            # which is the expected state when verifying AFTER an uninstall.
+            add_check("uninstaller_found", True, "Not found (OK: verifying after uninstall)", "warn")
         if not args.run_uninstaller:
             print("   (Use --run-uninstaller to execute it)")
 
@@ -208,16 +254,23 @@ def run_checks(args: argparse.Namespace) -> int:
     print("\n5. Checking registry keys...")
     try:
         import winreg
+
+        root_map = {"HKCU": winreg.HKEY_CURRENT_USER, "HKLM": winreg.HKEY_LOCAL_MACHINE}
         for key_path in REGISTRY_KEYS:
-            root_str, subkey = key_path.split("\\", 1)
-            root = getattr(winreg, root_str)
+            root_name, subkey = key_path.split("\\", 1)
+            root = root_map.get(root_name)
+            if root is None:
+                add_check(f"registry_{key_path}", False, f"Unknown root: {root_name}", "warn")
+                continue
             exists = False
             try:
                 with winreg.OpenKey(root, subkey, 0, winreg.KEY_READ):
                     exists = True
             except FileNotFoundError:
                 pass
-            key_name = subkey.rsplit(chr(92), 1)[-1]
+            except OSError:
+                pass
+            key_name = subkey.rsplit("\\", 1)[-1]
             add_check(f"registry_{key_name}", not exists,
                      "Removed" if not exists else "Still present")
     except Exception as e:
@@ -241,12 +294,20 @@ def run_checks(args: argparse.Namespace) -> int:
     print("\n7. Final process sweep...")
     remaining = []
     if psutil:
+        protected = _protected_pids()
+        cmdline_patterns = [p for p in patterns if p in CMDLINE_ONLY_PATTERNS]
+        name_only_patterns = [p for p in patterns if p not in CMDLINE_ONLY_PATTERNS]
         for proc in psutil.process_iter(["pid", "name", "cmdline"]):
             try:
                 info = proc.info
+                if info["pid"] in protected:
+                    continue
                 cmd = " ".join(info.get("cmdline") or [])
-                if any(p.lower() in (info.get("name") or "").lower() or p.lower() in cmd.lower()
-                       for p in patterns):
+                name = (info.get("name") or "").lower()
+                hit = any(p.lower() in name for p in name_only_patterns) or any(
+                    p.lower() in cmd.lower() for p in cmdline_patterns
+                )
+                if hit:
                     remaining.append(f"{info['pid']}: {info['name']}")
             except Exception:
                 pass
