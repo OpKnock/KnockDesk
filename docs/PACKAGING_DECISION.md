@@ -1,33 +1,61 @@
-# Packaging decision: NSIS offline installer (not MSIX, not web downloader)
+# Packaging decision: NSIS offline installer and an MSIX Store submission
 
-Date: 2026-10-17. Status: DECIDED. Artifacts: `installer/nsis/knockdesk-setup.nsi`,
-`scripts/build-nsis-installer.ps1`, `dist/` output (git-ignored, checksummed).
+Date: 2026-10-21 (revised; originally 2026-10-17). Status: DECIDED. Artifacts:
+`installer/nsis/knockdesk-setup.nsi`, `scripts/build-nsis-installer.ps1`,
+`scripts/build-msix.mjs`, `dist/` output (git-ignored, checksummed).
 
 ## Decision
-Ship Windows releases as a **standalone offline NSIS installer**
-(`KnockDesk-Setup-<version>-x64.exe`), per-user, no admin required.
-Keep the portable zip as a secondary artifact. Do NOT pursue MSIX/Store
-packaging until the prerequisites below are met, and NEVER submit a web
-downloader as the Store package.
+Ship Windows releases as **both**:
 
-## Why not MSIX (yet)
-1. No production signing identity. MSIX requires a trusted certificate whose
-   subject matches the package publisher; we ship unsigned today.
-2. 2GB+ single payload with embedded Chromium, Python, and sidecar processes
-   (dashboard, AgentTown, bridges) conflicts with MSIX container rules and
-   Store size/update expectations.
-3. The main process is bytenode bytecode (`resources/main.jsc`) rebuilt only
-   from the maintained source shell after feature-parity verification, which
-   is still open (see docs/BUILD_AND_SOURCE_MAP.md).
-4. No clean file-type/protocol associations manifest yet; no declared
-   restricted capabilities inventory.
+- a **standalone offline NSIS installer** (`KnockDesk-Setup-<version>-x64.exe`),
+  per-user, no admin required — the direct download, and the artifact that
+  runs today;
+- an **MSIX package** (`KnockDesk-<version>-x64.msix`) for submission to the
+  Microsoft Store through Partner Center, built with `--store`.
 
-## Why not a web downloader
-Store policy requires the submitted installer to be standalone/offline and to
-install the exact certified binaries. A downloader also breakschecksums,
-offline installs, and reproducible verification.
+Keep the portable zip as a secondary artifact. NEVER submit a web downloader
+as the Store package.
 
-## Why NSIS now
+## The two packages are different things, and they are not interchangeable
+
+| | NSIS installer | MSIX Store package |
+|---|---|---|
+| Built by | `scripts/build-nsis-installer.ps1` | `scripts/build-msix.mjs --store` |
+| Identity | none (it is a plain installer) | the name and publisher Partner Center assigned |
+| Signing | Authenticode, at build time, with the release certificate | **unsigned**: Microsoft signs it after it accepts the submission |
+| Install | runs today, from the release page | from the Microsoft Store, once it is certified |
+| Payload | the whole tree | the whole tree |
+
+They carry the same payload: the build takes it from the same staging tree
+(`staging/nsis-stage`), so the asar, the unpacked native modules, the Python
+and Hermes runtimes, the bundled browsers, the locales and the audio are
+identical.
+
+## The Store identity is not ours to choose
+Partner Center assigns the package identity name and the publisher
+distinguished name, and compares the manifest against them byte for byte,
+including capitalisation and punctuation. The package family name is derived
+from those two values and is never written by hand.
+
+A Store build therefore uses:
+
+- `Name="OpKnock.KnockDesk"`
+- `Publisher="CN=13E3D3C2-988F-4109-AD0E-42DE8604237C"`
+
+and it is submitted **unsigned**. Signing it with a personal certificate
+first would contradict the publisher the manifest declares and the package
+would be rejected. `--store` refuses to run when `SIGN_PFX` or
+`SIGN_PFX_PASSWORD` is set, so a Store package cannot be signed by accident.
+
+A sideload build (`node scripts/build-msix.mjs`, no `--store`) keeps the
+personal identity and the certificate in `installer/msix-publisher.txt`. It
+is written to `dist/KnockDesk-<version>-x64-sideload.msix` so the two can
+never be confused. Note that a package signed with a certificate that is not
+in the Windows trusted root list will not install on a machine that does not
+trust that certificate — `Add-AppxPackage` rejects it with 0x800B010A — so
+the sideload build is for testing, not for distribution.
+
+## Why NSIS first
 - Handles 2GB+ payloads, sidecars, and per-user installs without elevation.
 - Differential updates later via electron-updater; per-user SU credentials stay local.
 - Unsigned builds still install (with SmartScreen warning) so QA can verify
@@ -38,7 +66,12 @@ offline installs, and reproducible verification.
   directory and is preserved across upgrade and uninstall; the first run of
   this build also migrates a legacy `%APPDATA%\KnockDesk` profile into it.
 
-## Signing path (blocked, no secrets in repo)
+## Why not a web downloader
+Store policy requires the submitted installer to be standalone/offline and to
+install the exact certified binaries. A downloader also breaks checksums,
+offline installs, and reproducible verification.
+
+## Signing path (no secrets in repo)
 `scripts/sign-release.ps1` signs the exe + installer when a production
 certificate is present via environment/secret store, and refuses otherwise
 (no self-signed certs committed, no credentials in Actions). CI builds and

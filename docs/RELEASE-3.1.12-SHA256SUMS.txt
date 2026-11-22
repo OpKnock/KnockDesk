@@ -12,14 +12,27 @@
 # The SHA-256 below is the integrity check.
 669CEDA4D8C7252D84614959CCA32EE98C1226EE73DE443848D663EA33B3C9E5  KnockDesk-Setup-3.1.12-x64.exe
 #
-# Windows MSIX package. Rebuilt on 2026-10-21. The package that shipped
-# before this was a 24-entry shell: it carried the Electron runtime and the
-# app archive but not locales/, not resources.pak, and none of the
-# resources/ tree, so it could not launch. It also shipped three 1x1
-# placeholder pixels as the store icons. The rebuilt package carries the
-# full payload (48,436 files) and the KnockDesk mark as its store icons.
-# It is larger than the installer because the installer uses one solid
-# compression stream and the package format does not.
+# Windows MSIX package — the Microsoft Store submission package. Rebuilt on
+# 2026-10-21, unsigned. It declares the identity and publisher Partner
+# Center assigned to the account:
+#
+#   Name="OpKnock.KnockDesk"
+#   Publisher="CN=13E3D3C2-988F-4109-AD0E-42DE8604237C"
+#   Version="3.1.12.0"
+#
+# It is submitted unsigned and Microsoft signs it once the submission is
+# accepted. Signing it here with a personal certificate would contradict
+# the publisher the manifest declares, and the package would be rejected.
+# Build it with: node scripts/build-msix.mjs --store
+#
+# The package that shipped before this was a 24-entry shell: it carried the
+# Electron runtime and the app archive but not locales/, not resources.pak,
+# and none of the resources/ tree, so it could not launch. It also shipped
+# three 1x1 placeholder pixels as the store icons. This one carries the
+# whole payload — the same tree the installer carries — and the KnockDesk
+# mark as its store icons. It is larger than the installer because the
+# installer uses one solid compression stream and the package format does
+# not.
 9D07BCD094378FB0B3A6DE208E04ED87501639E79C9B17BA2A350B8946B8AA4D  KnockDesk-3.1.12-x64.msix
 #
 # macOS cross-builds (unsigned and un-notarized, structurally validated,
