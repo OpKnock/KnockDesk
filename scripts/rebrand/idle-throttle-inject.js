@@ -1,7 +1,12 @@
 'use strict';
 
 /**
- * KnockDesk idle throttle (injected by the launch shim into app windows).
+ * KnockDesk idle throttle (fallback post-load injection).
+ *
+ * Applied by the launch shim to every window of the app after it loads:
+ * the main UI (which also gets the document-start copy via its own
+ * index.html), the in-app browser pages the user opens inside the app,
+ * and the agent office.
  *
  * The shipped UI keeps an ambient layer alive: infinite CSS animations (orb
  * breathe/pulse/spin, voice-HUD beams, recording ripples) plus a WebGL
@@ -34,19 +39,13 @@
     if (window[KEY]) return;
     window[KEY] = true;
 
-    // Only the app's own UI. The main window is served by the bundled
-    // loopback static server (http://127.0.0.1:<ui-port>/index.html); the
-    // dist build also runs from an unpacked asar path. In-app browser
-    // pages, AgentTown, and the bridge/CDP ports are left untouched.
+    // Applies to every window of the app: the main UI, in-app browser pages
+    // (real web sites the user opened inside the app), and the agent office.
+    // Idle means idle for all of them, and a page that is actually doing
+    // something keeps itself awake (media, network, WebSocket, DOM changes).
+    // Only devtools windows are skipped.
     var href = location.href || '';
-    var hostOk = /^https?:\/\/(127\.0\.0\.1|localhost):\d+\//.test(href);
-    var portOk = hostOk && /:(45678|45679|45680)\//.test(href);
-    var isAppUi = portOk
-      || (location.protocol === 'file:'
-          && (href.indexOf('app.asar') !== -1
-              || href.indexOf('app.asar.unpacked') !== -1
-              || /[\\/]dist[\\/]index\.html/.test(href)));
-    if (!isAppUi) return;
+    if (href.indexOf('devtools://') === 0) return;
     if (typeof URL === 'function' && URL.searchParams && URL.searchParams.get('kdidle') === 'verbose') {
       window.__kdDbg = {};
       console.log('[KnockDesk] idle signals debug enabled');
