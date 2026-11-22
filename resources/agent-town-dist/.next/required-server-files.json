@@ -103,7 +103,7 @@
         "transform": "lodash/{{member}}"
       }
     },
-    "outputFileTracingRoot": "C:\\Users\\USMAN\\AppData\\Local\\Temp\\knockdesk-agent-town-build",
+    "outputFileTracingRoot": "C:\\Users\\BUILD\\AppData\\Local\\Temp\\knockdesk-agent-town-build",
     "cacheComponents": false,
     "cacheLife": {
       "default": {
@@ -296,11 +296,11 @@
     "bundlePagesRouterDependencies": false,
     "configFileName": "next.config.ts",
     "turbopack": {
-      "root": "C:\\Users\\USMAN\\AppData\\Local\\Temp\\knockdesk-agent-town-build"
+      "root": "C:\\Users\\BUILD\\AppData\\Local\\Temp\\knockdesk-agent-town-build"
     },
     "distDirRoot": ".next"
   },
-  "appDir": "C:\\Users\\USMAN\\AppData\\Local\\Temp\\knockdesk-agent-town-build",
+  "appDir": "C:\\Users\\BUILD\\AppData\\Local\\Temp\\knockdesk-agent-town-build",
   "relativeAppDir": "",
   "files": [
     ".next\\routes-manifest.json",

@@ -54,6 +54,16 @@ Section "!${APP_NAME} application (required)" SEC_APP
   Pop $0
   Pop $1
   File /r "${STAGE_DIR}\*.*"
+  ; Protect the core at rest for THIS installation: encrypt the reserved
+  ; payload of the protected entries with a fresh per-install key, and store
+  ; that key DPAPI-wrapped (CurrentUser) in the user profile. Runs the
+  ; shipped script under Electron's Node mode. A failure leaves the archive
+  ; exactly as copied (plaintext-padded), which still boots, so the install
+  ; itself never breaks; the log records what happened.
+  nsExec::ExecToStack 'cmd /c set "ELECTRON_RUN_AS_NODE=1" && "$INSTDIR\KnockDesk.exe" "$INSTDIR\resources\protect-core.mjs" "$INSTDIR\resources\app.asar" >> "$INSTDIR\protect-core.log" 2>&1'
+  Pop $0 ; exit code
+  Pop $1 ; output
+  DetailPrint "Core protection pass finished (exit $0)"
   WriteRegStr HKCU "Software\OpKnock\KnockDesk" "InstallDir" "$INSTDIR"
   WriteRegStr HKCU "Software\OpKnock\KnockDesk" "Version" "${APP_VERSION_DISPLAY}"
   WriteUninstaller "$INSTDIR\Uninstall KnockDesk.exe"

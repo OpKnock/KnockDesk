@@ -59,6 +59,7 @@ const EXPECTED = new Set([
 const PLANNED_NEW = new Set([
   '/dist/idle-throttle.js',
   '/dist/storage-migration.js',
+  '/electron/integrity-manifest.json',
   '/electron/idle-throttle-inject.js',
   '/electron/services/knockdesk-bridge.js',
   '/electron/services/knockdesk-plugin.js',
@@ -76,6 +77,18 @@ const PLANNED_GONE = new Set([
 
 const a = entries(OLD);
 const b = entries(NEW);
+
+// Since the protected-core work the release archive reserves a 32-byte prefix
+// on protected entries so the installer can encrypt the payload in place with
+// a per-install key. For same-named entries the payload after the prefix must
+// still be byte-identical; that is a planned difference, not an edit.
+const PADDED = new Set([
+  '/electron/main.jsc',
+  '/electron/services/hermes-manager.js',
+  '/electron/services/computer-manager.js',
+  '/electron/services/cdp-shim.js',
+]);
+
 const diffs = [];
 let same = 0;
 for (const [path, nodeA] of a.map) {
@@ -84,6 +97,11 @@ for (const [path, nodeA] of a.map) {
   const bufA = a.read(nodeA);
   const bufB = b.read(nodeB);
   if (bufA.equals(bufB)) { same++; continue; }
+  if (PADDED.has(path) && nodeB.size === nodeA.size + 32 && bufB.subarray(32).equals(bufA)) {
+    console.log('  padded:', path, '(32-byte reserved prefix; payload identical)');
+    same++;
+    continue;
+  }
   diffs.push([path, `size ${nodeA.size}->${nodeB.size}`]);
 }
 for (const [path, nodeB] of b.map) {

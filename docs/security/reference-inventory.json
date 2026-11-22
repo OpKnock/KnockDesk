@@ -1,0 +1,169 @@
+{
+ "generated_for": "KnockDesk protected core + anti-tamper",
+ "totals": {
+  "files_with_legacy_refs": 15,
+  "total_occurrences": 145,
+  "editable_occurrences": 94,
+  "frozen_occurrences": 51
+ },
+ "entries": [
+  {
+   "path": "dist/index.html",
+   "hits": 1,
+   "editable": true,
+   "kind": "app html",
+   "identifiers": [
+    "name-only"
+   ],
+   "sha256": "daddcde9cc0cfd1a"
+  },
+  {
+   "path": "dist/storage-migration.js",
+   "hits": 2,
+   "editable": true,
+   "kind": "electron module",
+   "identifiers": [
+    "name-only"
+   ],
+   "sha256": "e118414f110022a4"
+  },
+  {
+   "path": "dist/assets/index-u5ljrpMR-kd90.js",
+   "hits": 1,
+   "editable": true,
+   "kind": "renderer bundle",
+   "identifiers": [
+    "st_env_or_storage"
+   ],
+   "sha256": "0f6d7b2f3563c126"
+  },
+  {
+   "path": "electron/main.js",
+   "hits": 37,
+   "editable": true,
+   "kind": "electron module",
+   "identifiers": [
+    "media-scheme",
+    "legacy-path",
+    "bridge-key"
+   ],
+   "sha256": "dc5c5f0829f2d09c"
+  },
+  {
+   "path": "electron/main.jsc",
+   "hits": 51,
+   "editable": false,
+   "kind": "compiled bytecode",
+   "identifiers": [
+    "export",
+    "ipc-channel",
+    "st_env_or_storage",
+    "dpapi-tag",
+    "media-scheme",
+    "legacy-path"
+   ],
+   "sha256": "ce5e1a505ed1b052"
+  },
+  {
+   "path": "electron/main/bootstrap/knockdesk-bootstrap.js",
+   "hits": 4,
+   "editable": true,
+   "kind": "electron module",
+   "identifiers": [
+    "legacy-path"
+   ],
+   "sha256": "db51776ee158b561"
+  },
+  {
+   "path": "electron/main/ipc/index.js",
+   "hits": 3,
+   "editable": true,
+   "kind": "electron module",
+   "identifiers": [
+    "legacy-path"
+   ],
+   "sha256": "d6f839f8350ac22d"
+  },
+  {
+   "path": "electron/services/agenttown-manager.js",
+   "hits": 7,
+   "editable": true,
+   "kind": "electron module",
+   "identifiers": [
+    "st_env_or_storage"
+   ],
+   "sha256": "30fef663f8afa09f"
+  },
+  {
+   "path": "electron/services/cdp-shim.js",
+   "hits": 1,
+   "editable": true,
+   "kind": "electron module",
+   "identifiers": [
+    "st_env_or_storage"
+   ],
+   "sha256": "667a0e6d888ea4e7"
+  },
+  {
+   "path": "electron/services/computer-manager.js",
+   "hits": 10,
+   "editable": true,
+   "kind": "electron module",
+   "identifiers": [
+    "st_env_or_storage"
+   ],
+   "sha256": "5a8c0a8ebeaad530"
+  },
+  {
+   "path": "electron/services/computer-runtime.js",
+   "hits": 6,
+   "editable": true,
+   "kind": "electron module",
+   "identifiers": [
+    "st_env_or_storage"
+   ],
+   "sha256": "d3af97483847b337"
+  },
+  {
+   "path": "electron/services/hermes-manager.js",
+   "hits": 16,
+   "editable": true,
+   "kind": "electron module",
+   "identifiers": [
+    "st_env_or_storage"
+   ],
+   "sha256": "90487d0d12640bc2"
+  },
+  {
+   "path": "electron/services/hermes-runtime.js",
+   "hits": 2,
+   "editable": true,
+   "kind": "electron module",
+   "identifiers": [
+    "st_env_or_storage"
+   ],
+   "sha256": "d2b34d4b63e5f2c8"
+  },
+  {
+   "path": "electron/services/knockdesk-bridge.js",
+   "hits": 3,
+   "editable": true,
+   "kind": "electron module",
+   "identifiers": [
+    "export",
+    "st_env_or_storage"
+   ],
+   "sha256": "74c01183be27c9d5"
+  },
+  {
+   "path": "electron/services/telemetry.js",
+   "hits": 1,
+   "editable": true,
+   "kind": "electron module",
+   "identifiers": [
+    "st_env_or_storage"
+   ],
+   "sha256": "6dd02968dd23bb11"
+  }
+ ]
+}

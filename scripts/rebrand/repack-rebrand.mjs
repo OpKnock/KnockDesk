@@ -69,6 +69,7 @@ const listNew = listPackage(OUT).map(norm).sort();
 const PLANNED_NEW = new Set([
   '/dist/idle-throttle.js',
   '/dist/storage-migration.js',
+  '/electron/integrity-manifest.json',
   '/electron/idle-throttle-inject.js',
   '/electron/services/knockdesk-bridge.js',
   '/electron/services/knockdesk-plugin.js',
@@ -95,8 +96,16 @@ console.log('file list delta: +' + onlyNew.length, '(planned:', [...PLANNED_NEW]
 
 const jscOld = readEntry(ASAR, 'electron/main.jsc');
 const jscNew = readEntry(OUT, 'electron/main.jsc');
-console.log('main.jsc byte-identical:', jscOld.equals(jscNew), '|', jscNew.length, 'bytes');
-if (!jscOld.equals(jscNew)) { console.error('FAIL: main.jsc changed'); process.exit(1); }
+// Since the protected-core work the release archive reserves a 32-byte prefix
+// on each protected entry (32 zero bytes in a plaintext build) so the
+// installer can encrypt the payload in place with a per-install key. The
+// bytecode after the prefix stays byte-identical.
+const PREFIX = 32;
+const zeroPrefixed = jscNew.length >= PREFIX && jscNew.subarray(0, PREFIX).every((b) => b === 0);
+const jscPayload = zeroPrefixed ? jscNew.subarray(PREFIX) : jscNew;
+console.log('main.jsc byte-identical:', jscOld.equals(jscPayload), '|', jscNew.length, 'bytes',
+  zeroPrefixed ? '(32-byte reserved prefix)' : '(no prefix)');
+if (!jscOld.equals(jscPayload)) { console.error('FAIL: main.jsc changed'); process.exit(1); }
 
 const loader = readEntry(OUT, 'electron/main.js');
 console.log('main.js == launch shim:', loader.equals(readFileSync(SHIM)));
@@ -112,6 +121,14 @@ const THROTTLE = join(HERE, 'idle-throttle.js');
 const throttleBytes = readEntry(OUT, '/dist/idle-throttle.js'.slice(1));
 console.log('idle throttle source matches:', throttleBytes.equals(readFileSync(THROTTLE)));
 if (!throttleBytes.equals(readFileSync(THROTTLE))) { console.error('note: dist/idle-throttle.js differs from the source file'); }
+const manifestBytes = readEntry(OUT, '/electron/integrity-manifest.json'.slice(1));
+const manifest = JSON.parse(manifestBytes.toString('utf8'));
+console.log('integrity manifest: ' + manifest.total_entries + ' entries, '
+  + manifest.protected_entry_count + '/' + manifest.protected_entries.length + ' protected');
+if (manifest.protected_entry_count !== manifest.protected_entries.length) {
+  console.error('FAIL: manifest does not cover every protected entry');
+  process.exit(1);
+}
 const htmlEntry = readEntry(OUT, '/dist/index.html'.slice(1)).toString('utf8');
 const htmlOk = htmlEntry.includes('./idle-throttle.js');
 console.log('index.html loads the throttle first:', htmlOk);
