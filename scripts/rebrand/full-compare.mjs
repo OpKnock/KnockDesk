@@ -58,6 +58,7 @@ const EXPECTED = new Set([
 // inject source the launch shim reads at startup.
 const PLANNED_NEW = new Set([
   '/dist/idle-throttle.js',
+  '/dist/storage-migration.js',
   '/electron/idle-throttle-inject.js',
   '/electron/services/knockdesk-bridge.js',
   '/electron/services/knockdesk-plugin.js',
