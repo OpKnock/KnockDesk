@@ -8,7 +8,7 @@ AgentTown sidecar, and bridges run **on your PC** (`http://127.0.0.1` only).
 No account, no cloud backend operated by OpKnock.
 
 ## Data stored on your PC
-- Settings, profiles, themes, voice choice: `%APPDATA%\knockdesk` (+ JSON stores beside it). Older installs are migrated there from `%APPDATA%\stonic_gen3` on first launch.
+- Settings, profiles, themes, voice choice: `%APPDATA%\knockdesk` (+ JSON stores beside it). Older installs are migrated there from `%APPDATA%\KnockDesk` on first launch.
 - API keys you paste (Google Gemini, OpenRouter, etc.): OS-protected local
   stores (DPAPI on Windows). Keys are never written to logs.
 - Chat history, memories, notes, tasks: local JSON/SQLite under the same root.
@@ -31,7 +31,7 @@ KnockDesk performs no background recording.
 ## Retention and deletion
 Data stays on your PC until you delete it. In-app clearing (where offered)
 deletes the corresponding local stores. Full removal: uninstall the app,
-then delete `%APPDATA%\knockdesk` (and, if it still exists, the legacy `%APPDATA%\stonic_gen3` folder).
+then delete `%APPDATA%\knockdesk` (and, if it still exists, the legacy `%APPDATA%\KnockDesk` folder).
 
 ## Generative-AI disclosure
 Responses are machine-generated and can be wrong. The app labels AI content
