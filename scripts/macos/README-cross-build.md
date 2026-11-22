@@ -2,8 +2,8 @@
 
 Produces two distribution zips — `KnockDesk-3.1.14-macOS-arm64.zip` (Apple
 Silicon) and `KnockDesk-3.1.14-macOS-x64.zip` (Intel) — **without any Mac
-hardware**. The result is an unsigned `.app` bundle; a friend tests on real
-macOS before signing/notarization.
+hardware**. The result is an ad-hoc signed `.app` bundle; Developer ID
+signing and notarization remain a separate release gate.
 
 ## How it works (strategy)
 
@@ -40,6 +40,10 @@ disk entirely:
 - The only "symlinks" that exist solely in the zip map are the venv launchers,
   which are never created on disk; everything extracted from real archives
   round-trips through reader tests against Python's `zipfile`.
+- `adhoc-sign-app.mjs` is the exception: it materialises the mapped symlinks
+  with `mklink` for the duration of signing, then removes them. rcodesign
+  writes backslash targets into `CodeResources` as forward slashes, so the
+  final zip keeps the original Unix target strings and a valid seal.
 
 Windows *dos* drop these mode bits entirely, which is exactly why a normal
 Windows-made zip of a mac app fails with "permission denied" on launch.
@@ -64,7 +68,8 @@ downloads/   cached official artifacts (electron zip, node tarball, PBS tarball,
 staging/     per-arch assembled KnockDesk.app trees (big; safe to delete)
 dist/        final zips + SHA-256SUMS.txt
 scripts/
-  build-macos.mjs      orchestrator: downloads, assembly, venv, Info.plist, zips
+  build-macos.mjs      orchestrator: downloads, assembly, venv, Info.plist, sign, zips
+  adhoc-sign-app.mjs   temporary symlinks + rcodesign ad-hoc signature
   unpack.mjs           privilege-free zip + tar.gz readers (symlink maps)
   zip-with-mode.mjs    PK-ZIP writer with Unix modes + symlinks (store for .asar)
   icns.mjs             KnockDesk.icns generator (GDI+ scale -> pure-JS icns pack)
@@ -81,18 +86,23 @@ node scripts/build-macos.mjs --arch arm64   # one arch
 node scripts/build-macos.mjs               # both
 ```
 
-Requires network (official GitHub/nodejs.org artifacts) and Node.js on
-Windows. No elevation, no Developer Mode, no Mac.
+Requires network (official GitHub/nodejs.org artifacts), Node.js on Windows,
+and `rcodesign` on `PATH` (or `RCODESIGN=/path/to/rcodesign.exe`). No
+elevation, no Developer Mode, no Mac. Set `KNOCKDESK_MACOS_ADHOC_SIGN=0` only
+for local debugging of an unsigned archive; release builds must keep the
+default so macOS does not report the bundle as damaged.
 
 ## Friend testing
 
 See `MACOS_TEST_PLAN.md` (and `verify-macos.sh` for automated structural
-checks). Unsigned-app notes: right-click → Open, or `xattr -cr KnockDesk.app`.
+checks). The app is ad-hoc signed but not Developer ID signed or notarized:
+right-click → Open, or `xattr -cr KnockDesk.app` after checking the SHA-256.
 
 ## Signing (later, real release)
 
-With the Apple Developer account, sign with `rcodesign` (pure Rust, no Mac
-needed) or `codesign` on any Mac: export a `.p12` from the Developer portal,
-sign `KnockDesk.app` inside the bundle and helpers, staple the notarization
-ticket, and re-zip. The website download card switches from "Coming soon"
-to the signed zips once they exist.
+The ad-hoc signature fixes the "damaged" error but does not establish a
+Developer ID identity. With an Apple Developer account, sign the assembled
+app with `rcodesign` using the exported `.p12`, staple the notarization
+ticket, and re-zip. `build-macos.mjs` already signs after assembly, so the
+final pass replaces that ad-hoc signature rather than requiring a second
+manual re-zip.
