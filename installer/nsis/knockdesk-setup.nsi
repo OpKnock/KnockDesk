@@ -78,6 +78,12 @@ Section "Desktop shortcut" SEC_DESKTOP
 SectionEnd
 
 Section "-Start Menu shortcuts"
+  ; A previous developer install left a shortcut directly in the group (not
+  ; inside an app folder) pointing at the repo checkout. Windows sorts it
+  ; above the folder entry, so launching "KnockDesk" from Search hit the dev
+  ; build and got its idle-burn behaviour. Remove the stale root-level
+  ; shortcut so there is exactly one, unambiguous entry for the app.
+  Delete "$SMPROGRAMS\${APP_NAME}.lnk"
   CreateDirectory "$SMPROGRAMS\${APP_NAME}"
   CreateShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\${APP_ICON_FILE}" 0
   CreateShortcut "$SMPROGRAMS\${APP_NAME}\Uninstall ${APP_NAME}.lnk" "$INSTDIR\Uninstall KnockDesk.exe" "" "$INSTDIR\${APP_ICON_FILE}" 0
@@ -89,6 +95,8 @@ Section "Uninstall"
   Pop $1
   RMDir /r "$INSTDIR"
   RMDir /r "$SMPROGRAMS\${APP_NAME}"
+  ; The stale root-level shortcut from the old dev install lives here too.
+  Delete "$SMPROGRAMS\${APP_NAME}.lnk"
   Delete "$DESKTOP\${APP_NAME}.lnk"
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\KnockDesk"
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\App Paths\${APP_EXE}"
