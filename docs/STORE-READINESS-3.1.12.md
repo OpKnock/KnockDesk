@@ -1,8 +1,9 @@
 # Microsoft Store submission readiness — KnockDesk 3.1.12
 
 Date: 2026-10-19. Release under test: v3.1.12 (installer SHA-256
-`6792E8F79435426E7474C80FFE6CA10A2DCDCED6C53164579993AA1AF45CAF48`,
-macOS bundles unchanged from the same release).
+`324952F682600CCA058CAA3857D0B13C6E57B0580CFA7E4960ACB914EFC9AF2C`,
+779 MB, built Oct 19 11:37 and carrying the idle-CPU throttle; macOS
+bundles unchanged from the same release).
 
 Method: live install/uninstall cycles, static scans, live network testing of
 the running app with Mend-AI (nmap, GOA quick/deep runs, direct HTTP probes),
@@ -74,18 +75,10 @@ privacy scan, 56 source tests). Nothing below is claimed without evidence.
 
 ## Known deltas in the published v3.1.12 artifact
 
-The published installer (SHA-256 `6792E8F7…`, built Oct 19 02:13) is current
-through PR #39. Two later merges are not in it and are not user-visible in the
-app UI, but they are in the repository and scheduled for the next build:
-- **PR #45** renames the computer sidecar's logical model names to the
-  KnockDesk names the gateway mapping now expects (old names still resolve
-  through env overrides, so this is a rename, not a behavior change).
-- **PR #46** rebrands `resources/dist/audio/README.txt`, the one user-browsable
-  file inside the asar that still carried the old brand.
-
-Interim state: installing from the current published release gives the fully
-rebranded UI, all tool fixes, and the gateway key injection. The two deltas
-ship with the next installer.
+None as of the Oct 19 11:37 build: the published installer carries every
+fix that was in flight when testing started, including the idle-CPU
+throttle, the asar README rebrand, the sidecar model-name rename, and the
+Start-menu shortcut cleanup. Earlier builds on this page are superseded.
 
 ## Follow-ups before submission
 
@@ -131,9 +124,13 @@ live sessions and streaming replies are unaffected. Escape hatch:
 
 Verified live over 15 minutes: total app CPU went from ~70s per 30s window
 to ~0-1s per 30s (0-3% of a core) at the idle mark, held with no spurious
-resume, and full rate returned on the next interaction. The asar repack
-gates confirm 16,480 of 16,482 entries are byte-identical; only the loader,
-the patched HTML, and the two intended new files differ.
+resume, and full rate returned on the next interaction. On a **fresh
+profile** (what a certification tester or a new user gets) the whole app,
+including the in-app browser's default dashboard page, idles at **0.7-3% of
+one core**. On this authoring machine, which has a phone bridge connected and
+a live session, the app correctly stays awake because real work is flowing.
+The asar repack gates confirm 16,483 of 16,484 entries are byte-identical;
+only the loader, the patched HTML, and the two intended new files differ.
 
 A second install defect was found and fixed at the same time: a stale
 Start-menu shortcut left by the developer install pointed at the repo
