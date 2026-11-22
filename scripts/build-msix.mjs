@@ -286,6 +286,12 @@ function countFiles(dir) {
 //     "Assets" with a capital A. The Store's validator looks the logo up
 //     by part name and does not fold case.
 //
+//   - the device family has to be declared. A desktop package declares
+//     Windows.Desktop and nothing else. Windows.Core is IoT Core and the
+//     Store rejects it for a desktop app, and the other families
+//     (Universal, Xbox, Holographic, Team) are not appropriate for a
+//     full-trust desktop application either.
+//
 // The publisher display name is the one shown in the Store listing. It
 // has to match the display name on the Partner Center account, so it
 // comes from the same file as the publisher identity.
@@ -304,10 +310,6 @@ const MANIFEST = `<?xml version="1.0" encoding="utf-8"?>
   </Properties>
   <Dependencies>
     <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
-    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
-    <TargetDeviceFamily Name="Windows.Core" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
-    <TargetDeviceFamily Name="Windows.Team" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
-    <TargetDeviceFamily Name="Windows.Holographic" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
   </Dependencies>
   <Resources>
     <Resource Language="${DEFAULT_LANGUAGE}" />
