@@ -41,6 +41,13 @@ foreach ($pat in $rootFiles) {
     Copy-Item $src.FullName (Join-Path $stage $src.Name) -Force
   }
 }
+# Shortcut icon as a small standalone file. Windows extracts shortcut icons
+# from the target, and KnockDesk.exe is ~190 MB: the shell times out parsing
+# it and shows a blank icon. A 9 KB .ico beside the exe resolves instantly.
+$iconIco = Join-Path $assets 'install.ico'
+if (Test-Path $iconIco) {
+  Copy-Item $iconIco (Join-Path $stage 'KnockDesk.ico') -Force
+}
 foreach ($dir in $rootDirs) {
   $src = Join-Path $root $dir
   if (-not (Test-Path $src)) { continue }

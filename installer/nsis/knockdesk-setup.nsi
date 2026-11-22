@@ -8,6 +8,7 @@
 !define APP_VERSION "3.1.12"
 !define APP_VERSION_DISPLAY "3.1.12-local"
 !define APP_EXE "KnockDesk.exe"
+!define APP_ICON_FILE "KnockDesk.ico"
 !define INSTALLER_OUT "..\..\dist\KnockDesk-Setup-3.1.12-x64.exe"
 ; Staging path is passed via /D from build-nsis-installer.ps1 (short TEMP path
 ; to avoid Windows MAX_PATH on deeply nested Python venv files).
@@ -71,13 +72,15 @@ Section "!${APP_NAME} application (required)" SEC_APP
 SectionEnd
 
 Section "Desktop shortcut" SEC_DESKTOP
-  CreateShortcut "$DESKTOP\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\${APP_EXE},0" 0
+  ; Icon from the shipped .ico, not the exe: KnockDesk.exe is ~190 MB and the
+  ; shell's icon extraction times out on it, leaving a blank shortcut icon.
+  CreateShortcut "$DESKTOP\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\${APP_ICON_FILE}" 0
 SectionEnd
 
 Section "-Start Menu shortcuts"
   CreateDirectory "$SMPROGRAMS\${APP_NAME}"
-  CreateShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\${APP_EXE},0" 0
-  CreateShortcut "$SMPROGRAMS\${APP_NAME}\Uninstall ${APP_NAME}.lnk" "$INSTDIR\Uninstall KnockDesk.exe" "" "" 0
+  CreateShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\${APP_ICON_FILE}" 0
+  CreateShortcut "$SMPROGRAMS\${APP_NAME}\Uninstall ${APP_NAME}.lnk" "$INSTDIR\Uninstall KnockDesk.exe" "" "$INSTDIR\${APP_ICON_FILE}" 0
 SectionEnd
 
 Section "Uninstall"
