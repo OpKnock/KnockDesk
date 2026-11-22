@@ -8,10 +8,10 @@ Date: 2026-10-21 (revised; originally 2026-10-17). Status: DECIDED. Artifacts:
 Ship Windows releases as **both**:
 
 - a **standalone offline NSIS installer** (`KnockDesk-Setup-<version>-x64.exe`),
-  per-user, no admin required — the direct download, and the artifact that
+  per-user, no admin required â€” the direct download, and the artifact that
   runs today;
 - an **MSIX package** (`KnockDesk-<version>-x64.msix`) for submission to the
-  Microsoft Store through Partner Center, built with `--store`.
+  Microsoft Store through Partner Center, built with `node scripts/build-msix.mjs --skip-sign`.
 
 Keep the portable zip as a secondary artifact. NEVER submit a web downloader
 as the Store package.
@@ -20,7 +20,7 @@ as the Store package.
 
 | | NSIS installer | MSIX Store package |
 |---|---|---|
-| Built by | `scripts/build-nsis-installer.ps1` | `scripts/build-msix.mjs --store` |
+| Built by | `scripts/build-nsis-installer.ps1` | `scripts/build-msix.mjs` |
 | Identity | none (it is a plain installer) | the name and publisher Partner Center assigned |
 | Signing | Authenticode, at build time, with the release certificate | **unsigned**: Microsoft signs it after it accepts the submission |
 | Install | runs today, from the release page | from the Microsoft Store, once it is certified |
@@ -44,15 +44,20 @@ A Store build therefore uses:
 
 and it is submitted **unsigned**. Signing it with a personal certificate
 first would contradict the publisher the manifest declares and the package
-would be rejected. `--store` refuses to run when `SIGN_PFX` or
+would be rejected. A Store build refuses to run when `SIGN_PFX` or
 `SIGN_PFX_PASSWORD` is set, so a Store package cannot be signed by accident.
 
-A sideload build (`node scripts/build-msix.mjs`, no `--store`) keeps the
+A Store build is the **default**: `node scripts/build-msix.mjs` declares the
+Partner Center identity. Building the wrong identity is the easiest way to
+get a package rejected, so the correct one is what you get unless you ask
+for something else.
+
+A sideload build (`node scripts/build-msix.mjs --sideload`) keeps the
 personal identity and the certificate in `installer/msix-publisher.txt`. It
 is written to `dist/KnockDesk-<version>-x64-sideload.msix` so the two can
 never be confused. Note that a package signed with a certificate that is not
 in the Windows trusted root list will not install on a machine that does not
-trust that certificate — `Add-AppxPackage` rejects it with 0x800B010A — so
+trust that certificate â€” `Add-AppxPackage` rejects it with 0x800B010A â€” so
 the sideload build is for testing, not for distribution.
 
 ## Why NSIS first

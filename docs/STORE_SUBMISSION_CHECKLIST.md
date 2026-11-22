@@ -1,4 +1,4 @@
-# KnockDesk — Microsoft Store Submission Checklist
+# KnockDesk â€” Microsoft Store Submission Checklist
 
 Date: 2026-10-21 (revised; originally 2026-10-17). Version: 3.1.12. Status per item: VERIFIED / FAILED / BLOCKED / N/A.
 
@@ -8,9 +8,9 @@ Date: 2026-10-21 (revised; originally 2026-10-17). Version: 3.1.12. Status per i
 |------|--------|-------|
 | Version scheme (semver) | VERIFIED | 3.1.12 in exe metadata + package.json + NSIS VIAddVersionKey |
 | Architecture declared | VERIFIED | x64 (NSIS installer targets 64-bit) |
-| Package identity (Publisher/Name) | VERIFIED | `OpKnock.KnockDesk` / `CN=13E3D3C2-988F-4109-AD0E-42DE8604237C` — the values Partner Center assigned. `scripts/build-msix.mjs --store` declares them. |
+| Package identity (Publisher/Name) | VERIFIED | `OpKnock.KnockDesk` / `CN=13E3D3C2-988F-4109-AD0E-42DE8604237C` â€” the values Partner Center assigned. `scripts/build-msix.mjs` declares them. |
 | Package family name | VERIFIED | Derived by Windows from the identity name and publisher (`OpKnock.KnockDesk_f3e3af4par97c`). It is never written by hand. |
-| MSIX version number | VERIFIED | `3.1.12.0` — the four-part form Partner Center expects. Partner Center must not already hold an equal or higher version. |
+| MSIX version number | VERIFIED | `3.1.12.0` â€” the four-part form Partner Center expects. Partner Center must not already hold an equal or higher version. |
 | Version sync across exe/installer/about | VERIFIED | FileVersionInfo: 3.1.12; NSIS: 3.1.12; app displays 3.1.12-local |
 | Target device family | VERIFIED | `Windows.Desktop` only. Windows.Core is IoT Core and the Store rejects it for a desktop app; Universal, Xbox, Holographic and Team are not appropriate either. |
 
@@ -20,8 +20,8 @@ Date: 2026-10-21 (revised; originally 2026-10-17). Version: 3.1.12. Status per i
 |------|--------|-------|
 | NSIS offline installer | VERIFIED | The direct download. See docs/PACKAGING_DECISION.md. |
 | Standalone (no web downloader) | VERIFIED | The whole payload is embedded in the installer |
-| MSIX packaging | VERIFIED | `scripts/build-msix.mjs --store` builds the Store submission package from the same staging tree as the installer, so both carry the same payload. |
-| Store package is submitted unsigned | VERIFIED | Microsoft signs the package once it accepts the submission. `--store` refuses to run when `SIGN_PFX` or `SIGN_PFX_PASSWORD` is set, so a personal certificate can never contradict the declared publisher. |
+| MSIX packaging | VERIFIED | `scripts/build-msix.mjs` builds the Store submission package from the same staging tree as the installer, so both carry the same payload. |
+| Store package is submitted unsigned | VERIFIED | Microsoft signs the package once it accepts the submission. A Store build refuses to run when `SIGN_PFX` or `SIGN_PFX_PASSWORD` is set, so a personal certificate can never contradict the declared publisher. |
 | Payload is not trimmed | VERIFIED | Nothing is dropped from the payload. An earlier build removed about 267 MB of build tooling on the belief that the block map is capped at 65,535 blocks; that is the ZIP32 entry limit, not a block-map limit, and the package packs and unpacks with over 78,000 blocks. The package now carries exactly what the installer carries. |
 
 ## Installation Artifacts
@@ -37,7 +37,7 @@ Date: 2026-10-21 (revised; originally 2026-10-17). Version: 3.1.12. Status per i
 | Per-user install (no admin) | VERIFIED | `RequestExecutionLevel user`, HKCU registry, `$LOCALAPPDATA` |
 | Silent install/uninstall | VERIFIED | NSIS `/S` flag; quiet uninstall string registered |
 | Add/Remove Programs entry | VERIFIED | HKCU Uninstall registry key with all metadata |
-| App Paths registration | VERIFIED | HKCU `App Paths\KnockDesk.exe` — Win+R launch |
+| App Paths registration | VERIFIED | HKCU `App Paths\KnockDesk.exe` â€” Win+R launch |
 | Windows Search discoverable | VERIFIED | Start Menu shortcut (tested: search finds KnockDesk) |
 | SHA-256 checksums published | VERIFIED | `dist/SHA256SUMS.txt` + `dist/SHA256SUMS-installer.txt` |
 | User data preserved on upgrade | VERIFIED | `%APPDATA%\knockdesk` outside install dir (legacy `KnockDesk` migrated on first run); installer kills running exe, replaces files |
@@ -61,7 +61,7 @@ Date: 2026-10-21 (revised; originally 2026-10-17). Version: 3.1.12. Status per i
 | x64 architecture | VERIFIED | Tested on x64 Windows 11 |
 | RAM minimum | VERIFIED | 8 GB recommended (measured 2.5GB idle); 4 GB minimum |
 | Disk space | VERIFIED | ~3 GB installed (2.7 GB payload) |
-| Internet | VERIFIED | Optional — app works fully offline with local keys; internet needed for AI providers |
+| Internet | VERIFIED | Optional â€” app works fully offline with local keys; internet needed for AI providers |
 
 ## Accessibility
 
@@ -100,7 +100,7 @@ Date: 2026-10-21 (revised; originally 2026-10-17). Version: 3.1.12. Status per i
 |------|--------|-------|
 | Account creation | VERIFIED | The Partner Center account exists: the identity `OpKnock.KnockDesk` was assigned to it. |
 | App name reservation | VERIFIED | "KnockDesk" is reserved on the account. |
-| Package upload | READY | `dist/KnockDesk-3.1.12-x64.msix`, built with `--store`. |
+| Package upload | READY | `dist/KnockDesk-3.1.12-x64.msix`, built with `node scripts/build-msix.mjs --skip-sign`. |
 | Device family selection | READY | Select the Windows desktop family only. The package declares `Windows.Desktop` and nothing else. |
 | Restricted capabilities | READY | `runFullTrust` is declared and is a restricted capability: Partner Center asks for a justification in the submission options. See "runFullTrust justification" below. |
 | Test notes for certification | BLOCKED | Draft below; needs user review |
@@ -141,7 +141,7 @@ Every runtime path the app needs is present in the package:
 
 ## Remaining Blockers (user action required)
 
-1. **Upload the Store package** — `dist/KnockDesk-3.1.12-x64.msix` — to Partner Center, select the desktop device family only, and paste the `runFullTrust` justification above.
+1. **Upload the Store package** â€” `dist/KnockDesk-3.1.12-x64.msix` â€” to Partner Center, select the desktop device family only, and paste the `runFullTrust` justification above.
 2. **Provide support URL** for Store listing
 3. **Host privacy policy** at a public URL
 4. **Capture screenshots** at required resolutions
@@ -151,7 +151,7 @@ Every runtime path the app needs is present in the package:
 
 ## Draft Store Description (for review)
 
-> **KnockDesk — Your Local-First AI Assistant**
+> **KnockDesk â€” Your Local-First AI Assistant**
 >
 > KnockDesk is a privacy-respecting desktop AI assistant that runs entirely on
 > your PC. Your keys, your data, your control.
@@ -159,9 +159,9 @@ Every runtime path the app needs is present in the package:
 > **Features:**
 > - Voice chat with customizable AI characters
 > - Screen capture and computer-use automation
-> - Agent Town — a living workspace for AI agents
+> - Agent Town â€” a living workspace for AI agents
 > - Local memory system that learns your preferences
-> - Full offline capability — no cloud account required
+> - Full offline capability â€” no cloud account required
 > - Bring your own API keys (Google Gemini, OpenRouter, and more)
 > - 9 voice personas with distinct personalities
 > - Multiple themes and HUD configurations
