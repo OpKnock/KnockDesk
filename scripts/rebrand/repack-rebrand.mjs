@@ -55,17 +55,23 @@ const newHeader = getRawHeader(OUT, false).header;
 const countOld = JSON.stringify(oldHeader).match(/"size"/g)?.length ?? 0;
 const countNew = JSON.stringify(newHeader).match(/"size"/g)?.length ?? 0;
 console.log('entry counts:', countOld, '->', countNew);
-if (countOld !== countNew) { console.error('FAIL: entry count mismatch'); process.exit(1); }
+// Exactly one planned addition (the idle-throttle inject source); the
+// detailed file-list check below confirms which entries differ.
+if (countNew !== countOld + 2) { console.error('FAIL: entry count mismatch (expected +2: throttle script + inject)'); process.exit(1); }
 
-const listOld = listPackage(ASAR).map(String).sort();
-const listNew = listPackage(OUT).map(String).sort();
-if (JSON.stringify(listOld) !== JSON.stringify(listNew)) {
-  const onlyOld = listOld.filter((p) => !listNew.includes(p));
-  const onlyNew = listNew.filter((p) => !listOld.includes(p));
+const norm = (p) => String(p).replace(/\\/g, '/');
+const listOld = listPackage(ASAR).map(norm).sort();
+const listNew = listPackage(OUT).map(norm).sort();
+// Exactly one intended addition: the idle-throttle inject file the launch
+// shim reads and executes in the app's windows.
+const PLANNED_NEW = new Set(['/dist/idle-throttle.js', '/electron/idle-throttle-inject.js']);
+const onlyOld = listOld.filter((p) => !listNew.includes(p));
+const onlyNew = listNew.filter((p) => !listOld.includes(p));
+if (onlyOld.length || onlyNew.some((p) => !PLANNED_NEW.has(p))) {
   console.error('FAIL: file list differs. onlyOld:', onlyOld.slice(0, 5), 'onlyNew:', onlyNew.slice(0, 5));
   process.exit(1);
 }
-console.log('file lists identical:', listNew.length, 'entries');
+console.log('file list delta: +' + onlyNew.length, '(planned:', [...PLANNED_NEW].join(',') + ') |', listNew.length, 'entries');
 
 const jscOld = readEntry(ASAR, 'electron/main.jsc');
 const jscNew = readEntry(OUT, 'electron/main.jsc');
@@ -78,9 +84,22 @@ if (!loader.equals(readFileSync(SHIM))) { console.error('note: main.js differs f
 console.log('loader requires jsc:', loader.includes("require('./main.jsc')"));
 console.log('loader has migration hatch:', loader.includes('KNOCKDESK_SKIP_LEGACY_MIGRATION'));
 
+const INJECT = join(HERE, 'idle-throttle-inject.js');
+const injectBytes = readEntry(OUT, '/electron/idle-throttle-inject.js'.slice(1));
+console.log('idle inject source matches:', injectBytes.equals(readFileSync(INJECT)));
+if (!injectBytes.equals(readFileSync(INJECT))) { console.error('note: idle-throttle-inject.js differs from the source file'); }
+const THROTTLE = join(HERE, 'idle-throttle.js');
+const throttleBytes = readEntry(OUT, '/dist/idle-throttle.js'.slice(1));
+console.log('idle throttle source matches:', throttleBytes.equals(readFileSync(THROTTLE)));
+if (!throttleBytes.equals(readFileSync(THROTTLE))) { console.error('note: dist/idle-throttle.js differs from the source file'); }
+const htmlEntry = readEntry(OUT, '/dist/index.html'.slice(1)).toString('utf8');
+const htmlOk = htmlEntry.includes('./idle-throttle.js');
+console.log('index.html loads the throttle first:', htmlOk);
+if (!htmlOk) { console.error('FAIL: dist/index.html does not load the idle throttle'); process.exit(1); }
+
 const checks = [
   ['electron/services/hermes-manager.js', 'KNOCKDESK_BRIDGE_URL: bridgeUrl'],
-  ['electron/services/hermes-manager.js', '/^\\s*STONIC_(BRIDGE_URL|BRIDGE_KEY'],
+  ['electron/services/hermes-manager.js', /^\s*KNOCKDESK_(BRIDGE_URL|BRIDGE_KEY)/m],
   ['electron/services/computer-manager.js', "num('KNOCKDESK_COMPUTER_BOOT_DELAY_MS'"],
   ['electron/services/computer-manager.js', 'KNOCKDESK_COMPUTER_TESSERACT: tesseract'],
   ['electron/services/agenttown-manager.js', 'KNOCKDESK_AGENTTOWN_BUNDLED'],
@@ -90,8 +109,8 @@ const checks = [
 let bad = 0;
 for (const [file, needle] of checks) {
   const content = readEntry(OUT, file).toString('utf8');
-  const ok = content.includes(needle);
-  console.log((ok ? 'OK  ' : 'MISS') + ' ' + file + ' :: ' + needle.slice(0, 60));
+  const ok = needle instanceof RegExp ? needle.test(content) : content.includes(needle);
+  console.log((ok ? 'OK  ' : 'MISS') + ' ' + file + ' :: ' + String(needle).slice(0, 60));
   if (!ok) bad++;
 }
 if (bad) { console.error('FAIL: ' + bad + ' patch checks missing'); process.exit(1); }

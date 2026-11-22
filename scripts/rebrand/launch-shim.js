@@ -7,7 +7,7 @@
  * product was renamed from "Stonic" to "KnockDesk". Bytecode string tables
  * cannot be edited safely, so this plain-JavaScript entry file (which IS
  * editable) ports the launch path instead. It runs before the legacy bundle
- * is required and does five things:
+ * is required and does six things:
  *
  *  1. Redirects legacy folder/file names the bytecode builds via path.join:
  *        Documents/Stonic Data      -> Documents/KnockDesk Data
@@ -22,7 +22,12 @@
  *     even if the legacy bundle later asks for a Stonic-named profile.
  *  4. Publishes KNOCKDESK_* <-> STONIC_* environment aliases in both
  *     directions so configs written under either naming keep working.
- *  5. Still requires the unchanged main.jsc - the product behaviour is
+ *  5. Installs an idle throttle in the app's own windows: the ambient CSS
+ *     animation layer and the WebGL particle globe pause after two idle
+ *     minutes and restore instantly on any input, DOM activity, media, or
+ *     network call (the release build otherwise holds the GPU process at
+ *     ~150% of a core while sitting idle, which reads as a hang).
+ *  6. Still requires the unchanged main.jsc - the product behaviour is
  *     byte-for-byte what shipped, only the visible paths and names move.
  *
  * Escape hatches (env):
@@ -30,6 +35,8 @@
  *   KNOCKDESK_SKIP_LEGACY_MIGRATION=1 - keep the path remap and userData pin,
  *     but skip every file copy (used by smoke tests so they never touch the
  *     real profile before the formal first-run migration).
+ *   KNOCKDESK_DISABLE_IDLE_THROTTLE=1 - do not install the idle
+ *     throttle (diagnostics only).
  *
  * Identifiers inside the bytecode that are tightly coupled to live
  * infrastructure (cloud-gateway URL, gateway model ids, crypto format tag,
@@ -218,6 +225,60 @@ require('bytenode');
       }
     } catch (err) {
       console.warn('[KnockDesk] Documents port skipped:', (err && err.message) || err);
+    }
+    // ---- 6. Idle throttle for the ambient UI layer ------------------------
+    // The shipped UI keeps an ambient layer alive: infinite CSS animations
+    // (orb breathe/pulse/spin, voice-HUD beams, recording ripples) plus a
+    // WebGL particle globe, for as long as the window is visible. Measured
+    // on the release build that layer holds the GPU process at ~150% of a
+    // core and a renderer at ~30-55% of a core while the app simply sits
+    // there - what users report as "the app hangs when left idle" and what
+    // certification counts as excessive idle CPU.
+    //
+    // The throttle itself ships as dist/idle-throttle.js and is loaded by the
+    // app's own index.html (patched in this repack) as the FIRST script, so
+    // its timer and animation patches are in place before the app bundle
+    // runs: a post-load injection cannot reach loops that captured timer
+    // references at module scope. Two minutes with no input and no app
+    // activity throttles ambient schedulers to a 2 fps floor; input, DOM
+    // change, media playback, a network call, or a WebSocket message
+    // restores full rate instantly. Nothing is dropped, only slowed.
+    //
+    // This section keeps two pieces of support:
+    //   a. the renderer log forwarder, so the throttle's own state lines
+    //      show up in the app log;
+    //   b. a post-load injection as a fallback for any window whose document
+    //      did not come from the patched index.html.
+    // Escape hatch: KNOCKDESK_DISABLE_IDLE_THROTTLE=1
+    try {
+      if (process.env.KNOCKDESK_DISABLE_IDLE_THROTTLE !== '1' && typeof app.on === 'function') {
+        const injectPath = origJoinFn(__dirname, 'idle-throttle-inject.js');
+        const injectSrc = fs.readFileSync(injectPath, 'utf8');
+        app.on('web-contents-created', function onWebContents(_evt, wc) {
+          try {
+            if (!wc || wc.__kdIdleInjected) return;
+            wc.__kdIdleInjected = true;
+            if (typeof wc.on === 'function') {
+              wc.on('console-message', function onConsole(_e, _level, message) {
+                try {
+                  if (typeof message === 'string' && message.indexOf('[KnockDesk] idle') === 0) {
+                    console.log('[renderer]', message);
+                  }
+                } catch (e) {}
+              });
+            }
+            wc.on('did-finish-load', function onIdleInjectionTarget() {
+              const src = process.env.KNOCKDESK_DEBUG_IDLE === '1'
+                ? 'window.__kdDbg={};' + injectSrc
+                : injectSrc;
+              try { wc.executeJavaScript(src); } catch (e) {}
+            });
+          } catch (e) {}
+        });
+        console.log('[KnockDesk] Idle throttle support installed (renderer logs forwarded)');
+      }
+    } catch (err) {
+      try { console.warn('[KnockDesk] Idle throttle hook skipped:', (err && err.message) || err); } catch {}
     }
   } catch (err) {
     try { console.error('[KnockDesk] Launch shim failed, continuing with legacy paths:', (err && err.message) || err); } catch {}
