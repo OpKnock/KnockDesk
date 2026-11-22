@@ -30,6 +30,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const crypto = require('node:crypto');
 
 const PLUGIN_NAME = 'knockdesk';
 // Nayi file yahan likhna BHOOLNA sab se aasaan ghalti hai: plugin chalta
@@ -112,6 +113,28 @@ function readVersion(dir) {
 }
 
 /**
+ * Installed plugin ka har managed file bundled source se byte-for-byte mel
+ * khata hai ya nahi. Waqt (mtime) nahi dekhte — installer copy karte waqt
+ * waqt badal deta hai. SHA-256 se pata chalta hai ke code waqai wahi hai jo
+ * is app ke saath aaya tha.
+ */
+function fileDigest(filePath) {
+  try {
+    return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
+  } catch {
+    return null;
+  }
+}
+
+function managedFilesMatch(source, target, files) {
+  return files.every((file) => {
+    const expected = fileDigest(path.join(source, file));
+    const actual = fileDigest(path.join(target, file));
+    return expected !== null && expected === actual;
+  });
+}
+
+/**
  * Plugin ko user ke Hermes folder mein rakh dena (ya update kar dena).
  *
  * Wapas ek object aata hai:
@@ -166,12 +189,14 @@ function ensurePlugin(hermesHome, { name, files: PLUGIN_FILES, marker }) {
   // bhi chalta raha (adapter.py usay der se import karta hai) — is liye ghalti
   // kahin nazar nahi aayi, bas ek feature khamoshi se ghayab raha.
   //
-  // Ab do sharton par copy skip hoti hai: version wohi HO, AUR har mutawaqqa
-  // file waqai target par mojood ho. Ye jaanch sasti hai (chand `existsSync`)
-  // aur is poori qism ki ghalti hamesha ke liye khatam kar deti hai.
+  // Ab teen sharton par copy skip hoti hai: version wohi HO, har mutawaqqa
+  // file mojood HO, AUR uska content bundled source jaisa HO. Is se na sirf
+  // gayab file pakri jati hai, balki woh case bhi jahan code badla ho magar
+  // plugin.yaml ka version wohi reh gaya ho.
   const complete = PLUGIN_FILES.every((file) => fs.existsSync(path.join(target, file)));
+  const contentsMatch = complete && managedFilesMatch(source, target, PLUGIN_FILES);
 
-  if (installed && wanted && installed === wanted && complete) {
+  if (installed && wanted && installed === wanted && contentsMatch) {
     return { ok: true, changed: false, version: installed, dir: target };
   }
 
@@ -179,6 +204,14 @@ function ensurePlugin(hermesHome, { name, files: PLUGIN_FILES, marker }) {
     const missing = PLUGIN_FILES.filter((file) => !fs.existsSync(path.join(target, file)));
     console.warn(
       `[KnockDeskPlugin] ${name} v${installed} adhoora mila (${missing.join(', ')} nahi thi) — dobara copy kar rahe hain.`,
+    );
+  } else if (installed && wanted && installed === wanted && !contentsMatch) {
+    // Version wohi hai magar file ka content badla hua hai. Purane app ne
+    // plugin.yaml bump kiye baghair code update kiya ho to bhi naya code
+    // users tak pohnch jata hai — warna "fix ship ho gaya" ka matlab sirf
+    // source tree tak hota tha, installed plugin par purana code chalta rehta tha.
+    console.warn(
+      `[KnockDeskPlugin] ${name} v${installed} purana content rakhta hai — bundled files se dobara copy kar rahe hain.`,
     );
   }
 
@@ -216,10 +249,6 @@ module.exports = {
   ensureKnockDeskPlugin,
   ensureKnockDeskComputerPlugin,
   ensureKnockDeskMemoryPlugin,
-  // Purane naam alias ke tor par (koi bahar wala purana naam le to na toote).
-  ensureKnockDeskPlugin: ensureKnockDeskPlugin,
-  ensureKnockDeskComputerPlugin: ensureKnockDeskComputerPlugin,
-  ensureKnockDeskMemoryPlugin: ensureKnockDeskMemoryPlugin,
   PLUGIN_NAME,
   COMPUTER_PLUGIN_NAME: COMPUTER_PLUGIN.name,
   MEMORY_PLUGIN_NAME: MEMORY_PLUGIN.name,

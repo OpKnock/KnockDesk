@@ -1,7 +1,7 @@
 # KnockDesk macOS cross-build (built on Windows)
 
-Produces two distribution zips — `KnockDesk-3.1.12-macOS-arm64.zip` (Apple
-Silicon) and `KnockDesk-3.1.12-macOS-x64.zip` (Intel) — **without any Mac
+Produces two distribution zips — `KnockDesk-3.1.13-macOS-arm64.zip` (Apple
+Silicon) and `KnockDesk-3.1.13-macOS-x64.zip` (Intel) — **without any Mac
 hardware**. The result is an unsigned `.app` bundle; a friend tests on real
 macOS before signing/notarization.
 

@@ -1,7 +1,7 @@
 name: knockdesk-computer
 label: KnockDesk Computer Use
 kind: standalone
-version: 1.0.0
+version: 1.0.1
 description: >
   Hermes को `computer_task` tool देता है — screen पर इंसान की तरह mouse
   और keyboard चलाने वाला Agent S3 (KnockDesk desktop app के अंदर चलता है)।

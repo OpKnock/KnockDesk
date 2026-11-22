@@ -121,8 +121,10 @@ try:
 except Exception:  # noqa: BLE001
     AgentOverlay = None
 
-
-def _noop_overlay() -> None:
+    # Overlay module na mile to bhi stop/shutdown ka cursor cleanup call
+    # safe rahe. Pehle yahan sirf AgentOverlay=None tha aur
+    # `restore_system_cursors` undefined reh jata tha — NameError try/except
+    # mein chhup jati thi aur agent cursor badla hua hi reh jata tha.
     def restore_system_cursors() -> bool:  # type: ignore[misc]
         return False
 

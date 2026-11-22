@@ -191,7 +191,7 @@ if (info) {
     const xml = entryPayload(info).toString('utf8');
     for (const needle of [
         ['CFBundleIdentifier app.knockdesk.desktop', 'app.knockdesk.desktop'],
-        ['CFBundleShortVersionString 3.1.12', '3.1.12'],
+        ['CFBundleShortVersionString 3.1.13', '3.1.13'],
         ['NSMicrophoneUsageDescription', 'NSMicrophoneUsageDescription'],
         ['NSCameraUsageDescription', 'NSCameraUsageDescription'],
         ['NSAppleEventsUsageDescription', 'NSAppleEventsUsageDescription'],
