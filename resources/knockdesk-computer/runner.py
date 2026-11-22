@@ -212,11 +212,32 @@ class Emitter:
     def send(self, event: str, **fields: Any) -> None:
         line = json.dumps({"event": event, **fields}, ensure_ascii=False)
         with self._lock:
-            sys.stdout.write(line + "\n")
-            sys.stdout.flush()
+            # Waqt ki asli pipe — third-party libraries (gui-agents) sys.stdout
+            # ko badalte hain, protocol ko nuqsan na ho.
+            _PROTOCOL_OUT.write(line + "\n")
+            _PROTOCOL_OUT.flush()
 
 
 emit = Emitter()
+
+
+class _LibraryStdoutToStderr:
+    """gui-agents apne retry/status messages seedha ``print`` karta hai, jo
+    NDJSON protocol wali stdout ko kharab kar deta hai ("Attempt 1 failed..."
+    lines). Agent ke load aur ``predict`` ke daoran stdout ko stderr par
+    bhejo; Emitter ki asli pipe alag mehfooz hai."""
+
+    def __enter__(self) -> "_LibraryStdoutToStderr":
+        self._saved = sys.stdout
+        sys.stdout = sys.stderr
+        return self
+
+    def __exit__(self, *exc: Any) -> bool:
+        sys.stdout = self._saved
+        return False
+
+
+_PROTOCOL_OUT = sys.stdout
 
 
 class TaskStopped(BaseException):
@@ -767,9 +788,29 @@ class ComputerAgent:
             shot.save(buf, format="PNG")
             obs["screenshot"] = buf.getvalue()
 
-            info, code = self.agent.predict(instruction=t.text, observation=obs)
+            with _LibraryStdoutToStderr():
+                info, code = self.agent.predict(instruction=t.text, observation=obs)
             action = (code[0] if code else "") or ""
             sections = _plan_sections(info.get("plan", ""))
+            # Model ne asal plan hi nahi diya — gui-agents 3 koshish + format
+            # retries ke baad khali plan ke saath ek no-op placeholder
+            # (`import time; time.sleep(...)`) lout karta hai. Bina plan ke
+            # steps chalana "max_steps / error: null" se khatam hota hai —
+            # yani jhooti "ho gaya" report. Seedha saaf error do (UI is par
+            # "credits" card kholti hai).
+            if not (info.get("plan") or "").strip() or (
+                not action.strip() and not sections.get("next action", "").strip()
+            ):
+                err = RuntimeError(
+                    "the computer model returned no plan. This almost always means the "
+                    "configured model cannot be paid for (402 / insufficient credits, or "
+                    "the key limit is too low). Check the model provider balance and the "
+                    "key limit, then retry."
+                )
+                # 402 jaisa hi ilzaam: app ka card isi se "Add credits" kholta hai
+                # (_explain_byok_error status_code dekhta hai).
+                err.status_code = 402  # type: ignore[attr-defined]
+                raise err
             t.steps = step
             emit.send(
                 "step",
@@ -871,13 +912,14 @@ class Runner:
 
         threading.Thread(target=heartbeat, name="load-hb", daemon=True).start()
         try:
-            self._get_agent()
-            # जो modules agent के actions बाद में lazily import करते हैं,
-            # अभी ले आओ — task के दौरान कोई नया DLL load न हो।
-            try:
-                import pyperclip  # noqa: F401  (`type` action clipboard से लिखता है)
-            except Exception:  # noqa: BLE001
-                pass
+            with _LibraryStdoutToStderr():
+                self._get_agent()
+                # जो modules agent के actions बाद में lazily import करते हैं,
+                # अभी ले आओ — task के दौरान कोई नया DLL load न हो।
+                try:
+                    import pyperclip  # noqa: F401  (`type` action clipboard से लिखता है)
+                except Exception:  # noqa: BLE001
+                    pass
         except Exception as err:  # noqa: BLE001
             self._loaded.set()
             log.error("Agent load fail: %s\n%s", err, traceback.format_exc())
