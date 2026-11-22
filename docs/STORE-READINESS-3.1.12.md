@@ -60,8 +60,8 @@ privacy scan, 56 source tests). Nothing below is claimed without evidence.
 |---|---|---|
 | Advertised features exist | PASS | Voice, search, memory, skills, computer control, and AgentTown were each exercised; the site copy describes the same feature set |
 | No placeholder pages | PASS | Every advertised surface was launched at least once in testing |
-| Computer control failures are visible, not silent | PASS | The sidecar aborts with the provider-account reason instead of a false completion (PR #35); the model-name defaults are KnockDesk-named. Caveat: the gateway-key injection (PR #39) is not in the v3.1.12 installer, so on a fresh install the Gemini key saved in Settings is not yet passed to the gateway — the release artifact needs one rebuild before the friend tests voice on a clean machine |
-| Voice output works | PASS (same caveat) | Speech synthesizes through the configured voice path; when the free Microsoft endpoint refuses, the app falls back to the Gemini key — once the gateway receives it |
+| Computer control failures are visible, not silent | PASS | The sidecar aborts with the provider-account reason instead of a false completion (PR #35). The published installer was built Oct 19 02:13 and carries every fix merged through PR #39, including the gateway-key injection |
+| Voice output works | PASS | Speech synthesizes through the configured voice path; when the free Microsoft endpoint refuses, the app falls back to the Gemini key, which the gateway receives (PR #39, in this installer) |
 
 ### Listing metadata (evidenced)
 | Check | Status | Evidence |
@@ -71,18 +71,31 @@ privacy scan, 56 source tests). Nothing below is claimed without evidence.
 | System requirements accurate | PASS | Windows 10 1809+ 64-bit / macOS 11+ |
 | Age rating questionnaire | READY | The app has no UGC publishing, gambling, or violence surfaces |
 
+## Known deltas in the published v3.1.12 artifact
+
+The published installer (SHA-256 `6792E8F7…`, built Oct 19 02:13) is current
+through PR #39. Two later merges are not in it and are not user-visible in the
+app UI, but they are in the repository and scheduled for the next build:
+- **PR #45** renames the computer sidecar's logical model names to the
+  KnockDesk names the gateway mapping now expects (old names still resolve
+  through env overrides, so this is a rename, not a behavior change).
+- **PR #46** rebrands `resources/dist/audio/README.txt`, the one user-browsable
+  file inside the asar that still carried the old brand.
+
+Interim state: installing from the current published release gives the fully
+rebranded UI, all tool fixes, and the gateway key injection. The two deltas
+ship with the next installer.
+
 ## Follow-ups before submission
-1. **Rebuild the release installer** so it carries the gateway-key injection
-   (PR #39) on top of the already-shipped icon/search/env/sidecar fixes, then
-   re-run this checklist's launch and voice rows against the new artifact.
-2. **Unsigned binaries** (installer + exe): SmartScreen will warn and the
+
+1. **Unsigned binaries** (installer + exe): SmartScreen will warn and the
    Store path may reject at package validation. Owner action: SignPath
    Foundation free OSS approval (wired in CI — the release will be signed the
    moment the approval and secrets land), Azure Trusted Signing (~$10/month),
    or a purchased OV certificate. See `docs/ops/signing.md`.
-3. **Friend's real-hardware pass**: the macOS bundles and the longer idle soak
+2. **Friend's real-hardware pass**: the macOS bundles and the longer idle soak
    need the friend's hardware (plan: `docs/MACOS_TEST_PLAN.md`).
-4. **Extract API key is optional**: web page extraction is search-only until
+3. **Extract API key is optional**: web page extraction is search-only until
    an extract provider key is added (Firecrawl/Tavily/Exa/Parallel). Search
    works without one.
 
