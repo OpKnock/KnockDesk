@@ -1,13 +1,15 @@
 # KnockDesk 3.1.12 release artifacts (2026-10-18)
 # Windows installer (NSIS, built from main with the SSRF guard, the CDP
-# token gate, and the Stonic to KnockDesk naming cleanup)
-EDD3BCF19CB0A41C5B2AA1EF0BA084E8BE102E55AE3A9A844E37F7A15B54B5A2  KnockDesk-Setup-3.1.12-x64.exe
+# token gate, the Stonic to KnockDesk naming cleanup, the web-search
+# package fix, and the computer-use false-success fix)
+C5CE5FB1636BE74F8BD70B6628208E902A26B4C16C16346D6A7A5ABB90A8F370  KnockDesk-Setup-3.1.12-x64.exe
 # macOS cross-builds (unsigned, structurally validated, awaiting real
 # hardware validation on a Mac)
 C5D1DE21BB019A4E73D9F2257BD23BEB1F875BEE5BF992D13DBEF42617D57D8F  KnockDesk-3.1.12-macOS-arm64.zip
 BDD86415978A85FC43ABD9A40A0A6EFC3BCB1C95919A68887CC8D3E4B9A1409B  KnockDesk-3.1.12-macOS-x64.zip
 #
 # Superseded builds (kept for audit):
-# F8F7F39E8C5FD48EAB8D08D493A7D277B1EAF834BB43EE65164706D855693405  KnockDesk-Setup-3.1.12-x64.exe (pre-fix)
+# EDD3BCF19CB0A41C5B2AA1EF0BA084E8BE102E55AE3A9A844E37F7A15B54B5A2  KnockDesk-Setup-3.1.12-x64.exe (pre tool fixes)
+# F8F7F39E8C5FD48EAB8D08D493A7D277B1EAF834BB43EE65164706D855693405  KnockDesk-Setup-3.1.12-x64.exe (pre SSRF/CDP fixes)
 # 5F75E5528A862FDDA2D67604998CFDD87083D44E2683D7E1F99180F7AC6107DD  KnockDesk-3.1.12-macOS-arm64.zip (pre-rename)
 # 1D4523C3C3D1E73D043EBDE2E6006C62AA43DBFC43860AC2E5A88F20266A4466  KnockDesk-3.1.12-macOS-x64.zip (pre-rename)
