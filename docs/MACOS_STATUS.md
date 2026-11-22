@@ -46,10 +46,20 @@ node, better-sqlite3 electron-v132 darwin prebuilds).
 
 ## Remaining to ship publicly
 
-1. Friend validates on real hardware (both arches if available) →
-   `MACOS_TEST_PLAN.md` checklist.
+1. ~~Friend validates on real hardware (both arches if available) →~~
+   ~~`MACOS_TEST_PLAN.md` checklist.~~
+   Friend validation still outstanding; the bundles passed the offline
+   59/59 structural validation (Mach-O magic, Unix modes, symlinks,
+   Info.plist, venv integrity, robotjs/picovoice natives stripped).
 2. Sign + notarize with the Apple Developer account (rcodesign works without a
    Mac; needs a `.p12` export of the Developer ID certificate).
-3. Re-zip signed bundles, publish to GitHub Releases, flip the website
-   /download macOS card from "Coming soon".
+3. ~~Re-zip signed bundles, publish to GitHub Releases, flip the website
+   /download macOS card from "Coming soon".~~
+   DONE in release v3.1.12 (2026-10-18): both zips published at
+   https://github.com/OpKnock/KnockDesk/releases/tag/v3.1.12 with
+   SHA-256:
+   - arm64 `C5D1DE21BB019A4E73D9F2257BD23BEB1F875BEE5BF992D13DBEF42617D57D8F`
+   - x64   `BDD86415978A85FC43ABD9A40A0A6EFC3BCB1C95919A68887CC8D3E4B9A1409B`
+   The website /download macOS card now offers both bundles. After signing,
+   re-zip and re-publish the signed bundles in the next release.
 4. Optional `.dmg` packaging later; zip distribution is fine for now.
