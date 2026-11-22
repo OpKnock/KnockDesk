@@ -50,6 +50,13 @@ const DOWNLOADS = join(ROOT, 'downloads');
 const WORK = join(ROOT, 'staging');
 const DIST = join(ROOT, 'dist');
 
+// Every released zip must be ad-hoc signed. A Developer ID signature would
+// be better, but an ad-hoc signature is what stops macOS from reporting the
+// rewritten Electron bundle as "damaged". Set
+// KNOCKDESK_MACOS_ADHOC_SIGN=0 only for local debugging of the unsigned zip.
+const ADHOC_SIGN = process.env.KNOCKDESK_MACOS_ADHOC_SIGN !== '0';
+const RCODESIGN = process.env.RCODESIGN || 'rcodesign';
+
 const argv = process.argv.slice(2);
 const archArg = argv.includes('--arch') ? argv[argv.indexOf('--arch') + 1] : 'both';
 const ARCHES = archArg === 'both' ? ['arm64', 'x64'] : [archArg];
@@ -369,6 +376,10 @@ async function main() {
     log('workspace:', ROOT);
     if (!existsSync(STAGE)) throw new Error('Windows stage missing: ' + STAGE);
 
+    const { adhocSignApp } = ADHOC_SIGN
+        ? await import('./adhoc-sign-app.mjs')
+        : { adhocSignApp: null };
+
     const pbs = await findPbsRelease();
     const sums = [];
     mkdirSync(DOWNLOADS, { recursive: true });
@@ -510,7 +521,15 @@ async function main() {
         symlinks.set(`${venvBinPrefix}/python3`, 'python');
         symlinks.set(`${venvBinPrefix}/python3.11`, 'python');
 
-        // 10. zip (unix modes baked in)
+        // 10. ad-hoc sign while the symlinks exist on disk. The seal records
+        //     them as symlinks; the zip writer re-adds them after cleanup.
+        if (adhocSignApp) {
+            adhocSignApp(join(WORK, arch), symlinks, RCODESIGN);
+        } else {
+            log('ad-hoc signing disabled (KNOCKDESK_MACOS_ADHOC_SIGN=0)');
+        }
+
+        // 11. zip (unix modes baked in)
         const zipOut = join(DIST, `KnockDesk-${APP_VERSION}-macOS-${arch}.zip`);
         const { entries, bytes } = zipDirectory(join(WORK, arch), zipOut, { symlinks });
         const size = (bytes / 1073741824).toFixed(2) + ' GB';

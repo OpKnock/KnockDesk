@@ -60,6 +60,16 @@ test('Electron build script is valid Node JavaScript', () => {
   assert.equal(check.status, 0, check.stderr);
 });
 
+test('macOS build ad-hoc signs the assembled app before zipping', () => {
+  const build = readFileSync(resolve(root, 'scripts/macos/build-macos.mjs'), 'utf8');
+  const helper = readFileSync(resolve(root, 'scripts/macos/adhoc-sign-app.mjs'), 'utf8');
+  assert.match(build, /KNOCKDESK_MACOS_ADHOC_SIGN/);
+  assert.match(build, /adhocSignApp\(join\(WORK, arch\), symlinks, RCODESIGN\)/);
+  assert.match(helper, /rcodesign/);
+  assert.match(helper, /mklink/);
+  assert.match(helper, /CodeResources/);
+});
+
 test('dry run targets staging and preserves shipped artifacts', () => {
   const run = spawnSync(process.execPath, [script, '--dry-run'], { cwd: root, encoding: 'utf8' });
   assert.equal(run.status, 0, run.stderr);
