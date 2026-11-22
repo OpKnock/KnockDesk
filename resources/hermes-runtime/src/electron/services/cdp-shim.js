@@ -16,9 +16,9 @@
 //       is no fixed address to hand Hermes ahead of time.
 //
 //  This shim is the fixed address, and it is the browser's front door:
-//  Hermes gets `ws://127.0.0.1:<shim>/devtools/browser/knockdesk ai`, a URL that
-//  is valid before Chromium exists. Nothing happens until a CDP client
-//  actually opens that websocket — THAT is the moment a tool needs a
+//  Hermes gets `ws://127.0.0.1:<shim>/devtools/browser/<per-boot token>`, a
+//  URL that is valid before Chromium exists. Nothing happens until a CDP
+//  client actually opens that websocket — THAT is the moment a tool needs a
 //  browser, so that is where we launch Chromium and then splice the socket
 //  through to the real endpoint.
 //
@@ -34,8 +34,9 @@
 //    (browser_tool.py → _resolve_cdp_override), so handing it one keeps the
 //    availability check free and moves the launch to first real use.
 //
-//  The discovery routes below are kept for other CDP clients, and they too
-//  report the lazy endpoint rather than launching anything.
+//  The discovery routes below are kept for other CDP clients, and they never
+//  launch anything either — but since CDP-01 they no longer echo the tokenized
+//  endpoint either (see the discovery section below).
 //
 //  Hermes itself is not modified — KnockDesk only sets the env var it already
 //  looks for, and every Hermes child process (dashboard, `hermes -z`
@@ -44,6 +45,7 @@
 
 const http = require('http');
 const net = require('net');
+const crypto = require('crypto');
 
 const SHIM_PORT_START = 9333;
 const SHIM_PORT_END = 9353;
@@ -52,7 +54,14 @@ const SHIM_PORT_END = 9353;
 // carries a GUID that changes on every launch; this one never does, so a
 // client that reconnects after the user closed the browser by hand lands
 // back here and simply reopens it.
-const LAZY_BROWSER_PATH = '/devtools/browser/knockdesk ai';
+//
+// CDP-01 (pentest 2026-10-17): the path embeds a random per-boot token. The
+// URL is handed only to the Hermes processes the app spawns itself (via the
+// BROWSER_CDP_URL env var), so a localhost attacker learns nothing useful by
+// probing this port — the old fixed, publicly-readable browser path is gone.
+// The token is also never
+// published through the discovery routes below.
+const LAZY_BROWSER_PATH = `/devtools/browser/knockdesk-${crypto.randomBytes(16).toString('hex')}`;
 
 // A fresh PC's first-ever Chromium start can be very slow (AV scans the
 // whole binary while the profile is created), and browser-manager now allows
@@ -152,9 +161,12 @@ function sendJson(res, payload) {
 
 // ─── Discovery (never launches) ─────────────────────────────────────────
 //
-// Answers with the lazy endpoint whether or not Chromium is up, so a client
-// that discovers here always gets a URL it can connect to — and connecting
-// is what starts the browser.
+// Third-party CDP clients can discover the live browser here: when Chromium
+// is running the routes proxy the real upstream payloads (which carry
+// Chromium's own GUID-protected websocket), and when it is not they answer an
+// empty/"not started" body. They never report the tokenized endpoint and
+// never launch anything — connecting to the websocket is the only thing that
+// starts the browser, and only callers holding the token path may connect.
 async function handleRequest(req, res) {
     if (!hostIsLoopback(req.headers.host)) {
         return sendJsonError(res, 403, 'Forbidden');
@@ -171,13 +183,18 @@ async function handleRequest(req, res) {
         return sendJsonError(res, 404, 'Not found');
     }
 
+    // CDP-01: discovery responses never carry our tokenized endpoint. A
+    // localhost page or process that cannot guess the path must not be able
+    // to just ask the shim for it. Third-party CDP clients get Chromium's own
+    // (GUID-protected) endpoint instead — the price is they no longer come
+    // back through the shim for relaunch-on-close; Hermes does, because the
+    // app handed it the tokenized URL at spawn time.
     if (!browserIsRunning()) {
         // Nothing to report yet, and asking is not a reason to open a browser.
         if (pathname === '/json/version') {
             return sendJson(res, {
                 Browser: 'Chrome/KnockDesk (not started)',
                 'Protocol-Version': '1.3',
-                webSocketDebuggerUrl: browserWsUrl,
             });
         }
         return sendJson(res, []);   // /json and /json/list: no targets yet
@@ -188,14 +205,6 @@ async function handleRequest(req, res) {
 
     try {
         const upstream = await fetchFromChromium(cdpPort, pathname);
-        if (pathname === '/json/version') {
-            // Hand out OUR websocket, not Chromium's: clients must come back
-            // through the shim so the browser can be relaunched under them if
-            // it was closed in the meantime.
-            const payload = JSON.parse(upstream.body);
-            payload.webSocketDebuggerUrl = browserWsUrl;
-            return sendJson(res, payload);
-        }
         res.writeHead(upstream.status, { 'Content-Type': upstream.contentType });
         res.end(upstream.body);
     } catch (err) {
@@ -242,7 +251,18 @@ async function handleUpgrade(req, clientSocket, head) {
     } catch {
         return fail('400 Bad Request', 'unparseable request URL');
     }
-    if (!pathname.startsWith('/devtools/')) return fail('404 Not Found', `path ${pathname}`);
+    // Never echo the raw path into logs or rejection bodies: with the
+    // tokenized endpoint the path itself is the credential, and a rejected
+    // client must be able to learn nothing from the failure.
+    if (!pathname.startsWith('/devtools/')) return fail('404 Not Found', 'unknown path');
+
+    // CDP-01: browser-level connects must present the per-boot token path.
+    // Page-level endpoints pass through unchanged — they carry Chromium's own
+    // per-launch GUID, which cannot be guessed without querying Chromium's
+    // own loopback discovery.
+    if (pathname.startsWith('/devtools/browser/') && pathname !== LAZY_BROWSER_PATH) {
+        return fail('404 Not Found', 'browser endpoint rejected');
+    }
 
     const { getCdpPort, appendBrowserLog } = require('./browser-manager');
     const connectStarted = Date.now();

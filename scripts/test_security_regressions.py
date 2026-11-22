@@ -14,6 +14,11 @@ regression was (re)introduced:
 4. Theme asset ``url()`` escaping in ``web/src/themes/context.tsx``: bare
    paths get wrapped, CSS expressions pass through, ``"`` / ``\\`` / ``)``
    are escaped so a hostile theme value cannot break out of ``url("...")``.
+5. CDP shim browser endpoint token-gating in
+   ``electron/services/cdp-shim.js`` (pentest finding CDP-01): the stable
+   websocket path embeds a random per-boot token, browser-level connects
+   without it are refused, discovery responses never publish the tokenized
+   endpoint, and rejection logs/bodies never echo the request path.
 
 Style mirrors ``scripts/test_maintenance_tools.py`` (plain unittest,
 ``unittest.main()`` entry point). The hermes web server itself cannot be
@@ -39,6 +44,9 @@ BRIDGE_JS = (
     ROOT / "resources" / "hermes-runtime" / "src" / "scripts" / "whatsapp-bridge" / "bridge.js"
 )
 THEME_TSX = ROOT / "resources" / "hermes-runtime" / "src" / "web" / "src" / "themes" / "context.tsx"
+CDP_SHIM_JS = (
+    ROOT / "resources" / "hermes-runtime" / "src" / "electron" / "services" / "cdp-shim.js"
+)
 
 SRC_DIR = ROOT / "resources" / "hermes-runtime" / "src"
 if str(SRC_DIR) not in sys.path:
@@ -494,6 +502,79 @@ class ThemeCssUrlBehaviorTests(unittest.TestCase):
 
     def test_whitespace_trimmed_before_wrapping(self) -> None:
         self.assertEqual(_theme_wrap("  images/bg.png  "), 'url("images/bg.png")')
+
+
+# ---------------------------------------------------------------------------
+# (5) CDP shim endpoint token gating (pentest 2026-10-17, finding CDP-01)
+#
+# The CDP shim on 127.0.0.1:9333-9353 used to accept *any* local websocket
+# client at a fixed, repository-public path (`/devtools/browser/knockdesk ai`),
+# which made the embedded browser drivable by any local unprivileged process:
+# navigation, cookie/data exfiltration from the persistent profile, arbitrary
+# page content. The remediation ("require a token shared only between
+# KnockDesk processes") makes the stable path embed a random per-boot token
+# handed to Hermes children only, and the shim so:
+#   a) the fixed public path literal is completely gone from the file,
+#   b) browser-level connects without the token path are refused (404),
+#   c) discovery responses never publish the tokenized endpoint,
+#   d) rejection logs/bodies never echo the client-controlled path.
+# ---------------------------------------------------------------------------
+
+class CdpShimEndpointTokenTests(unittest.TestCase):
+    def test_no_public_path_literal_anywhere(self) -> None:
+        src = _read(CDP_SHIM_JS)
+        # The literal used to be the endpoint AND a repo-public constant. If
+        # it reappears anywhere (code or comments), the token gate is moot.
+        self.assertNotIn("/devtools/browser/knockdesk ai", src)
+
+    def test_token_generation_present(self) -> None:
+        src = _read(CDP_SHIM_JS)
+        self.assertRegex(
+            src,
+            r"require\(\s*['\"]crypto['\"]\s*\)",
+        )
+        self.assertRegex(
+            src,
+            r"const\s+LAZY_BROWSER_PATH\s*=\s*`/devtools/browser/knockdesk-\$\{"
+            r"[^}]*randomBytes\(16\)[^}]*\}\`",
+        )
+
+    def test_browser_level_connects_require_token(self) -> None:
+        src = _read(CDP_SHIM_JS)
+        match = re.search(
+            r"pathname\.startsWith\(\s*['\"]/devtools/browser/['\"]\s*\)"
+            r"\s*&&\s*pathname\s*!==\s*LAZY_BROWSER_PATH",
+            src,
+        )
+        self.assertIsNotNone(
+            match,
+            "browser-level websocket connects must be gated on the token path",
+        )
+        # The gate must sit in the websocket upgrade path (after `fail` is in
+        # scope), not somewhere inert.
+        upgrade_start = src.index("async function handleUpgrade")
+        gate = src.index("/devtools/browser/", upgrade_start)
+        self.assertGreater(gate, upgrade_start)
+        self.assertIn("fail('404 Not Found'", src[gate : gate + 400])
+
+    def test_discovery_never_publishes_token_endpoint(self) -> None:
+        src = _read(CDP_SHIM_JS)
+        for pattern in (
+            r"webSocketDebuggerUrl\s*:\s*browserWsUrl",
+            r"\.webSocketDebuggerUrl\s*=\s*browserWsUrl",
+        ):
+            self.assertIsNone(
+                re.search(pattern, src),
+                "tokenized endpoint must never be published via discovery",
+            )
+
+    def test_rejections_never_echo_the_client_path(self) -> None:
+        src = _read(CDP_SHIM_JS)
+        # The path itself is the credential: no fail() reason may embed it.
+        self.assertIsNone(
+            re.search(r"fail\(\s*'404[^']*'\s*,\s*`path \$\{pathname\}", src),
+            "rejection reason must not echo the request path",
+        )
 
 
 if __name__ == "__main__":
