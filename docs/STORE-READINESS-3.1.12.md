@@ -1,8 +1,8 @@
 # Microsoft Store submission readiness — KnockDesk 3.1.12
 
 Date: 2026-10-19. Release under test: v3.1.12 (installer SHA-256
-`324952F682600CCA058CAA3857D0B13C6E57B0580CFA7E4960ACB914EFC9AF2C`,
-779 MB, built Oct 19 11:37 and carrying the idle-CPU throttle; macOS
+`D020C05C0079D3B9B3CC01FC356F8F2A6D924E07DB6FE7DB868EFA6091C1B771`,
+780 MB, built Oct 19 11:37 and carrying the idle-CPU throttle; macOS
 bundles unchanged from the same release).
 
 Method: live install/uninstall cycles, static scans, live network testing of
@@ -28,11 +28,11 @@ privacy scan, 56 source tests). Nothing below is claimed without evidence.
 | Check | Status | Evidence |
 |---|---|---|
 | HTTPS, versioned installer URL | PASS | Release asset URLs are HTTPS under the v3.1.12 tag |
-| Standalone installer, not a downloader | PASS | 779 MB NSIS installer contains the full payload |
+| Standalone installer, not a downloader | PASS | 780 MB NSIS installer contains the full payload |
 | Silent install | PASS | `/S` silent path exercised end to end |
 | Accurate publisher/version metadata | PASS | ProductName KnockDesk, CompanyName OpKnock, FileVersion 3.1.12 |
 | Upgrade/reinstall/uninstall | PASS | Upgrade over the same directory verified; uninstall removes files, registry keys, and shortcuts |
-| Valid Authenticode signature chaining to a trusted root | **BLOCKED** | Both files report `NotSigned`. Requires a certificate — see Signing below |
+| Authenticode signature that Windows trusts (trusted root) | **BLOCKED** | Installer is now signed and timestamped, but the chain resolves to `Codegic Root CA G2`, which is not in Microsoft's Trusted Root Program, so `signtool verify /pa` returns `0x800B010A` and SmartScreen still reports an unknown publisher. Store acceptance needs SignPath/Azure Trusted Signing or a purchased OV certificate |
 
 ### Security (evidenced)
 | Check | Status | Evidence |
@@ -82,13 +82,19 @@ Start-menu shortcut cleanup. Earlier builds on this page are superseded.
 
 ## Follow-ups before submission
 
-1. **Unsigned binaries** (installer + exe): SmartScreen will warn and the
-   Store path may reject at package validation. Owner action: SignPath
-   Foundation free OSS approval (wired in CI — the release will be signed the
-   moment the approval and secrets land), Azure Trusted Signing (~$10/month),
-   or a purchased OV certificate. See `docs/ops/signing.md`.
-2. **Friend's real-hardware pass**: the macOS bundles and the longer idle soak
-   need the friend's hardware (plan: `docs/MACOS_TEST_PLAN.md`).
+1. **Signature chain not trusted** (installer + exe): the installer is
+   Authenticode-signed and RFC 3161-timestamped, but the signer chains to
+   `Codegic Root CA G2`, which is not in Microsoft's Trusted Root Program.
+   Windows therefore reports the publisher as unknown and `signtool verify
+   /pa` returns `0x800B010A`. The signature is cryptographically valid and
+   the timestamp is trusted, so it keeps verifying after the certificate
+   expires on 2026-12-19 - it simply does not carry reputation. The Store
+   path will still reject at package validation. Owner action: SignPath
+   Foundation free OSS approval (wired in CI - the release will be re-signed
+   the moment the approval and secrets land), Azure Trusted Signing
+   (~$10/month), or a purchased OV certificate. See `docs/ops/signing.md`.
+2. **Real-hardware pass**: the macOS bundles and the longer idle soak
+   need an actual Mac (plan: `docs/MACOS_TEST_PLAN.md`).
 3. **Extract API key is optional**: web page extraction is search-only until
    an extract provider key is added (Firecrawl/Tavily/Exa/Parallel). Search
    works without one.

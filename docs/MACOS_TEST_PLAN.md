@@ -2,7 +2,7 @@
 
 This build is **unsigned** (no Apple Developer signature/notarization yet), so
 macOS Gatekeeper needs a one-time workaround per Mac. Everything below is
-written for a friend with no build tooling installed — only macOS itself.
+written for a machine with no build tooling installed — only macOS itself.
 
 ## 0. What you got
 

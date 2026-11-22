@@ -4,7 +4,7 @@
 # fix, the web-search package, the computer-use false-success fix, the
 # legacy-plugin env fix, the TTS fallback, the gateway Gemini key
 # injection, and the idle CPU throttle.
-324952F682600CCA058CAA3857D0B13C6E57B0580CFA7E4960ACB914EFC9AF2C  KnockDesk-Setup-3.1.12-x64.exe
+D020C05C0079D3B9B3CC01FC356F8F2A6D924E07DB6FE7DB868EFA6091C1B771  KnockDesk-Setup-3.1.12-x64.exe
 # macOS cross-builds (unsigned, structurally validated, awaiting real
 # hardware validation on a Mac)
 C5D1DE21BB019A4E73D9F2257BD23BEB1F875BEE5BF992D13DBEF42617D57D8F  KnockDesk-3.1.12-macOS-arm64.zip

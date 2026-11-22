@@ -73,11 +73,11 @@ $env:KNOCKDESK_PFX_PASSWORD = '***'
 powershell -ExecutionPolicy Bypass -File scripts/sign-release.ps1 -ExePath KnockDesk.exe
 ```
 
-## Testing with a friend before a certificate exists
+## Testing before a certificate exists
 
 A self-signed signature does **not** remove SmartScreen for other machines
 (the root is not trusted), so shipping one is worse than shipping unsigned
-with published checksums. For a friend's test machine, the practical options
+with published checksums. For a test machine, the practical options
 are unchanged: click **More info → Run anyway**, or add the root certificate
-to the friend's Trusted Root store so the file verifies locally. The
+to that machine's Trusted Root store so the file verifies locally. The
 published SHA-256 on the release page is the integrity check either way.
