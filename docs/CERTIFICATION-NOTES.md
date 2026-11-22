@@ -11,6 +11,17 @@ plus a bundled Python runtime and a local browser for in-app pages). It talks
 to AI providers only when the user supplies their own API key. There is no
 account system, no server-side login, and no paid feature inside the app.
 
+## Things you may notice while testing
+
+- **The window goes quiet when left alone.** Two minutes without input, the
+  ambient motion (a breathing orb, panel glows) parks to save battery. Any
+  mouse move, key press, or new reply brings it straight back. This is
+  deliberate idle behaviour, not a frozen app.
+- **A SmartScreen warning on first run** until the binaries are countersigned.
+- **A local update feed** is disabled by default in this build; the updater
+  logs a harmless error line about it every few minutes. Nothing is being
+  contacted.
+
 ## Steps to test the app
 
 1. Install the submitted installer. A standard per-user install works without
