@@ -830,6 +830,7 @@ class HermesManager {
     if (this._knockdeskReady) return this._knockdeskReady;
 
     this._knockdeskReady = (async () => {
+      let succeeded = false;
       try {
         if (this.state !== 'ready') {
           return { ok: false, error: 'Hermes abhi tayyar nahi hai.' };
@@ -904,15 +905,16 @@ class HermesManager {
           this._memoryPluginUpdated = false;
         }
 
+        succeeded = true;
         this._knockdeskReady = true;
         return { ok: true, restarted: mustBounce, version: installed.version };
       } catch (err) {
         return { ok: false, error: err.message };
       } finally {
-        // Promise ko yaad nahi rakhte: agar setup nakaam hua to agli koshish
-        // naye siray se honi chahiye. Ek yaad rakha hua nakaam promise har
-        // baad ki koshish ko wohi purani nakaami de deta.
-        this._knockdeskReady = null;
+        // Sirf nakaami ka promise hatao. Kamyabi ke baad `_knockdeskReady`
+        // boolean true rehna chahiye — warna supervisor us gateway ko kabhi
+        // zinda nahi karta jise isi setup ne khara kiya tha.
+        if (!succeeded) this._knockdeskReady = null;
       }
     })();
 
@@ -1023,6 +1025,7 @@ class HermesManager {
 
     const cachePath = path.join(this.getHermesHome(), 'knockdesk-bridge-env.json');
     const legacyCachePath = path.join(this.getHermesHome(), 'stonic-bridge-env.json');
+    const cacheMissing = !fs.existsSync(cachePath);
     let cached = {};
     try {
       cached = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
@@ -1064,7 +1067,9 @@ class HermesManager {
       }
     } catch { /* purani cache reh gayi to koi harj nahi */ }
 
-    if (changed) {
+    // Cache tab bhi likho jab legacy cache se sab kuch pehle se set tha —
+    // warna agle pass par cached empty hoga aur ek be-wajah gateway bounce hoga.
+    if (changed || cacheMissing) {
       try {
         fs.mkdirSync(path.dirname(cachePath), { recursive: true });
         fs.writeFileSync(cachePath, JSON.stringify(desired, null, 2));
@@ -1073,6 +1078,8 @@ class HermesManager {
         // nuqsan hai, kharabi ka nahi.
         console.warn('[Hermes] KnockDesk env cache save nahi hui:', err.message);
       }
+    }
+    if (changed) {
       console.log('[Hermes] KnockDesk bridge ki settings .env mein likh di gayin.');
     }
 

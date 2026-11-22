@@ -153,6 +153,15 @@ function getCurrentAppBundlePath() {
   return exe.slice(0, idx + 4);
 }
 
+/** Resolve a channel-file asset against the feed without encoding path separators. */
+function resolveAssetUrl(feed, asset) {
+  try {
+    return new URL(asset, `${feed}/`).toString();
+  } catch {
+    return `${feed}/${encodeURIComponent(asset)}`;
+  }
+}
+
 // ── Core steps ──────────────────────────────────────────
 
 async function checkForUpdates() {
@@ -198,7 +207,7 @@ async function downloadUpdate(info, feed) {
 
   try {
     // ── Download with progress + streaming SHA512 ──
-    const url = `${feed}/${encodeURIComponent(info.zipUrl)}`;
+    const url = resolveAssetUrl(feed, info.zipUrl);
     log.info(`Downloading ${url}`);
     const res = await httpGet(url, { asStream: true });
     const total = parseInt(res.headers['content-length'] || '0', 10) || info.zipSize || 0;
@@ -316,14 +325,15 @@ async function quitAndInstall() {
         detached: true,
         stdio: 'ignore',
       });
+      reopen.on('error', (err) => log.error('Relaunch process failed:', err.message));
       reopen.unref();
     } catch (err) {
       log.error('Relaunch spawn failed:', err.message);
     }
     state.pending = null;
+    // Exit only after the replacement has been spawned. An immediate app.exit
+    // here killed Electron before `open` had a chance to launch the new bundle.
     setTimeout(() => app.exit(0), 1000);
-    state.pending = null;
-    app.exit(0);
   } catch (err) {
     log.error('Install failed:', err.message);
     state.sendStatus({ status: 'error', message: `Install failed: ${err.message}` });
@@ -342,7 +352,7 @@ function setupMacUpdater({ getMainWindow, autoDownload }) {
   };
 
   ipcMain.handle('install-update', () => quitAndInstall());
-  ipcMain.handle('check-for-updates', () => { checkForUpdates(); });
+  ipcMain.handle('check-for-updates', () => checkForUpdates());
 
   // Same cadence as the Windows path: first check 5s after startup.
   setTimeout(() => checkForUpdates(), 5000);
@@ -364,4 +374,5 @@ module.exports = {
   // exported for tests
   parseChannelYml,
   isNewerVersion,
+  resolveAssetUrl,
 };
