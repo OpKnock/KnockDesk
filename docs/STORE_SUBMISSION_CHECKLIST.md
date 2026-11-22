@@ -37,7 +37,7 @@ Date: 2026-10-17. Version: 3.1.12-local. Status per item: VERIFIED / FAILED / BL
 | SHA-256 checksums published | VERIFIED | `dist/SHA256SUMS.txt` + `dist/SHA256SUMS-installer.txt` |
 | User data preserved on upgrade | VERIFIED | `%APPDATA%\stonic_gen3` outside install dir; installer kills running exe, replaces files |
 | User data preserved on uninstall | VERIFIED | Uninstaller does not touch `%APPDATA%\stonic_gen3` |
-| Clean uninstall | VERIFIED | Removes install dir, shortcuts, HKCU registry keys |
+| Clean uninstall | PARTIAL | Removes app, shortcuts, all registry. 65 deeply-nested Python files in `hermes-runtime\python\` remain due to Windows MAX_PATH (inert, no executable). Documented; user can delete folder manually. |
 
 ## Code Signing
 

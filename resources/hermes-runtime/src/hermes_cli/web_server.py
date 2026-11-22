@@ -4884,7 +4884,19 @@ async def validate_provider_credential(body: EnvVarUpdate, request: Request):
             if ip.is_link_local or ip.is_reserved or ip.is_multicast:
                 return {"ok": False, "reachable": False, "message": "Refused unsafe endpoint URL."}
         except ValueError:
-            pass
+            # inet_aton-style alternate spellings ("2130706433", "0xa9fea9fe",
+            # "0x7f.0.0.1", "0177.0.0.1", mixed radix like "0x7f.1") are
+            # rejected by ``ipaddress`` yet resolved by the OS resolver, so
+            # they must not fall through. The canonical dotted-quad (or
+            # bracketed IPv6) spelling is required instead: refuse any host
+            # whose dot-separated parts are all decimal digits or 0x-hex.
+            parts = host.split(".")
+            if (
+                host
+                and 1 <= len(parts) <= 4
+                and all(p.startswith(("0x", "0X")) or p.isdigit() for p in parts)
+            ):
+                return {"ok": False, "reachable": False, "message": "Refused unsafe endpoint URL."}
         # Send the optional API key so endpoints that require auth on
         # ``/v1/models`` (many hosted OpenAI-compatible servers) still enumerate
         # their models instead of returning an empty list behind a 401.
