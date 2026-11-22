@@ -340,7 +340,7 @@ function listenOn(port) {
 async function startCdpShim() {
     if (browserWsUrl) return browserWsUrl;
 
-    const override = parseInt(process.env.STONIC_CDP_SHIM_PORT || '', 10);
+    const override = parseInt(process.env.KNOCKDESK_CDP_SHIM_PORT || process.env.STONIC_CDP_SHIM_PORT || '', 10);
     const ports = Number.isInteger(override) && override > 0
         ? [override]
         : Array.from(

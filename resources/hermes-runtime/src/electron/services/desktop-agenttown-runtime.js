@@ -198,7 +198,7 @@ class DesktopAgentTownRuntime {
       HOSTNAME: '127.0.0.1',
       HOST: '127.0.0.1',
       NODE_ENV: 'production',
-      GATEWAY_URL: process.env.STONIC_AGENTTOWN_GATEWAY || 'ws://127.0.0.1:18789/',
+      GATEWAY_URL: process.env.KNOCKDESK_AGENTTOWN_GATEWAY || process.env.STONIC_AGENTTOWN_GATEWAY || 'ws://127.0.0.1:18789/',
       AGENT_PROVIDER: 'hermes',
       HERMES_EXE: hermesExe,
     });

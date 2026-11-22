@@ -105,8 +105,8 @@ def _bridge() -> Optional[tuple]:
     है और सही भी — app ने बीच में port बदला हो तो अगला event नई
     जगह चला जाता है।
     """
-    url = (os.getenv("STONIC_BRIDGE_URL", "") or "").strip().rstrip("/")
-    key = (os.getenv("STONIC_BRIDGE_KEY", "") or "").strip()
+    url = ((os.getenv("KNOCKDESK_BRIDGE_URL") or os.getenv("STONIC_BRIDGE_URL", "")) or "").strip().rstrip("/")
+    key = ((os.getenv("KNOCKDESK_BRIDGE_KEY") or os.getenv("STONIC_BRIDGE_KEY", "")) or "").strip()
     if not url or not key:
         return None
     return url, key

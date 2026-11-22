@@ -58,11 +58,11 @@ Hermes ने ख़ुद यही रास्ता दिखाया ह�
 यह सब env vars KnockDesk desktop app ख़ुद लिखती है (Hermes के अपने
 ``PUT /api/env`` से) — user को कुछ भरना नहीं पड़ता::
 
-    STONIC_BRIDGE_URL      http://127.0.0.1:<port>   (लाज़मी)
-    STONIC_BRIDGE_KEY      shared secret             (लाज़मी)
-    STONIC_CHAT_ID         KnockDesk account का user id
-    STONIC_ALLOWED_USERS   वही user id
-    STONIC_HOME_CHANNEL    वही user id (cron के लिए)
+    KNOCKDESK_BRIDGE_URL      http://127.0.0.1:<port>   (लाज़मी)
+    KNOCKDESK_BRIDGE_KEY      shared secret             (लाज़मी)
+    KNOCKDESK_CHAT_ID         KnockDesk account का user id
+    KNOCKDESK_ALLOWED_USERS   वही user id
+    KNOCKDESK_HOME_CHANNEL    वही user id (cron के लिए)
 
 ======================================================================
   पहचान और भरोसा
@@ -132,11 +132,11 @@ class _FatalStreamError(Exception):
 
 
 def _bridge_url() -> str:
-    return (os.getenv("STONIC_BRIDGE_URL", "") or "").strip().rstrip("/")
+    return ((os.getenv("KNOCKDESK_BRIDGE_URL") or os.getenv("STONIC_BRIDGE_URL", "")) or "").strip().rstrip("/")
 
 
 def _bridge_key() -> str:
-    return (os.getenv("STONIC_BRIDGE_KEY", "") or "").strip()
+    return ((os.getenv("KNOCKDESK_BRIDGE_KEY") or os.getenv("STONIC_BRIDGE_KEY", "")) or "").strip()
 
 
 def _auth_headers(key: str) -> Dict[str, str]:
@@ -144,7 +144,7 @@ def _auth_headers(key: str) -> Dict[str, str]:
 
 
 def _default_chat_id() -> str:
-    return (os.getenv("STONIC_CHAT_ID", "") or "").strip()
+    return ((os.getenv("KNOCKDESK_CHAT_ID") or os.getenv("STONIC_CHAT_ID", "")) or "").strip()
 
 
 class KnockDeskAdapter(BasePlatformAdapter):
@@ -202,7 +202,7 @@ class KnockDeskAdapter(BasePlatformAdapter):
             return False
         if not self._url or not self._key:
             logger.warning(
-                "[%s] STONIC_BRIDGE_URL या STONIC_BRIDGE_KEY set नहीं। "
+                "[%s] KNOCKDESK_BRIDGE_URL या KNOCKDESK_BRIDGE_KEY set नहीं। "
                 "यह KnockDesk desktop app ख़ुद लिखती है — क्या वह चल रही है?",
                 self.name,
             )
@@ -701,7 +701,7 @@ def _env_enablement() -> Optional[dict]:
     if chat_id:
         seed["chat_id"] = chat_id
 
-    home = (os.getenv("STONIC_HOME_CHANNEL", "") or "").strip() or chat_id
+    home = ((os.getenv("KNOCKDESK_HOME_CHANNEL") or os.getenv("STONIC_HOME_CHANNEL", "")) or "").strip() or chat_id
     if home:
         seed["home_channel"] = {"chat_id": home, "name": "KnockDesk Mobile"}
     return seed
@@ -825,13 +825,13 @@ def register(ctx) -> None:
         check_fn=check_requirements,
         validate_config=validate_config,
         is_connected=is_connected,
-        required_env=["STONIC_BRIDGE_URL", "STONIC_BRIDGE_KEY"],
+        required_env=["KNOCKDESK_BRIDGE_URL", "KNOCKDESK_BRIDGE_KEY"],
         install_hint="httpx पहले से Hermes की dependency है — कुछ install नहीं करना।",
         env_enablement_fn=_env_enablement,
-        cron_deliver_env_var="STONIC_HOME_CHANNEL",
+        cron_deliver_env_var="KNOCKDESK_HOME_CHANNEL",
         standalone_sender_fn=_standalone_send,
-        allowed_users_env="STONIC_ALLOWED_USERS",
-        allow_all_env="STONIC_ALLOW_ALL_USERS",
+        allowed_users_env="KNOCKDESK_ALLOWED_USERS",
+        allow_all_env="KNOCKDESK_ALLOW_ALL_USERS",
         max_message_length=MAX_MESSAGE_LENGTH,
         emoji="📱",
         # KnockDesk की पहचान एक Supabase user id है — कोई phone number या

@@ -25,7 +25,7 @@ const {
 } = require('./knockdesk-plugin');
 const childRegistry = require('./child-registry');
 
-const DEFAULT_PORT = parseInt(process.env.STONIC_HERMES_PORT || '9119', 10);
+const DEFAULT_PORT = parseInt(process.env.KNOCKDESK_HERMES_PORT || process.env.STONIC_HERMES_PORT || '9119', 10);
 // First boot can rebuild the dashboard web bundle (npm build inside Hermes),
 // which takes minutes on slow disks. Poll generously.
 const READY_TIMEOUT_MS = 4 * 60 * 1000;
@@ -94,7 +94,7 @@ const GATEWAY_STABLE_MS = 5 * 60 * 1000;
 // Hermes' api_server platform — the OpenAI-compatible HTTP surface that also
 // carries its asynchronous run API (/v1/runs). Agent Town drives its seats
 // through it; see agent-town-main/lib/hermes-run-api.ts.
-const RUN_API_PORT = parseInt(process.env.STONIC_HERMES_API_PORT || '8642', 10);
+const RUN_API_PORT = parseInt(process.env.KNOCKDESK_HERMES_API_PORT || process.env.STONIC_HERMES_API_PORT || '8642', 10);
 
 class HermesManager {
   constructor() {
@@ -706,7 +706,7 @@ class HermesManager {
     this._knockdeskWanted = next;
 
     // chatId ke baghair setup ka koi faida nahi: .env mein khali
-    // STONIC_CHAT_ID likhne ka matlab hai authorization ki list khali, aur
+    // KNOCKDESK_CHAT_ID likhne ka matlab hai authorization ki list khali, aur
     // phir Hermes har paighaam rad kar deta hai. Sign in hone tak intezaar
     // us se behtar hai — renderer login ke baad khud asli id le kar aata hai.
     //
@@ -988,16 +988,16 @@ class HermesManager {
    */
   async _ensureKnockDeskEnv({ bridgeUrl, bridgeKey, chatId }) {
     const desired = {
-      STONIC_BRIDGE_URL: bridgeUrl,
-      STONIC_BRIDGE_KEY: bridgeKey,
-      STONIC_CHAT_ID: chatId || '',
+      KNOCKDESK_BRIDGE_URL: bridgeUrl,
+      KNOCKDESK_BRIDGE_KEY: bridgeKey,
+      KNOCKDESK_CHAT_ID: chatId || '',
       // Pehra do jagah: bridge par bhi (localhost + secret) aur yahan bhi.
       // Hermes sirf usi KnockDesk account se baat karega jis se desktop par
       // sign in kiya gaya hai — koi aur user id aa bhi jaye to ruk jayegi.
-      STONIC_ALLOWED_USERS: chatId || '',
+      KNOCKDESK_ALLOWED_USERS: chatId || '',
       // Cron aur `send_message` tool ka pata — is ke baghair Hermes khud se
       // phone par kuch nahi bhej sakta ("deliver=knockdesk" chup-chaap girta).
-      STONIC_HOME_CHANNEL: chatId || '',
+      KNOCKDESK_HOME_CHANNEL: chatId || '',
     };
     // One-time rebrand migration: neeche file-level cleanup purani keys ki
     // lines .env se nikaal deta hai (API empty-PUTs ko nazar-andaaz karta hai).
@@ -1031,11 +1031,11 @@ class HermesManager {
       const envPath = path.join(this.getHermesHome(), '.env');
       const raw = fs.readFileSync(envPath, 'utf8');
       const lines = raw.split('\n');
-      const kept = lines.filter((ln) => !/^\s*KNOCKDESK_(BRIDGE_URL|BRIDGE_KEY|CHAT_ID|ALLOWED_USERS|HOME_CHANNEL)\s*=/.test(ln));
+      const kept = lines.filter((ln) => !/^\s*STONIC_(BRIDGE_URL|BRIDGE_KEY|CHAT_ID|ALLOWED_USERS|HOME_CHANNEL)\s*=/.test(ln));
       if (kept.length !== lines.length) {
         fs.writeFileSync(envPath, kept.join('\n'));
         changed = true;
-        console.log('[Hermes] Purani KNOCKDESK_* keys .env se hata di gayin.');
+        console.log('[Hermes] Purani STONIC_* keys .env se hata di gayin.');
       }
     } catch { /* agli dafa sahi — gateway purani keys nazar-andaaz karta hai */ }
     try {

@@ -22,9 +22,9 @@ const axios = require('axios');
 // Aliased: this class has a method of the same name that delegates to it.
 const { resolveHermesExe: resolveSharedHermesExe, hermesSpawnEnv } = require('./hermes-runtime');
 
-const DEFAULT_PORT = parseInt(process.env.STONIC_AGENTTOWN_PORT || '3010', 10);
+const DEFAULT_PORT = parseInt(process.env.KNOCKDESK_AGENTTOWN_PORT || process.env.STONIC_AGENTTOWN_PORT || '3010', 10);
 // Agent Town's default gateway is Hermes' port. Not connected yet — see header.
-const DEFAULT_GATEWAY = process.env.STONIC_AGENTTOWN_GATEWAY || 'ws://127.0.0.1:18789/';
+const DEFAULT_GATEWAY = process.env.KNOCKDESK_AGENTTOWN_GATEWAY || process.env.STONIC_AGENTTOWN_GATEWAY || 'ws://127.0.0.1:18789/';
 // Next.js dev first-compile can be slow; poll generously.
 const READY_TIMEOUT_MS = 3 * 60 * 1000;
 const READY_POLL_MS = 5000; // idle-throttled (was 1500)
@@ -129,10 +129,10 @@ class AgentTownManager {
   //
   // Dev keeps using the source tree so `next dev` hot reload still works. A
   // packaged app has no source tree — and no Node, no pnpm — so it must use the
-  // bundle. Set STONIC_AGENTTOWN_BUNDLED=1 to exercise the shipped path in dev.
+  // bundle. Set KNOCKDESK_AGENTTOWN_BUNDLED=1 to exercise the shipped path in dev.
   resolveRuntime() {
     const bundledCandidates = [
-      process.env.STONIC_AGENTTOWN_BUNDLED === '1' ? process.env.STONIC_AGENTTOWN_DIR : null,
+      (process.env.KNOCKDESK_AGENTTOWN_BUNDLED === '1' || process.env.STONIC_AGENTTOWN_BUNDLED === '1') ? (process.env.KNOCKDESK_AGENTTOWN_DIR || process.env.STONIC_AGENTTOWN_DIR) : null,
       process.resourcesPath ? path.join(process.resourcesPath, 'agent-town-dist') : null,
       path.resolve(__dirname, '..', '..', 'agent-town-dist'),
     ];
@@ -146,6 +146,7 @@ class AgentTownManager {
     };
 
     const sourceCandidates = [
+      process.env.KNOCKDESK_AGENTTOWN_DIR,
       process.env.STONIC_AGENTTOWN_DIR,
       // electron/services → up 3 = workspace root ("KnockDesk Ai - AGI") → agent-town-main
       path.resolve(__dirname, '..', '..', '..', 'agent-town-main'),
@@ -162,10 +163,10 @@ class AgentTownManager {
     let packaged = false;
     try { packaged = require('electron').app.isPackaged; } catch { /* not in main process */ }
 
-    if (packaged || process.env.STONIC_AGENTTOWN_BUNDLED === '1') {
+    if (packaged || process.env.KNOCKDESK_AGENTTOWN_BUNDLED === '1' || process.env.STONIC_AGENTTOWN_BUNDLED === '1') {
       return findBundled() || findSource();
     }
-    if (process.env.STONIC_AGENTTOWN_DIR) return findSource() || findBundled();
+    if (process.env.KNOCKDESK_AGENTTOWN_DIR || process.env.STONIC_AGENTTOWN_DIR) return findSource() || findBundled();
     return findSource() || findBundled();
   }
 
@@ -193,7 +194,8 @@ class AgentTownManager {
   // unavailable" even with Node installed. Only the dev path uses this; a
   // packaged app runs the bundle on Electron's own Node on every platform.
   resolveDevNodeExe() {
-    const candidates = [process.env.STONIC_AGENTTOWN_NODE];
+    const candidates = [process.env.KNOCKDESK_AGENTTOWN_NODE];
+    if (process.env.STONIC_AGENTTOWN_NODE) candidates.push(process.env.STONIC_AGENTTOWN_NODE);
     if (process.platform === 'win32') {
       candidates.push(
         process.env.ProgramFiles ? path.join(process.env.ProgramFiles, 'nodejs', 'node.exe') : null,
@@ -530,8 +532,8 @@ class AgentTownManager {
         const tsxCli = path.join(this.dir, 'node_modules', 'tsx', 'dist', 'cli.mjs');
         if (!nodeExe || !fs.existsSync(tsxCli)) {
           this._setState('error', process.platform === 'win32'
-            ? 'Agent Town development runtime is unavailable. Install Node.js or set STONIC_AGENTTOWN_NODE to node.exe.'
-            : 'Agent Town development runtime is unavailable. Install Node.js or set STONIC_AGENTTOWN_NODE to the node binary.');
+            ? 'Agent Town development runtime is unavailable. Install Node.js or set KNOCKDESK_AGENTTOWN_NODE to node.exe.'
+            : 'Agent Town development runtime is unavailable. Install Node.js or set KNOCKDESK_AGENTTOWN_NODE to the node binary.');
           return this.getState();
         }
         console.log('[AgentTown] Spawning dev server in', this.dir, 'on port', this.port, '(node:', nodeExe, '; hermes:', hermesExe + ')');

@@ -289,8 +289,8 @@ def _bridge() -> Optional[Tuple[str, str]]:
     process का `os.environ` फ़ौरन बदल जाता है, और gateway अपने start पर
     पढ़ता है। याद रख लेने से port बदलने के बाद पुरानी जगह खटखटाते।
     """
-    url = (os.getenv("STONIC_BRIDGE_URL", "") or "").strip().rstrip("/")
-    key = (os.getenv("STONIC_BRIDGE_KEY", "") or "").strip()
+    url = ((os.getenv("KNOCKDESK_BRIDGE_URL") or os.getenv("STONIC_BRIDGE_URL", "")) or "").strip().rstrip("/")
+    key = ((os.getenv("KNOCKDESK_BRIDGE_KEY") or os.getenv("STONIC_BRIDGE_KEY", "")) or "").strip()
     if not url or not key:
         return None
     return url, key
@@ -312,7 +312,7 @@ def _is_automated(text: Any) -> bool:
 
 
 def _session_source() -> str:
-    """इस turn की session का `source` (जैसे `stonic`, `knockdesk-voice`, `tui`)।
+    """इस turn की session का `source` (जैसे `knockdesk`, `knockdesk-voice`, `tui`)।
 
     Hermes इसे `initialize` में नहीं देता। वह एक ContextVar में होता है जो
     सिर्फ़ TURN के thread पर set होता है (tui_gateway/server.py), इस लिए यह

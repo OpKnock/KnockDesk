@@ -11,7 +11,7 @@ description: >
   KnockDesk Memory Core को Hermes का memory provider बना देता है: agent वही
   याददाश्त पढ़ता और लिखता है जो KnockDesk का voice assistant इस्तेमाल करता है।
   यह plugin ख़ुद कुछ store नहीं करता; सिर्फ़ KnockDesk desktop app के local bridge
-  (127.0.0.1, STONIC_BRIDGE_URL + STONIC_BRIDGE_KEY) से बात करता है। Desktop
+  (127.0.0.1, KNOCKDESK_BRIDGE_URL + KNOCKDESK_BRIDGE_KEY) से बात करता है। Desktop
   app बंद हो या याददाश्त बंद हो तो चुप रहता है और Hermes अपनी built-in
   memory के साथ पहले जैसा चलता है। सिर्फ़ Python की standard library।
 author: KnockDesk

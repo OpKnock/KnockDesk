@@ -54,7 +54,7 @@ const path = require('node:path');
 // Pehli koshish is port par. Yehi rehne se Hermes ki .env baar baar likhni
 // nahi parti aur gateway ko bar bar restart nahi karna parta.
 // (9119 = Hermes dashboard, 8642 = Hermes run API — dono se door.)
-const PREFERRED_PORT = parseInt(process.env.STONIC_BRIDGE_PORT || '8749', 10);
+const PREFERRED_PORT = parseInt(process.env.KNOCKDESK_BRIDGE_PORT || process.env.STONIC_BRIDGE_PORT || '8749', 10);
 
 // Stream par har itni der baad ek ping. Do kaam karta hai: proxy/OS ko socket
 // zinda batata hai, aur plugin ko pata chalta rehta hai ke bridge sun raha hai.

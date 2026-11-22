@@ -92,7 +92,7 @@ function registerKnockDeskRemoteHandlers({ getBridge, getHermesManager }) {
   //
   // Renderer ye tab chalata hai jab usay user ki pehchan (chatId) maloom ho
   // jati hai — yani Supabase ka channel judne ke baad. Pehle nahi: Hermes ki
-  // .env mein khali `STONIC_CHAT_ID` likhne ka matlab hota ke authorization
+  // .env mein khali `KNOCKDESK_CHAT_ID` likhne ka matlab hota ke authorization
   // list khali reh jati aur koi bhi paighaam rad ho jata.
   //
   // ── YE AB INTEZAAR NAHI KARWATA ──────────────────────────────────────────

@@ -34,8 +34,9 @@ offline installs, and reproducible verification.
   the exact release candidate before signing.
 - Supports silent install/uninstall (`/S`), Start Menu + desktop shortcuts,
   Add/Remove Programs registration, and clean upgrade over the same
-  directory. User data (`%APPDATA%\stonic_gen3`) lives outside the install
-  directory and is preserved across upgrade and uninstall.
+  directory. User data (`%APPDATA%\knockdesk`) lives outside the install
+  directory and is preserved across upgrade and uninstall; the first run of
+  this build also migrates a legacy `%APPDATA%\stonic_gen3` profile into it.
 
 ## Signing path (blocked, no secrets in repo)
 `scripts/sign-release.ps1` signs the exe + installer when a production

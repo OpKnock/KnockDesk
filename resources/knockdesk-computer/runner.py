@@ -47,16 +47,16 @@ mouse एक ही है।
 
 Config सिर्फ़ environment से आती है (Electron spawn पर देता है):
 
-    STONIC_COMPUTER_API_URL          OpenAI-compatible base URL (gateway या OpenRouter)
-    STONIC_COMPUTER_API_KEY          उस के लिए key
-    STONIC_COMPUTER_PLANNER_MODEL    सोचने वाला model   (default openai/gpt-5.6-sol)
-    STONIC_COMPUTER_GROUNDING_MODEL  x,y बताने वाला     (default bytedance/ui-tars-1.5-7b)
-    STONIC_COMPUTER_GROUNDING_WIDTH / _HEIGHT   dev override; ख़ाली = screenshot के नाप से
-    STONIC_COMPUTER_TESSERACT        tesseract.exe का पूरा रास्ता (OCR के लिए)
-    STONIC_COMPUTER_MAX_TRAJECTORY   कितने screenshots याद रखे (default 8)
+    KNOCKDESK_COMPUTER_API_URL          OpenAI-compatible base URL (gateway या OpenRouter)
+    KNOCKDESK_COMPUTER_API_KEY          उस के लिए key
+    KNOCKDESK_COMPUTER_PLANNER_MODEL    सोचने वाला model   (default openai/gpt-5.6-sol)
+    KNOCKDESK_COMPUTER_GROUNDING_MODEL  x,y बताने वाला     (default bytedance/ui-tars-1.5-7b)
+    KNOCKDESK_COMPUTER_GROUNDING_WIDTH / _HEIGHT   dev override; ख़ाली = screenshot के नाप से
+    KNOCKDESK_COMPUTER_TESSERACT        tesseract.exe का पूरा रास्ता (OCR के लिए)
+    KNOCKDESK_COMPUTER_MAX_TRAJECTORY   कितने screenshots याद रखे (default 8)
 
-NOTE: ऊपर `STONIC_COMPUTER_*` नाम वैसे ही रखे गए हैं — compiled app
-bundle (app.asar) इन्हीं नामों से env पढ़ता है, इसलिए नाम बदलना app तोड़ देगा।
+NOTE: ये नाम अब `KNOCKDESK_COMPUTER_*` हैं - पुराना `STONIC_COMPUTER_*`
+स्पेल अब भी fallback की तरह चलता है, ताकि पुरानी configs टूटें नहीं।
 
 Safety जो यहाँ है:
   - pyautogui FAILSAFE: mouse screen के top-left कोने में = फ़ौरन बंद।
@@ -129,7 +129,7 @@ def _noop_overlay() -> None:
 
 # ── Logging: सिर्फ़ stderr पर। stdout protocol के लिए महफ़ूज़ है। ───────────
 logging.basicConfig(
-    level=os.environ.get("STONIC_COMPUTER_LOG_LEVEL", "INFO"),
+    level=os.environ.get("KNOCKDESK_COMPUTER_LOG_LEVEL") or os.environ.get("STONIC_COMPUTER_LOG_LEVEL") or "INFO",
     stream=sys.stderr,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
@@ -138,20 +138,24 @@ log = logging.getLogger("knockdesk-computer")
 
 # ── Config ───────────────────────────────────────────────────────────────────
 def _env(name: str, default: str = "") -> str:
-    return (os.environ.get(name) or default).strip()
+    """KNOCKDESK_COMPUTER_* naam parhta hai; purana STONIC_COMPUTER_* bhi chalta hai."""
+    value = os.environ.get(name)
+    if value is None and name.startswith("KNOCKDESK_COMPUTER_"):
+        value = os.environ.get("STONIC_COMPUTER_" + name[len("KNOCKDESK_COMPUTER_"):])
+    return (value or default).strip()
 
 
-API_URL = _env("STONIC_COMPUTER_API_URL")
-API_KEY = _env("STONIC_COMPUTER_API_KEY")
+API_URL = _env("KNOCKDESK_COMPUTER_API_URL")
+API_KEY = _env("KNOCKDESK_COMPUTER_API_KEY")
 # "byok" = Lifetime customer की अपनी OpenRouter key, सीधा OpenRouter। बाक़ी सब
 # (ख़ाली भी) = KnockDesk Cloud का gateway। सिर्फ़ ग़लती का पाठ इस पर बदलता है
 # (देखो `_explain_error`) — चलने का तरीक़ा दोनों पर एक है।
-ROUTE = _env("STONIC_COMPUTER_ROUTE", "cloud").lower()
+ROUTE = _env("KNOCKDESK_COMPUTER_ROUTE", "cloud").lower()
 # Logical नाम — gateway इन्हें असली model पर मोड़ देता है। Electron हमेशा
 # यह ख़ुद भेजता है; यह default सिर्फ़ runner को अकेले चलाने के लिए है।
 # NOTE: `stonic-computer-planner/grounding` default मान gateway mapping के हैं — न बदलें।
-PLANNER_MODEL = _env("STONIC_COMPUTER_PLANNER_MODEL", "stonic-computer-planner")
-GROUNDING_MODEL = _env("STONIC_COMPUTER_GROUNDING_MODEL", "stonic-computer-grounding")
+PLANNER_MODEL = _env("KNOCKDESK_COMPUTER_PLANNER_MODEL", "stonic-computer-planner")
+GROUNDING_MODEL = _env("KNOCKDESK_COMPUTER_GROUNDING_MODEL", "stonic-computer-grounding")
 # Grounding के नाप जानबूझ कर 0 हैं — असली क़ीमत उस तस्वीर से निकलती
 # है जो model को भेजी जाती है (देखो __init__)। Agent S3 का अपना help text:
 # "Width of screenshot image after processor rescaling"। यानी यह model की कोई
@@ -160,10 +164,10 @@ GROUNDING_MODEL = _env("STONIC_COMPUTER_GROUNDING_MODEL", "stonic-computer-groun
 # हुए उसी नाप का रहता है। 2K (2560x1440) पर screenshot 2400x1350 जाता था
 # मगर model को 1920x1080 बताया जाता था, तो हर coordinate 25% बढ़ कर
 # निकलता: click button से नीचे-दाएँ खिसक जाता। Env सिर्फ़ dev का override.
-GROUNDING_W = int(_env("STONIC_COMPUTER_GROUNDING_WIDTH", "0"))
-GROUNDING_H = int(_env("STONIC_COMPUTER_GROUNDING_HEIGHT", "0"))
-MAX_TRAJECTORY = int(_env("STONIC_COMPUTER_MAX_TRAJECTORY", "8"))
-TESSERACT = _env("STONIC_COMPUTER_TESSERACT")
+GROUNDING_W = int(_env("KNOCKDESK_COMPUTER_GROUNDING_WIDTH", "0"))
+GROUNDING_H = int(_env("KNOCKDESK_COMPUTER_GROUNDING_HEIGHT", "0"))
+MAX_TRAJECTORY = int(_env("KNOCKDESK_COMPUTER_MAX_TRAJECTORY", "8"))
+TESSERACT = _env("KNOCKDESK_COMPUTER_TESSERACT")
 
 # Screenshot का बड़ा से बड़ा रुख़। 1920 इस लिए कि UI-TARS के coordinates उसी
 # तस्वीर के पैमाने में आते हैं जो उसे भेजी गई, और 1920x1080 वही नाप
@@ -178,7 +182,7 @@ POST_ACTION_WAIT_S = 1.0
 USER_MOUSE_MOVE_PX = 60
 # एक cloud call ज़्यादा से ज़्यादा इतनी देर। OpenAI SDK का default 10 MINUTE है —
 # एक अटकी हुई call पूरे task को उतनी देर लटका सकती थी।
-LLM_TIMEOUT_S = float(_env("STONIC_COMPUTER_LLM_TIMEOUT_S", "120"))
+LLM_TIMEOUT_S = float(_env("KNOCKDESK_COMPUTER_LLM_TIMEOUT_S", "120"))
 # Stop के बाद worker thread को अपने आप ख़त्म होने के लिए इतना वक़्त; फिर
 # task को "stopped" लिख कर thread को पीछे छोड़ दिया जाता है (abandoned)।
 STOP_JOIN_S = 4.0
@@ -585,7 +589,7 @@ class ComputerAgent:
 
     def __init__(self) -> None:
         if not API_URL or not API_KEY:
-            raise RuntimeError("STONIC_COMPUTER_API_URL / STONIC_COMPUTER_API_KEY set नहीं हैं।")
+            raise RuntimeError("KNOCKDESK_COMPUTER_API_URL / KNOCKDESK_COMPUTER_API_KEY set नहीं हैं।")
 
         _configure_tesseract()
 
