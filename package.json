@@ -16,6 +16,7 @@
     "list:asar": "node scripts/unpack-app-asar.mjs --list",
     "unpack:asar": "node scripts/unpack-app-asar.mjs --extract",
     "repack:asar": "node scripts/unpack-app-asar.mjs --pack",
+    "rebuild:packaged-core": "node scripts/rebuild-packaged-core.mjs",
     "unpack:all": "python scripts/unpack-all.py",
     "inventory": "python scripts/inventory.py",
     "check:privacy": "python scripts/privacy-scan.py",

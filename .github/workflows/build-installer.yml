@@ -111,6 +111,10 @@ jobs:
             Write-Output "$($pair.venv): $n packages installed"
           }
 
+      - name: Rebuild packaged core from maintained source
+        shell: pwsh
+        run: node scripts/rebuild-packaged-core.mjs
+
       - name: Build installer
         shell: pwsh
         run: |
