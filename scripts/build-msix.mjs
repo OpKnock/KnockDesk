@@ -274,10 +274,10 @@ function countFiles(dir) {
 //     full-trust desktop application either.
 //
 // The publisher display name is the one shown in the Store listing. It
-// has to match the display name on the Partner Center account, so it
-// comes from the same file as the publisher identity.
+// has to match the Partner Center account display name exactly; the GitHub
+// organisation name is not a substitute and Partner Center rejects it.
 const DISPLAY_NAME = 'KnockDesk';
-const PUBLISHER_DISPLAY_NAME = process.env.KNOCKDESK_PUBLISHER_DISPLAY || 'OpKnock';
+const PUBLISHER_DISPLAY_NAME = process.env.KNOCKDESK_PUBLISHER_DISPLAY || 'Mehul Wagde';
 const DEFAULT_LANGUAGE = 'en-us';
 
 // The package identity name. A Store package uses the name Partner Center
