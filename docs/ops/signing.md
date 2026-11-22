@@ -59,8 +59,12 @@ to open-source projects. Worth applying in parallel with SignPath.
 - `scripts/sign-release.ps1` — local signing with `signtool`, timestamped
   (RFC3161), verifies the signature afterwards. Refuses to run without a
   certificate rather than self-signing. Env inputs (never commit them):
-  - `KNOCKDESK_PFX_PATH` / `KNOCKDESK_PFX_PASSWORD`
+  - Local: `KNOCKDESK_PFX_PATH` / `KNOCKDESK_PFX_PASSWORD`
+  - CI: `WINDOWS_CERT_PFX_B64` / `WINDOWS_CERT_PASSWORD`
   - `KNOCKDESK_TIMESTAMP_URL` (optional, defaults to DigiCert)
+  The `-InstallerPath` parameter pins the versioned installer produced by
+  `build-nsis-installer.ps1`; without it the newest `dist\KnockDesk-Setup-*.exe`
+  is used automatically.
 - The `Build Windows installer` workflow has a signing step gated on the CI
   secrets `WINDOWS_CERT_PFX_B64` + `WINDOWS_CERT_PASSWORD`; it runs
   automatically the moment both are set in repository settings, and the

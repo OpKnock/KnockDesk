@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -107,6 +107,61 @@ test('runtime state keeps structured status instead of stringifying it', () => {
   const manager = readFileSync(resolve(root, 'resources/hermes-runtime/src/electron/services/hermes-manager.js'), 'utf8');
   assert.ok(manager.includes('status: this.lastStatus && typeof this.lastStatus === \'object\''));
   assert.ok(manager.includes('external: Boolean(this.external)'));
+});
+
+test('gateway supervisor revives only the gateway owned by KnockDesk setup', () => {
+  const require = createRequire(import.meta.url);
+  // hermes-manager.js is a staged legacy service whose axios dependency is not
+  // installed in the source workspace. Stub only that import; the supervisor
+  // branch under test does no HTTP.
+  const { Module } = require('node:module');
+  const originalLoad = Module._load;
+  Module._load = function loadWithAxiosStub(request, parent, isMain) {
+    if (request === 'axios') return function axiosStub() {};
+    return originalLoad.call(this, request, parent, isMain);
+  };
+  let hermesManagerModule;
+  try {
+    hermesManagerModule = require(resolve(root, 'resources/hermes-runtime/src/electron/services/hermes-manager.js'));
+  } finally {
+    Module._load = originalLoad;
+  }
+  const { HermesManager } = hermesManagerModule;
+
+  const makeManager = (knockdeskReady) => {
+    const manager = new HermesManager();
+    manager.state = 'ready';
+    manager._knockdeskReady = knockdeskReady;
+    manager._knockdeskPending = false;
+    manager._gatewayDownTicks = 0;
+    manager._gatewayUpSince = 0;
+    manager._gatewayRevivals = 0;
+    manager._gatewayLastReviveAt = 0;
+    manager._gatewayCommandAt = 0;
+    manager._gatewayHeldAt = 0;
+    manager.reviveCalls = 0;
+    manager._runKnockDeskSetupSoon = () => { manager.reviveCalls += 1; };
+    return manager;
+  };
+
+  const originalWarn = console.warn;
+  console.warn = () => {};
+  try {
+    const owned = makeManager(true);
+    const now = 1_000_000;
+    for (let tick = 0; tick < 5; tick += 1) {
+      owned._superviseGateway({ gateway_running: false }, now + tick * 1000);
+    }
+    assert.equal(owned.reviveCalls, 1, 'a dead owned gateway must be revived once');
+
+    const notOwned = makeManager(false);
+    for (let tick = 0; tick < 5; tick += 1) {
+      notOwned._superviseGateway({ gateway_running: false }, now + tick * 1000);
+    }
+    assert.equal(notOwned.reviveCalls, 0, 'a gateway not owned by KnockDesk setup must be left alone');
+  } finally {
+    console.warn = originalWarn;
+  }
 });
 
 test('Hermes command approval is on by default; unattended mode requires explicit opt-in', () => {
@@ -258,9 +313,40 @@ test('first-run setup installs every first-party plugin into the supplied Hermes
     ]) {
       assert.ok(existsSync(join(home, relativePath)), 'missing installed plugin file: ' + relativePath);
     }
+
+    // Same version, stale code: the installer must still detect the content
+    // drift and repair the installed copy. Otherwise a source fix never
+    // reaches machines that already have the plugin installed.
+    const installedTool = join(home, 'plugins/knockdesk-computer/tool.py');
+    const bundledTool = resolve(root, 'resources/hermes-plugins/knockdesk-computer/tool.py');
+    writeFileSync(installedTool, '# stale installed plugin\n', 'utf8');
+    const repaired = plugins.ensureKnockDeskComputerPlugin(home);
+    assert.equal(repaired.ok, true, repaired.error);
+    assert.equal(repaired.changed, true, 'stale plugin code must be reinstalled even when the version matches');
+    assert.equal(readFileSync(installedTool, 'utf8'), readFileSync(bundledTool, 'utf8'));
   } finally {
     rmSync(home, { recursive: true, force: true });
   }
+});
+
+test('computer_task cleanup regression tests run against the real plugin handler', () => {
+  const testFile = resolve(root, 'scripts/test_computer_task.py');
+  const candidates = process.platform === 'win32'
+    ? [['py', ['-3']], ['python', []]]
+    : [['python3', []], ['python', []]];
+  let executed = false;
+  for (const [command, prefix] of candidates) {
+    const run = spawnSync(command, [...prefix, testFile], { cwd: root, encoding: 'utf8' });
+    if (run.error && run.error.code === 'ENOENT') continue;
+    assert.equal(
+      run.status,
+      0,
+      `${command} ${prefix.join(' ')} ${testFile} failed:\n${run.stdout || ''}\n${run.stderr || ''}`,
+    );
+    executed = true;
+    break;
+  }
+  assert.ok(executed, 'No Python interpreter found to run computer_task regression tests.');
 });
 
 test('staging bundles the plugin source used by its first-run installer', () => {

@@ -93,6 +93,8 @@ def handle_computer_task(args: Dict[str, Any], **_kw: Any) -> str:
         return _reply(success=False, error="KnockDesk desktop app is not connected (no bridge).")
     headers = {"Authorization": f"Bearer {key}"}
 
+    task_id = None
+    finished = False
     try:
         with httpx.Client(timeout=httpx.Timeout(POLL_S + 15, connect=5)) as client:
             started = client.post(
@@ -124,6 +126,7 @@ def handle_computer_task(args: Dict[str, Any], **_kw: Any) -> str:
                 if not body.get("ok"):
                     return _reply(success=False, error=body.get("error", "wait failed"), task_id=task_id)
                 if body.get("done"):
+                    finished = True
                     result = body.get("result") or {}
                     status = result.get("status")
                     return _reply(
@@ -136,8 +139,7 @@ def handle_computer_task(args: Dict[str, Any], **_kw: Any) -> str:
                         error=result.get("error"),
                         task_id=task_id,
                     )
-            # वक़्त ख़त्म — task रोक दो, वरना mouse लटका रहेगा।
-            client.post(f"{url}/v1/computer/stop", headers=headers, json={"id": task_id})
+            # वक़्त ख़त्म — बाकी काम finally block करेगा
             return _reply(success=False, status="timeout", task_id=task_id,
                           error=f"Computer task exceeded {MAX_WAIT_S // 60} minutes and was stopped.")
     except httpx.HTTPError as err:
@@ -146,6 +148,15 @@ def handle_computer_task(args: Dict[str, Any], **_kw: Any) -> str:
     except Exception as err:  # noqa: BLE001
         logger.exception("computer_task failed")
         return _reply(success=False, error=str(err))
+    finally:
+        if task_id and not finished:
+            try:
+                with httpx.Client(timeout=5) as client:
+                    client.post(f"{url}/v1/computer/stop", headers=headers, json={"id": task_id})
+            except Exception as stop_err:  # noqa: BLE001
+                # Task id ka pata hai magar stop request nahi gaya — yahan
+                # chup rehna theek nahi: agent abhi bhi mouse chala sakta hai.
+                logger.warning("computer_task cleanup stop failed: %s", stop_err)
 
 
 def register(ctx) -> None:
