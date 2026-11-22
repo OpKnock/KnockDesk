@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KnockDesk Access — Local Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #05070a;
+            color: #e2e8f0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .glass {
+            background: rgba(13, 17, 23, 0.8);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .emerald-glow {
+            box-shadow: 0 0 40px rgba(16, 185, 129, 0.05);
+        }
+
+        .active-glow {
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        @media (max-width: 640px) {
+            .mobile-stack {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .hide-on-mobile {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body class="min-h-screen selection:bg-emerald-500/30">
+    <div class="max-w-5xl mx-auto px-4 py-6 md:py-12 space-y-6 md:space-y-10">
+
+        <!-- Header Section -->
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div class="flex items-center gap-5">
+                <div
+                    class="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center border border-emerald-500/20 active-glow">
+                    <i data-lucide="shield-check" class="text-emerald-500 w-7 h-7"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-white">KnockDesk Access</h1>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <p class="text-[10px] md:text-xs text-gray-400 uppercase tracking-[0.2em] font-black">Local-only build — no license server</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Auth & Refresh -->
+            <div class="flex items-center w-full md:w-auto gap-3">
+                <div class="relative flex-1 md:flex-initial">
+                    <i data-lucide="lock" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"></i>
+                    <input id="adminPass" type="password" placeholder="Admin Pwd"
+                        class="w-full md:w-44 bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+                        value="">
+                </div>
+                <button onclick="loadLicenses()"
+                    class="p-2.5 hover:bg-white/5 rounded-xl border border-white/5 transition-all active:scale-90">
+                    <i data-lucide="refresh-cw" class="w-5 h-5 text-gray-400"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Stats & Action Card -->
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
+            <!-- Total Count Stat -->
+            <div
+                class="md:col-span-4 glass p-6 rounded-3xl emerald-glow border-emerald-500/10 flex flex-col justify-between group overflow-hidden relative">
+                <i data-lucide="key"
+                    class="absolute -right-4 -bottom-4 text-emerald-500/5 w-32 h-32 rotate-12 group-hover:rotate-0 transition-transform duration-700"></i>
+                <p class="text-[10px] text-emerald-500 uppercase tracking-widest font-black mb-1">Live Licenses</p>
+                <div class="flex items-baseline gap-2">
+                    <span id="totalCount" class="text-6xl font-bold text-white tabular-nums tracking-tighter">--</span>
+                    <span class="text-gray-500 font-medium">Active</span>
+                </div>
+            </div>
+
+            <!-- CTA Card -->
+            <div
+                class="md:col-span-8 glass p-6 md:p-8 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative border-white/5">
+                <div class="relative z-10 text-center md:text-left">
+                    <h3 class="text-xl font-bold text-white mb-1">Ship New Access</h3>
+                    <p class="text-gray-400 text-sm max-w-sm">Instant, hardware-locked key generation. Keys are locked
+                        to the first PC that uses them.</p>
+                </div>
+                <!-- Generate Button -->
+                <button id="genBtn" onclick="createLicense()"
+                    class="w-full md:w-auto bg-emerald-550 hover:bg-emerald-500 bg-emerald-600 text-white px-8 py-4 rounded-2xl font-bold transition-all shadow-xl shadow-emerald-500/10 active:scale-[0.97] flex items-center justify-center gap-3 relative z-10 group">
+                    <i data-lucide="zap" class="w-5 h-5 group-hover:fill-current"></i>
+                    <span>Generate Key</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Desktop Table / Mobile List -->
+        <div class="glass rounded-[2rem] overflow-hidden border-white/5 shadow-2xl">
+            <!-- Desktop Table Header -->
+            <div
+                class="hidden md:grid grid-cols-12 gap-4 px-8 py-5 bg-white/[0.03] border-b border-white/5 text-[11px] font-black uppercase tracking-widest text-gray-500">
+                <div class="col-span-4">License Key</div>
+                <div class="col-span-3">Machine Fingerprint</div>
+                <div class="col-span-2">Status</div>
+                <div class="col-span-2">Activated At</div>
+                <div class="col-span-1 text-right">Actions</div>
+            </div>
+
+            <!-- List Container -->
+            <div id="licenseBody" class="divide-y divide-white/5">
+                <!-- Data will load here -->
+                <div class="p-20 text-center text-gray-600 flex flex-col items-center gap-4">
+                    <div
+                        class="w-10 h-10 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin">
+                    </div>
+                    <span class="font-bold tracking-widest text-xs uppercase">Initializing HQ Terminal...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Copy Toast Notification -->
+    <div id="toast"
+        class="fixed bottom-6 inset-x-4 md:inset-x-auto md:right-8 bg-emerald-600/90 backdrop-blur-md text-white px-6 py-4 rounded-2xl shadow-2xl translate-y-32 opacity-0 transition-all duration-500 flex items-center gap-3 z-50 pointer-events-none">
+        <i data-lucide="check-circle" class="w-5 h-5"></i>
+        <span class="font-bold text-sm tracking-wide" id="toastMsg">Key copied to clipboard!</span>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            const tm = document.getElementById('toastMsg');
+            tm.innerText = msg;
+            t.classList.remove('translate-y-32', 'opacity-0');
+            t.classList.add('translate-y-0', 'opacity-100');
+            setTimeout(() => {
+                t.classList.add('translate-y-32', 'opacity-0');
+                t.classList.remove('translate-y-0', 'opacity-100');
+            }, 3500);
+        }
+
+        async function api(payload) {
+            const pass = document.getElementById('adminPass').value;
+            try {
+                const res = await fetch('http://127.0.0.1:1/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...payload, password: pass })
+                });
+                return await res.json();
+            } catch (e) {
+                return { success: false, message: 'Server Unreachable' };
+            }
+        }
+
+        async function loadLicenses() {
+            const result = await api({ action: 'list' });
+            if (result.success) {
+                document.getElementById('totalCount').innerText = result.data.length;
+                const body = document.getElementById('licenseBody');
+
+                if (result.data.length === 0) {
+                    body.innerHTML = '<div class="p-12 text-center text-gray-500 font-bold uppercase tracking-widest text-xs">No licenses found yet.</div>';
+                    return;
+                }
+
+                body.innerHTML = result.data.map(l => {
+                    const statusClass = l.status === 'active' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500';
+                    const dateStr = l.activated_at ? new Date(l.activated_at).toLocaleDateString('en-GB') : 'PENDING';
+                    const usedText = l.machine_fingerprint ? 'LOCKED' : 'UNUSED';
+                    const usedColor = l.machine_fingerprint ? 'text-emerald-500' : 'text-orange-500/60';
+
+                    return `
+                        <div class="flex flex-col md:grid md:grid-cols-12 items-center gap-4 px-6 py-6 md:px-8 hover:bg-white/[0.015] transition-all group border-l-2 border-transparent hover:border-emerald-500/50">
+                            <!-- Key Info -->
+                            <div class="col-span-4 w-full flex items-center justify-between md:justify-start gap-4">
+                                <span class="font-mono text-base md:text-sm font-bold text-white tracking-wider truncate py-1 px-3 bg-white/5 rounded-lg border border-white/5">
+                                    ${l.license_key}
+                                </span>
+                                <button onclick="copyToClipboard('${l.license_key}')" class="p-2 md:opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/10 rounded-lg active:scale-90 flex items-center gap-2 text-emerald-500 md:text-gray-400">
+                                    <i data-lucide="copy" class="w-4 h-4"></i>
+                                    <span class="md:hidden text-[10px] font-bold uppercase tracking-widest">Copy</span>
+                                </button>
+                            </div>
+
+                            <!-- Mobile Divider Label -->
+                            <div class="md:hidden w-full flex justify-between text-[10px] font-black uppercase text-gray-600 pt-2 border-t border-white/5">
+                                <span>Fingerprint</span>
+                                <span>Status</span>
+                                <span>Date</span>
+                            </div>
+
+                            <div class="col-span-3 w-full md:w-auto font-mono text-[10px] md:text-xs truncate ${usedColor} mb-2 md:mb-0">
+                                ${l.machine_fingerprint || 'WAITING_FOR_USER'}
+                            </div>
+
+                            <div class="col-span-2 w-full md:w-auto">
+                                <span class="px-2 py-1 rounded text-[10px] font-black uppercase ${statusClass} inline-block">
+                                    ${l.status} — ${usedText}
+                                </span>
+                            </div>
+
+                            <div class="col-span-2 w-full md:w-auto text-[10px] md:text-xs text-gray-500 font-bold uppercase tabular-nums">
+                                ${dateStr}
+                            </div>
+
+                            <div class="col-span-1 w-full md:w-auto text-right">
+                                <button onclick="revokeLicense('${l.id}')" class="w-full md:w-auto flex items-center justify-center gap-2 md:block text-red-500/40 hover:text-red-500 hover:bg-red-500/10 p-2 rounded-xl transition-all">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    <span class="md:hidden text-xs font-bold uppercase">Terminate License</span>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                lucide.createIcons();
+            } else {
+                alert('Auth Error: Please enter a valid Admin Password.');
+            }
+        }
+
+        async function createLicense() {
+            const btn = document.getElementById('genBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> Processing...';
+            lucide.createIcons();
+
+            const result = await api({ action: 'create' });
+
+            btn.disabled = false;
+            btn.innerHTML = '<i data-lucide="zap" class="w-5 h-5"></i> Generate Key';
+            lucide.createIcons();
+
+            if (result.success) {
+                copyToClipboard(result.key);
+                loadLicenses();
+                showToast(`SUCCESS: ${result.key} saved & copied. Send it now! 🚀`);
+            } else {
+                alert('Connection Failed: Check Password.');
+            }
+        }
+
+        async function revokeLicense(id) {
+            if (confirm('TERMINATE ACCESS? This user will be permanently locked out.')) {
+                const result = await api({ action: 'revoke', license_id: id });
+                if (result.success) {
+                    showToast('Access terminated successfully.');
+                    loadLicenses();
+                }
+            }
+        }
+
+        function copyToClipboard(text) {
+            const el = document.createElement('textarea');
+            el.value = text;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            showToast('Ready for WhatsApp! Key copied 🚀');
+        }
+
+        // Auto-load
+        loadLicenses();
+    </script>
+</body>
+
+</html>
