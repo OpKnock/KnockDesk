@@ -198,17 +198,9 @@ class KnockDeskBridge {
     } catch {
       /* pehli dafa — neeche dekho */
     }
-    // One-time rebrand migration: purani key apnao (taake Hermes ki .env
-    // aur gateway restart na ho), naye naam se save karo.
-    try {
-      const legacy = path.join(this._userDataDir, 'knockdesk-bridge-key');
-      const old = fs.readFileSync(legacy, 'utf8').trim();
-      if (valid(old)) {
-        try { fs.writeFileSync(file, old, { mode: 0o600 }); } catch { /* save na ho saki — key waise bhi return hogi */ }
-        return old;
-      }
-    } catch { /* purani key nahi — neeche nayi ban jayegi */ }
-
+    // Purane rebrand migration ka yahan zikr tha magar `legacy` aur `file`
+    // dono ek hi naam the — yaani wo hamesha no-op raha. Ab sirf ek hi
+    // canonical key file hai; duplicate naam ka bhoot hata diya hai.
     const fresh = crypto.randomBytes(32).toString('hex');
     try {
       fs.writeFileSync(file, fresh, { mode: 0o600 });

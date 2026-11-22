@@ -19,6 +19,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOL_PATH = ROOT / "resources" / "hermes-plugins" / "knockdesk-computer" / "tool.py"
+RUNNER_PATH = ROOT / "resources" / "knockdesk-computer" / "runner.py"
 
 
 class FakeHTTPError(Exception):
@@ -97,16 +98,16 @@ class FakeClient:
         return event
 
 
-def _load_tool() -> types.ModuleType:
-    spec = importlib.util.spec_from_file_location("knockdesk_computer_tool", TOOL_PATH)
+def _load_module(path: Path, name: str) -> types.ModuleType:
+    spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
-        raise RuntimeError(f"cannot load {TOOL_PATH}")
+        raise RuntimeError(f"cannot load {path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-TOOL = _load_tool()
+TOOL = _load_module(TOOL_PATH, "knockdesk_computer_tool")
 
 
 def _done_payload() -> dict:
@@ -206,6 +207,35 @@ class ComputerTaskCleanupTests(unittest.TestCase):
         self.assertFalse(reply["success"])
         self.assertTrue(reply["busy"])
         self.assertEqual(HARNESS.stop_calls, [])
+
+
+class ComputerRunnerFallbackTests(unittest.TestCase):
+    def test_missing_overlay_module_still_exposes_cursor_cleanup(self) -> None:
+        fake_pyautogui = types.ModuleType("pyautogui")
+        fake_pyautogui.FAILSAFE = False
+        fake_pyautogui.size = lambda: (1920, 1080)
+        fake_pil = types.ModuleType("PIL")
+        fake_image = types.ModuleType("PIL.Image")
+        fake_image.LANCZOS = 1
+        fake_pil.Image = fake_image
+
+        names = ("pyautogui", "PIL", "PIL.Image", "knockdesk_overlay")
+        saved = {name: sys.modules.get(name) for name in names}
+        sys.modules["pyautogui"] = fake_pyautogui
+        sys.modules["PIL"] = fake_pil
+        sys.modules["PIL.Image"] = fake_image
+        sys.modules["knockdesk_overlay"] = None
+        try:
+            runner = _load_module(RUNNER_PATH, "knockdesk_computer_runner")
+            self.assertIsNone(runner.AgentOverlay)
+            self.assertTrue(callable(runner.restore_system_cursors))
+            self.assertIs(runner.restore_system_cursors(), False)
+        finally:
+            for name, previous in saved.items():
+                if previous is None:
+                    sys.modules.pop(name, None)
+                else:
+                    sys.modules[name] = previous
 
 
 if __name__ == "__main__":
