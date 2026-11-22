@@ -44,3 +44,13 @@ certificate is present via environment/secret store, and refuses otherwise
 (no self-signed certs committed, no credentials in Actions). CI builds and
 verifies the UNSIGNED installer; a separate gated job signs only when
 `WINDOWS_CERT_PFX_B64` + `WINDOWS_CERT_PASSWORD` secrets exist.
+
+## Payload note (why the release installer is host-built)
+The Hermes venv, the computer-use venv, the hermes `src/node_modules` tree,
+and the dashboard dists are git-ignored build-host trees (hundreds of MB,
+never committed). A checkout-only CI runner stages only tracked files, so
+the CI job now fails loudly at a payload-verification step rather than
+packaging an installer without the agent runtimes. The shipped release
+installer is built on the host that holds those trees; to make CI produce
+the release itself, commit the payloads via LFS or rebuild them from
+`requirements-darwin.txt`-style pins in the workflow.
